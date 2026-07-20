@@ -9,6 +9,8 @@ import { resetErrorWindow } from "./reset-error-window";
 import { rebuildIndexRule } from "./rebuild-index";
 import { restartWorkerRule } from "./restart-worker";
 import { scaleConcurrencyRule } from "./scale-concurrency";
+import { rerunJobRule } from "./rerun-job";
+import { clearCacheRule } from "./clear-cache";
 
 // Regole eseguite dallo scheduler/watchdog in modo AUTONOMO (cicli periodici e
 // /run-now). Solo operazioni SICURE e IDEMPOTENTI con trigger metrici chiari.
@@ -27,6 +29,15 @@ export const PROPOSAL_DISPATCH_RULES: Record<string, AutoFixRule> = {
   rebuild_index:      rebuildIndexRule,
   restart_worker:     restartWorkerRule,
   scale_concurrency:  scaleConcurrencyRule,
+  rerun_job:          rerunJobRule,
+  clear_cache:        clearCacheRule,
+};
+
+// Task #891 — Motivi specifici per gli actionKind noti ma NON eseguibili in
+// automatico. L'UI li mostra al posto del vecchio messaggio generico "applica a mano".
+export const NON_DISPATCHABLE_REASONS: Record<string, string> = {
+  rotate_secret: "rotate_secret richiede accesso manuale al vault dei secret",
+  manual_only: "la proposta è dichiarata esplicitamente come azione manuale",
 };
 
 export interface AutoFixOutcome {

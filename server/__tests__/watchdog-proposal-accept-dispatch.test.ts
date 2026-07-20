@@ -121,6 +121,11 @@ vi.mock("../ai/watchdog/auto-fix", () => ({
     restart_worker:    { id: "restart_worker",    run: restartWorkerRunMock },
     scale_concurrency: { id: "scale_concurrency", run: scaleConcurrencyRunMock },
   },
+  // Task #891 — motivi specifici per azioni note ma non automatizzabili.
+  NON_DISPATCHABLE_REASONS: {
+    rotate_secret: "rotate_secret richiede accesso manuale al vault dei secret",
+    manual_only: "la proposta è dichiarata esplicitamente come azione manuale",
+  },
 }));
 
 import aiWatchdogRouter from "../routes/admin/ai-watchdog";
@@ -228,7 +233,7 @@ describe("POST /api/admin/watchdog/proposals/:id/accept — dispatcher auto-fix 
     expect(scaleConcurrencyRunMock).toHaveBeenCalledTimes(1);
   });
 
-  it("ritorna autoApplied=false con message manuale quando la regola non si applica (applied=false)", async () => {
+  it("ritorna autoApplied=false con motivo specifico quando la regola non si applica (applied=false)", async () => {
     dbSelectMock.mockResolvedValue([makeProposalLog("rebuild_index")]);
     rebuildIndexRunMock.mockResolvedValue({
       applied: false,
@@ -241,31 +246,49 @@ describe("POST /api/admin/watchdog/proposals/:id/accept — dispatcher auto-fix 
     expect(res.status).toBe(200);
     expect(res.body.dispatch.action).toBe("rebuild_index");
     expect(res.body.dispatch.autoApplied).toBe(false);
-    expect(res.body.dispatch.message).toBe("Azione manuale richiesta");
+    expect(res.body.dispatch.message).toBe(
+      "Azione registrata — non eseguibile in automatico: indice già valido — nessun rebuild necessario",
+    );
   });
 
-  it("mantiene dispatch=null e non esegue regole per proposte riskLevel=high", async () => {
+  // Task #891 — il gate riskLevel=high è stato rimosso: l'autorizzazione è
+  // nella confirmation dialog lato client. Il server esegue anche le high.
+  it("esegue la regola anche per proposte riskLevel=high (gate rimosso, Task #891)", async () => {
     dbSelectMock.mockResolvedValue([makeProposalLog("rebuild_index", "high")]);
+    rebuildIndexRunMock.mockResolvedValue({ applied: true, summary: "Indice ricostruito" });
 
     const res = await request(buildApp())
       .post("/api/admin/watchdog/proposals/proposal-id-123/accept");
 
     expect(res.status).toBe(200);
-    expect(res.body.dispatch).toBeNull();
-    expect(rebuildIndexRunMock).not.toHaveBeenCalled();
+    expect(res.body.dispatch.autoApplied).toBe(true);
+    expect(rebuildIndexRunMock).toHaveBeenCalledTimes(1);
   });
 
-  it("mantiene dispatch=null per azioni non mappate (manual_only)", async () => {
+  it("ritorna motivo specifico per azioni non automatizzabili (manual_only)", async () => {
     dbSelectMock.mockResolvedValue([makeProposalLog("manual_only")]);
 
     const res = await request(buildApp())
       .post("/api/admin/watchdog/proposals/proposal-id-123/accept");
 
     expect(res.status).toBe(200);
-    expect(res.body.dispatch).toBeNull();
+    expect(res.body.dispatch.autoApplied).toBe(false);
+    expect(res.body.dispatch.message).toContain("Azione registrata — non eseguibile in automatico");
+    expect(res.body.dispatch.summary).toContain("azione manuale");
   });
 
-  it("mantiene dispatch=null se nessuno snapshot è disponibile", async () => {
+  it("ritorna motivo specifico per rotate_secret (non automatizzabile)", async () => {
+    dbSelectMock.mockResolvedValue([makeProposalLog("rotate_secret")]);
+
+    const res = await request(buildApp())
+      .post("/api/admin/watchdog/proposals/proposal-id-123/accept");
+
+    expect(res.status).toBe(200);
+    expect(res.body.dispatch.autoApplied).toBe(false);
+    expect(res.body.dispatch.summary).toContain("vault");
+  });
+
+  it("ritorna motivo 'snapshot assente' se nessuno snapshot è disponibile", async () => {
     dbSelectMock.mockResolvedValue([makeProposalLog("rebuild_index")]);
     getLatestSnapshotMock.mockReturnValue(null);
 
@@ -273,7 +296,8 @@ describe("POST /api/admin/watchdog/proposals/:id/accept — dispatcher auto-fix 
       .post("/api/admin/watchdog/proposals/proposal-id-123/accept");
 
     expect(res.status).toBe(200);
-    expect(res.body.dispatch).toBeNull();
+    expect(res.body.dispatch.autoApplied).toBe(false);
+    expect(res.body.dispatch.summary).toContain("snapshot");
     expect(rebuildIndexRunMock).not.toHaveBeenCalled();
   });
 });

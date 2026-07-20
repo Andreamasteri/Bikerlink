@@ -54,7 +54,8 @@ export function relativeTimeIt(iso: string, now: number = Date.now()): string {
 
 interface Props {
   proposals: WatchdogLog[];
-  onAccept: (id: string) => void;
+  /** Task #891 — riskLevel passato al parent per la confirmation dialog su "high". */
+  onAccept: (id: string, riskLevel?: string | null) => void;
   onReject: (id: string) => void;
   busyId?: string | null;
   /** Task #890 — problemi high/critical dall'ultimo snapshot, per decidere se
@@ -66,7 +67,7 @@ interface Props {
 }
 
 function ProposalRow({ p, onAccept, onReject, busy }: {
-  p: WatchdogLog; onAccept: (id: string) => void; onReject: (id: string) => void; busy: boolean;
+  p: WatchdogLog; onAccept: (id: string, riskLevel?: string | null) => void; onReject: (id: string) => void; busy: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const det = (p.details ?? {}) as ProposalDetails;
@@ -120,7 +121,7 @@ function ProposalRow({ p, onAccept, onReject, busy }: {
             <TouchableOpacity style={[styles.btn, styles.reject]} onPress={() => onReject(p.id)}>
               <Text style={styles.btnText}>Rifiuta</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btn, styles.accept, { backgroundColor: color }]} onPress={() => onAccept(p.id)}>
+            <TouchableOpacity style={[styles.btn, styles.accept, { backgroundColor: color }]} onPress={() => onAccept(p.id, det.riskLevel ?? null)}>
               <Text style={styles.btnText}>{det.actionLabel ?? "Accetta"}</Text>
             </TouchableOpacity>
           </>

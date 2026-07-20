@@ -180,10 +180,10 @@ router.post("/watchdog/proposals/:id/accept", async (req, res) => {
   if (!adminId) return sendError(res, 401, "Sessione scaduta");
   await markProposalAccepted(id, adminId);
 
-  // Task #2554 — dispatcher: se la proposta indica un'azione automatizzabile
-  // (releaseLockZombie / clearCacheDegraded / resetErrorWindow) la eseguiamo
-  // qui dopo l'accept. Per azioni non mappate o riskLevel="high" restiamo
-  // manual-only e ritorniamo dispatch=null.
+  // Task #2554/#891 — dispatcher: se la proposta indica un'azione automatizzabile
+  // la eseguiamo qui dopo l'accept. Il gate riskLevel="high" è stato rimosso:
+  // il rischio è già stato valutato dall'admin (confirmation dialog lato client).
+  // Per azioni note ma non automatizzabili ritorniamo un motivo specifico.
   let dispatch: { action: string; applied: boolean; autoApplied: boolean; summary: string; message: string } | null = null;
   try {
     const [row] = await db.select().from(aiWatchdogLog).where(eq(aiWatchdogLog.id, id)).limit(1);
@@ -197,30 +197,41 @@ router.post("/watchdog/proposals/:id/accept", async (req, res) => {
         : typeof rawAction === "string"
           ? rawAction
           : null;
-    const riskLevel = typeof details.riskLevel === "string" ? details.riskLevel : null;
-    if (action && riskLevel !== "high") {
+    if (action) {
+      // Usa il registro PROPOSAL_DISPATCH_RULES (solo accept-time) — NON
+      // AUTO_FIX_RULES (scheduler-driven) — per evitare esecuzione autonoma
+      // di operazioni ad alto impatto fuori dal controllo dell'admin.
+      const { PROPOSAL_DISPATCH_RULES, NON_DISPATCHABLE_REASONS } = await import("../../ai/watchdog/auto-fix");
+      const rule = PROPOSAL_DISPATCH_RULES[action];
       const snap = getLatestSnapshot();
-      if (snap) {
-        // Usa il registro PROPOSAL_DISPATCH_RULES (solo accept-time) — NON
-        // AUTO_FIX_RULES (scheduler-driven) — per evitare esecuzione autonoma
-        // di operazioni ad alto impatto fuori dal controllo dell'admin.
-        const { PROPOSAL_DISPATCH_RULES } = await import("../../ai/watchdog/auto-fix");
-        const rule = PROPOSAL_DISPATCH_RULES[action];
-        if (rule) {
-          const out = await rule.run(snap);
-          const autoApplied = out.applied;
-          const summary = out.applied ? out.summary : out.reason;
-          dispatch = {
-            action,
-            applied: out.applied,
-            autoApplied,
-            summary,
-            message: autoApplied ? `Fix applicato automaticamente: ${summary}` : "Azione manuale richiesta",
-          };
-        }
+      if (rule && snap) {
+        const out = await rule.run(snap);
+        const autoApplied = out.applied;
+        const summary = out.applied ? out.summary : out.reason;
+        dispatch = {
+          action,
+          applied: out.applied,
+          autoApplied,
+          summary,
+          message: autoApplied
+            ? `Fix applicato automaticamente: ${summary}`
+            : `Azione registrata — non eseguibile in automatico: ${summary}`,
+        };
+      } else {
+        // Azione nota ma senza regola di dispatch (es. rotate_secret) oppure
+        // snapshot assente: ritorniamo un motivo specifico invece di dispatch=null.
+        const reason = !snap && rule
+          ? "nessun snapshot di sistema disponibile — riprova dopo un ciclo watchdog"
+          : NON_DISPATCHABLE_REASONS[action] ?? `nessuna regola di esecuzione automatica per "${action}"`;
+        dispatch = {
+          action,
+          applied: false,
+          autoApplied: false,
+          summary: reason,
+          message: `Azione registrata — non eseguibile in automatico: ${reason}`,
+        };
       }
     }
-    // Azioni non mappate a nessuna regola o manual_only: dispatch null → frontend mostra messaggio manuale.
   } catch (err) {
     console.warn("[watchdog] dispatch error (non-fatal):", err);
   }

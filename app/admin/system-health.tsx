@@ -173,7 +173,10 @@ export default function SystemHealthScreen() {
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
-  const onAccept = async (id: string) => {
+  // Task #891 — accetta ed esegue: il fix parte subito server-side; per le
+  // proposte risk="high" chiediamo prima conferma esplicita (il server non
+  // ha più il gate — l'autorizzazione è nel click confermato).
+  const doAccept = async (id: string) => {
     setBusyProposalId(id);
     try {
       const resp = await apiRequest("POST", `/api/admin/watchdog/proposals/${id}/accept`);
@@ -182,12 +185,32 @@ export default function SystemHealthScreen() {
       const dispatch = data?.dispatch;
       if (dispatch?.autoApplied) {
         Alert.alert("✅ Fix applicato automaticamente", dispatch.summary ?? dispatch.message ?? "Operazione completata con successo.");
+      } else if (dispatch) {
+        Alert.alert(
+          "Azione registrata",
+          `Non eseguibile in automatico: ${dispatch.summary ?? "motivo non disponibile"}`,
+        );
       } else {
-        Alert.alert("Proposta accettata", "Ricorda: l'azione resta MANUALE. Esegui tu il fix.");
+        Alert.alert("Proposta accettata", "Nessuna azione automatica associata a questa proposta.");
       }
     } catch (err) {
       Alert.alert("Errore", (err as Error).message);
     } finally { setBusyProposalId(null); }
+  };
+
+  const onAccept = (id: string, riskLevel?: string | null) => {
+    if (riskLevel === "high") {
+      Alert.alert(
+        "Rischio alto — confermi l'esecuzione automatica?",
+        "Questa proposta è classificata a rischio alto. Il fix verrà eseguito immediatamente.",
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Sì, esegui", style: "destructive", onPress: () => { void doAccept(id); } },
+        ],
+      );
+      return;
+    }
+    void doAccept(id);
   };
 
   const onReject = async (id: string) => {
