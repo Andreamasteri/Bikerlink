@@ -384,6 +384,40 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     }
   }
 
+  // Routing self-hosted non plausibile (Task #941) — segnale "high" emesso dal
+  // routing-correctness-collector quando GH o Valhalla rispondono 2xx ma il
+  // percorso restituito non è plausibile (distanza/durata anomale o fuori range).
+  // Non è un timeout (che genera già severity critical → catturato dal loop generico
+  // sotto): è una risposta "corrotta" con contenuto errato (grafo danneggiato,
+  // profilo mancante). Severity "high" → NON catturato dal loop critical-only:
+  // serve un blocco dedicato per garantire la push agli admin.
+  // Throttle: 10 min per engine (chiave indipendente così i due engine non
+  // si throttlano a vicenda).
+  for (const routingEngine of ["graphhopper", "valhalla"] as const) {
+    const routingPlausibilityProblem = snap.problems.find(
+      (p) => p.id === `horus.routing.${routingEngine}.correct` && p.severity === "high",
+    );
+    if (routingPlausibilityProblem) {
+      await emitWatchdogAlert({ problem: routingPlausibilityProblem, score: snap.score, status: snap.status });
+      if (shouldSend(`routing.${routingEngine}.correct.high`)) {
+        let detail: { reason?: string; distanceKm?: number; durationMin?: number; impliedKmh?: number } = {};
+        try { detail = JSON.parse(routingPlausibilityProblem.detail ?? "{}"); } catch { /* use defaults */ }
+        const reason = detail.reason ?? routingPlausibilityProblem.title;
+        const n = await sendSystemAlertPushToAdmins(
+          `⚠️ Routing ${routingEngine}: percorso non plausibile`,
+          `${routingEngine} risponde ma il percorso è anomalo (${reason}). Verifica grafo e salute di ${routingEngine} sul ThinkCentre.`,
+          { type: "watchdog_routing_plausibility", engine: routingEngine, reason, score: snap.score },
+        );
+        sentCount += n;
+        await writeWatchdogLog({
+          kind: "alert", scope: `horus.routing.${routingEngine}.correct`, status: "ok",
+          summary: `Alert routing ${routingEngine} non plausibile inviato a ${n} admin`,
+          details: { sent: n, reason, distanceKm: detail.distanceKm, durationMin: detail.durationMin, impliedKmh: detail.impliedKmh },
+        });
+      }
+    }
+  }
+
   // Crash-free rate 24h (Task #395) — segnale critical/warn emesso dall'error-collector
   // quando il tasso di sessioni senza crash scende sotto soglia. Blocco dedicato
   // perché il loop generico sotto logga solo { sent, suggestion } perdendo tutti i
