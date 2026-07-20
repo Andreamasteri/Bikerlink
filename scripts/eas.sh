@@ -2,7 +2,7 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #  BikerLink — EAS CLI wrapper
 #
-#  Usa eas-cli tramite npx con versione ^20.1.0 (npx usa la cache locale,
+#  Usa eas-cli tramite npx con versione ^21.0.0 (npx usa la cache locale,
 #  quindi non scarica il pacchetto ad ogni run dopo la prima volta).
 #  La versione minima è imposta anche in eas.json "cli.version": ">= 20.0.0".
 #
@@ -135,7 +135,7 @@ if [[ "$FIRST_ARG" == "build" ]]; then
 fi
 
 if [[ "$_USE_NPX" == "true" ]]; then
-  exec "$EAS_BIN" --yes "eas-cli@^20.1.0" "$@"
+  exec "$EAS_BIN" --yes "eas-cli@^21.0.0" "$@"
 else
   exec "$EAS_BIN" "$@"
 fi
