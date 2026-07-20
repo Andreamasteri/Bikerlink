@@ -57,6 +57,12 @@ interface Props {
   onAccept: (id: string) => void;
   onReject: (id: string) => void;
   busyId?: string | null;
+  /** Task #890 — problemi high/critical dall'ultimo snapshot, per decidere se
+   *  mostrare il placeholder "Genera proposte" quando pendingProposals è vuoto. */
+  activeHighProblems?: number;
+  /** Task #890 — callback del pulsante "Genera proposte ora" nello stato vuoto. */
+  onProposeNow?: () => void;
+  proposingNow?: boolean;
 }
 
 function ProposalRow({ p, onAccept, onReject, busy }: {
@@ -124,8 +130,34 @@ function ProposalRow({ p, onAccept, onReject, busy }: {
   );
 }
 
-export function ProposalsCard({ proposals, onAccept, onReject, busyId }: Props) {
+export function ProposalsCard({ proposals, onAccept, onReject, busyId, activeHighProblems, onProposeNow, proposingNow }: Props) {
+  // Task #890 — se non ci sono proposte pendenti ma ci sono problemi HIGH/CRITICAL
+  // attivi, mostra uno stato vuoto esplicito con CTA invece di sparire del tutto.
   if (!proposals.length) {
+    if (activeHighProblems && activeHighProblems > 0 && onProposeNow) {
+      return (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>Nessuna proposta pendente</Text>
+          <Text style={styles.emptyBody}>
+            {activeHighProblems} {activeHighProblems === 1 ? "problema" : "problemi"} HIGH/CRITICAL attivi —
+            premi il pulsante per chiedere all&apos;AI di analizzarli e generare nuove proposte.
+          </Text>
+          <TouchableOpacity
+            style={styles.emptyBtn}
+            onPress={onProposeNow}
+            disabled={proposingNow}
+            activeOpacity={0.7}
+          >
+            {proposingNow ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : null}
+            <Text style={styles.emptyBtnText}>
+              {proposingNow ? "Generazione…" : "Genera proposte ora"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
     return <Text style={styles.empty}>Nessuna proposta AI pendente.</Text>;
   }
   return (
@@ -163,4 +195,16 @@ const styles = StyleSheet.create({
   reject: { backgroundColor: "#4b5563" },
   btnText: { color: "#fff", fontWeight: "700" as const, fontSize: 13 },
   empty: { color: "#9ca3af", textAlign: "center" as const, padding: 16 },
+  // Task #890 — stato vuoto con CTA quando ci sono problemi HIGH ma 0 proposte pendenti.
+  emptyCard: {
+    backgroundColor: "#111827", borderRadius: 12, padding: 16, marginBottom: 8,
+    borderWidth: 1, borderColor: "#374151", alignItems: "center" as const,
+  },
+  emptyTitle: { color: "#f3f4f6", fontWeight: "700" as const, fontSize: 14, marginBottom: 6 },
+  emptyBody: { color: "#9ca3af", fontSize: 12, textAlign: "center" as const, lineHeight: 18, marginBottom: 14 },
+  emptyBtn: {
+    flexDirection: "row" as const, alignItems: "center" as const, gap: 8,
+    backgroundColor: "#3b82f6", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8,
+  },
+  emptyBtnText: { color: "#fff", fontWeight: "700" as const, fontSize: 13 },
 });

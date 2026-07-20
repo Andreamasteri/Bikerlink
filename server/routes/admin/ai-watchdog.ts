@@ -161,7 +161,10 @@ router.post("/watchdog/propose-now", async (_req, res) => {
   // Task #25 — genera sia le proposte generiche sia quelle di routing (namespace
   // "horus", gestito dal proposer dedicato di Horus). Le eseguiamo in serie:
   // condividono budget/quota AI e restano poche chiamate.
-  const out = await runProposer(snap);
+  // Task #890 — force:true bypassa il fingerprint check così premendo "Proponi"
+  // nell'header admin si ottengono sempre nuove proposte, indipendentemente da
+  // quante volte è stato premuto di recente.
+  const out = await runProposer(snap, { force: true });
   const horusOut = await runHorusRoutingProposer(snap);
   const proposals = [...(out?.proposals ?? []), ...(horusOut?.proposals ?? [])];
   return res.json({ proposals, meta: out?.meta ?? horusOut?.meta ?? null });

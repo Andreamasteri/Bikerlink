@@ -132,7 +132,18 @@ export interface ProposerResult {
   skipReason?: string;
 }
 
-export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult | null> {
+export interface ProposerOptions {
+  /**
+   * Task #890 — Quando true, bypassa il fingerprint check (ma non il kill-switch né
+   * il filtro mappe/horus). Usato dall'endpoint manuale "Proponi" per garantire che
+   * nuove proposte vengano generate immediatamente, indipendentemente dalla chiamata
+   * precedente. Il cooldown di 60 min è gestito dallo scheduler, non qui: l'endpoint
+   * manuale non passa per lo scheduler, quindi non ha cooldown da bypassare.
+   */
+  force?: boolean;
+}
+
+export async function runProposer(snap: HealthSnapshot, opts: ProposerOptions = {}): Promise<ProposerResult | null> {
   if (!(await isWatchdogEnabled())) return null;
   const mapsLlmEnabled = await isMapsFlagEnabled("llm");
   let hiSev = snap.problems
@@ -145,8 +156,8 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
 
   // Se il flag "ThinkCentre offline per test" è attivo, rimuovi i problemi ThinkCentre
   // da hiSev prima di qualsiasi analisi: vengono soppressi silenziosamente.
-  // Differenza rispetto ad allKnownOffline: qui si filtrano i singoli problemi TC anche
-  // in presenza di problemi misti (i non-TC vengono comunque proposti all'AI).
+  // Differenza rispetto al filtro offline standard: qui si filtrano i singoli problemi TC
+  // anche in presenza di problemi misti (i non-TC vengono comunque proposti all'AI).
   if (await isThinkCentreIgnoredForTests()) {
     const tcProblems = hiSev.filter((p) => isKnownOfflineProblem(p.id));
     if (tcProblems.length > 0) {
@@ -160,26 +171,45 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
     }
   }
 
-  // Skip se tutti i problemi attivi sono "noti offline" (ThinkCentre/GraphHopper/Valhalla):
-  // non c'è niente che possiamo fare automaticamente, evita di bruciare quota AI.
-  const allKnownOffline = hiSev.every((p) => isKnownOfflineProblem(p.id));
-  if (allKnownOffline) {
+  // Task #890 — Filtra i problemi "noti offline" (ThinkCentre/GraphHopper/Valhalla)
+  // DAL BATCH, ma non abortisce l'intera run se restano altri problemi non-offline.
+  // Comportamento corretto: vacuum.last_attempt e Pool DB devono generare proposte
+  // anche se dragonfly.ping_ms è nella stessa lista.
+  const offlineProblems = hiSev.filter((p) => isKnownOfflineProblem(p.id));
+  if (offlineProblems.length > 0) {
+    const remaining = hiSev.filter((p) => !isKnownOfflineProblem(p.id));
+    if (remaining.length === 0) {
+      // Tutti i problemi sono noti-offline: niente da fare, evita di bruciare quota AI.
+      console.info(
+        "[watchdog/proposer] skip — tutti i problemi sono ThinkCentre/routing noti, nessuna proposta" +
+        ` (${hiSev.length} problemi: ${hiSev.map((p) => p.id).join(", ")})`,
+      );
+      return null;
+    }
+    // Alcuni sono offline, altri no: procedi solo con quelli non-offline.
     console.info(
-      "[watchdog/proposer] skip — problemi invariati/noti, nessuna proposta" +
-      ` (${hiSev.length} problemi ThinkCentre/routing noti: ${hiSev.map((p) => p.id).join(", ")})`,
+      `[watchdog/proposer] filtrati ${offlineProblems.length} probl. offline (${offlineProblems.map((p) => p.id).join(", ")})` +
+      ` — ${remaining.length} problemi non-offline rimangono`,
     );
-    return null;
+    hiSev = remaining;
   }
 
   // Skip se i problemi non sono cambiati dall'ultima chiamata AI (fingerprint check).
+  // Task #890 — bypassato quando force=true (chiamata manuale "Proponi").
   const currentFp = computeProblemsFingerprint(snap.problems);
-  const lastFp = await getLastFingerprint();
-  if (lastFp !== null && lastFp === currentFp) {
+  if (!opts.force) {
+    const lastFp = await getLastFingerprint();
+    if (lastFp !== null && lastFp === currentFp) {
+      console.info(
+        `[watchdog/proposer] skip — problemi invariati/noti, nessuna proposta` +
+        ` (fingerprint invariato: ${hiSev.length} problemi high/critical, stesso set della chiamata precedente)`,
+      );
+      return null;
+    }
+  } else {
     console.info(
-      `[watchdog/proposer] skip — problemi invariati/noti, nessuna proposta` +
-      ` (fingerprint invariato: ${hiSev.length} problemi high/critical, stesso set della chiamata precedente)`,
+      `[watchdog/proposer] force=true — bypass fingerprint check (chiamata manuale "Proponi")`,
     );
-    return null;
   }
 
   const proposerModel = await getProposerModel();

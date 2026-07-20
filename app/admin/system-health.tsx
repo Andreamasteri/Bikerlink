@@ -363,11 +363,19 @@ export default function SystemHealthScreen() {
           >
             Proposte AI in attesa
           </SectionTitle>
+          {/* Task #890 — passa il numero di problemi HIGH/CRITICAL attivi e il
+              callback "Proponi" così ProposalsCard può mostrare il CTA quando
+              pendingProposals è vuoto ma ci sono problemi che richiedono azione. */}
           <ProposalsCard
             proposals={pendingProposals}
             busyId={busyProposalId}
             onAccept={onAccept}
             onReject={onReject}
+            activeHighProblems={
+              snap.problems.filter((p) => p.severity === "high" || p.severity === "critical").length
+            }
+            onProposeNow={() => proposeNow.mutate()}
+            proposingNow={proposeNow.isPending}
           />
 
           <SectionTitle icon="chart-line">Trend score (ultime ore)</SectionTitle>
