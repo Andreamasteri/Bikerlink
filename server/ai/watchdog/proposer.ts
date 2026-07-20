@@ -146,6 +146,16 @@ export interface ProposerResult {
   skipReason?: string;
 }
 
+/** Task #925 — Contesto crash per proposte generate da CrashBreakdownCard. */
+export interface CrashProposalContext {
+  crashType: string;
+  errorSummary: string | null;
+  count: number;
+  lastVersion: string | null;
+  /** ID sintetico usato per deduplicare proposte pending lato frontend. */
+  syntheticSignalId: string;
+}
+
 export interface ProposerOptions {
   /**
    * Task #890 — Quando true, bypassa il fingerprint check (ma non il kill-switch né
@@ -163,10 +173,115 @@ export interface ProposerOptions {
    * già rientrato) il proposer restituisce null senza chiamare l'AI.
    */
   signalId?: string;
+  /**
+   * Task #925 — Quando presente, bypassa la lista segnali correnti e costruisce
+   * il prompt AI direttamente dal contesto crash (tipo, summary, count, versione).
+   * Usato dal pulsante "Analizza ⚡" su ogni riga di CrashBreakdownCard.
+   */
+  crashContext?: CrashProposalContext;
+}
+
+// Task #925 — proposer dedicato per crash pattern da CrashBreakdownCard.
+// Bypassa la lista segnali (il crash non è un segnale watchdog attivo) e
+// costruisce il prompt direttamente dal contesto crash.
+async function runCrashContextProposer(snap: HealthSnapshot, ctx: CrashProposalContext): Promise<ProposerResult | null> {
+  const crashLabel = ctx.crashType === "crash_system" ? "SYSTEM crash" : "JS crash";
+  const summaryLine = ctx.errorSummary ? `Messaggio: "${ctx.errorSummary}"` : "Nessun messaggio di errore (crash nativo)";
+  const prompt = [
+    `Crash pattern rilevato nel pannello admin:`,
+    `Tipo: ${crashLabel}`,
+    summaryLine,
+    `Occorrenze negli ultimi giorni: ${ctx.count}`,
+    ctx.lastVersion ? `Ultima versione colpita: v${ctx.lastVersion}` : "Versione sconosciuta",
+    "",
+    "Analizza il pattern e proponi fino a 3 azioni concrete di rimedio.",
+    "Se non hai informazioni sufficienti, ritorna proposals=[].",
+  ].join("\n");
+
+  try {
+    return await withBudget("triage", async () => {
+      const started = Date.now();
+      const proposerModel = await getProposerModel();
+      const isGroqOnlyModel = /^(llama-3\.|llama-3\d|meta-llama\/|openai\/gpt-oss)/i.test(proposerModel);
+      const forcedModelId = isGroqOnlyModel ? undefined : proposerModel;
+      const groqOverrideModelId = isGroqOnlyModel ? proposerModel : undefined;
+
+      const callModel = (mm: ReturnType<typeof resolveModel>) =>
+        mm.scheduler(() => generateStructured(mm, {
+          schema: proposalsSchema, system: SYSTEM, prompt, temperature: 0.2,
+          providerOptions: { ollama: { think: false } },
+        }));
+
+      const resolveAndCall = async (): Promise<{ value: Awaited<ReturnType<typeof callModel>>; model: ReturnType<typeof resolveModel> }> => {
+        const om = tryBuildOllama();
+        if (om) {
+          try {
+            const value = await callModel(om);
+            return { value, model: om };
+          } catch (ollamaErr) {
+            console.warn("[watchdog/proposer/crash] ollama fallito, scalo a chain cloud:", (ollamaErr as Error).message);
+          }
+        }
+        if (groqOverrideModelId) {
+          try {
+            const groqM = resolveModel({ role: "brain", preferredProvider: "groq", forcedModelId: groqOverrideModelId });
+            return { value: await callModel(groqM), model: groqM };
+          } catch { /* fall through */ }
+        }
+        const fallback = await runWithFallback({ role: "brain", forcedModelId, skipOllama: true }, callModel);
+        return { value: fallback.value, model: fallback.model };
+      };
+
+      const { value: result, model: m } = await resolveAndCall();
+      const tokensIn = result.usage?.inputTokens ?? Math.ceil(prompt.length / 4);
+      const tokensOut = result.usage?.outputTokens ?? 200;
+      const meta: AiCallMeta = {
+        provider: m.providerName, model: m.modelId, tokensIn, tokensOut,
+        costUsd: estimateCostUsd(m.modelId, tokensIn, tokensOut),
+        durationMs: Date.now() - started,
+      };
+      await logAiCall({
+        scope: "anomaly", prompt: prompt.slice(0, 4000),
+        response: JSON.stringify(result.object).slice(0, 4000),
+        suggestion: result.object, meta,
+      });
+      await logAiUsage("proposer", m.modelId, { tokensIn, tokensOut }, "scheduler");
+      const proposals = result.object.proposals;
+      const withIds: Array<Proposal & { logId: string | null }> = [];
+      for (const p of proposals) {
+        const logId = await writeWatchdogLog({
+          kind: "proposal", scope: p.action.kind, status: "pending",
+          summary: p.title,
+          // Task #925 — salva crashSignalId nei details così la card frontend può
+          // deduplicate controllando proposals pending senza un campo DB dedicato.
+          details: {
+            ...p,
+            ...classifyProposal(`${p.title}. ${p.reasoning}`),
+            crashSignalId: ctx.syntheticSignalId,
+          },
+          costUsd: meta.costUsd / Math.max(1, proposals.length),
+        });
+        withIds.push({ ...p, logId });
+      }
+      return { proposals: withIds, meta: { provider: m.providerName, model: m.modelId, costUsd: meta.costUsd } };
+    });
+  } catch (err) {
+    const msg = (err as Error).message ?? "errore";
+    if (msg.startsWith("AI_BUDGET_EXCEEDED")) {
+      console.warn("[watchdog/proposer/crash] budget esaurito, skip");
+      return null;
+    }
+    console.warn("[watchdog/proposer/crash] error:", msg);
+    return null;
+  }
 }
 
 export async function runProposer(snap: HealthSnapshot, opts: ProposerOptions = {}): Promise<ProposerResult | null> {
   if (!(await isWatchdogEnabled())) return null;
+  // Task #925 — se crashContext è presente, usa il proposer crash dedicato.
+  if (opts.crashContext) {
+    return runCrashContextProposer(snap, opts.crashContext);
+  }
   const mapsLlmEnabled = await isMapsFlagEnabled("llm");
   let hiSev = snap.problems
     .filter((p) => p.severity === "high" || p.severity === "critical")

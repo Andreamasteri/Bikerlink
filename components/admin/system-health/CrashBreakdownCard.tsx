@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ActivityIndicator, ScrollView,
@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { getQueryFnWithTimeout } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+import type { WatchdogLog } from "@/components/admin/system-health/ProposalsCard";
 
 interface CrashGroup {
   crashType: string;
@@ -39,10 +40,20 @@ interface SamplesResp {
   samples: CrashSample[];
 }
 
+// Task #925 — stable synthetic ID shared with backend for proposal deduplication.
+// Must produce the same string from the same CrashGroup both here and in system-health.tsx.
+function syntheticCrashSignalId(group: CrashGroup): string {
+  const normalized = (group.errorSummary ?? "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 36);
+  return `app.crash.${group.crashType}.${normalized}`;
+}
+
 function makeSamplesKey(group: CrashGroup, days: number) {
   const qs = new URLSearchParams({
     crashType: group.crashType,
     ...(group.appVersion ? { appVersion: group.appVersion } : {}),
+    // Task #925 — only include errorSummary when it is a non-empty string.
+    // null/undefined means the crash group has no error_message (SYSTEM crashes),
+    // and we rely on the backend NULL-safe clause instead of a "= ''" comparison.
     ...(group.errorSummary ? { errorSummary: group.errorSummary } : {}),
     limit: "5",
     days: String(days),
@@ -114,8 +125,44 @@ function SamplesPanel({ group, days }: { group: CrashGroup; days: number }) {
   );
 }
 
-function CrashGroupRow({ group, days }: { group: CrashGroup; days: number }) {
+// Task #925 — safety timeout matches the API client timeout (90s) + a small buffer.
+const ANALYZE_SAFETY_TIMEOUT_MS = 95_000;
+
+function CrashGroupRow({
+  group, days, pendingLogs, onAnalyzeCrash,
+}: {
+  group: CrashGroup;
+  days: number;
+  pendingLogs: WatchdogLog[];
+  onAnalyzeCrash?: (group: CrashGroup) => Promise<void>;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Task #925 — check if there is already a pending proposal for this crash pattern.
+  const crashSigId = syntheticCrashSignalId(group);
+  const hasPending = pendingLogs.some(
+    (log) => log.status === "pending" && (log.details as Record<string, unknown> | null)?.crashSignalId === crashSigId,
+  );
+
+  const handleAnalyze = async () => {
+    if (!onAnalyzeCrash || analyzing || hasPending) return;
+    setAnalyzing(true);
+    safetyTimerRef.current = setTimeout(() => {
+      setAnalyzing(false);
+      safetyTimerRef.current = null;
+    }, ANALYZE_SAFETY_TIMEOUT_MS);
+    try {
+      await onAnalyzeCrash(group);
+    } finally {
+      if (safetyTimerRef.current !== null) {
+        clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+      }
+      setAnalyzing(false);
+    }
+  };
 
   return (
     <View style={styles.groupCard}>
@@ -135,6 +182,27 @@ function CrashGroupRow({ group, days }: { group: CrashGroup; days: number }) {
         </View>
         <View style={styles.groupRight}>
           <Text style={styles.totalCount}>{group.total}</Text>
+          {/* Task #925 — Analizza ⚡ button */}
+          {onAnalyzeCrash ? (
+            <TouchableOpacity
+              style={[
+                styles.analyzeBtn,
+                (analyzing || hasPending) && styles.analyzeBtnDisabled,
+              ]}
+              onPress={(e) => { e.stopPropagation?.(); void handleAnalyze(); }}
+              disabled={analyzing || hasPending}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            >
+              {analyzing ? (
+                <ActivityIndicator size="small" color="#fff" style={styles.analyzeSpinner} />
+              ) : (
+                <Text style={styles.analyzeBtnText}>
+                  {hasPending ? "Pending" : "Analizza ⚡"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          ) : null}
           <MaterialCommunityIcons
             name={expanded ? "chevron-up" : "chevron-down"}
             size={18}
@@ -147,7 +215,14 @@ function CrashGroupRow({ group, days }: { group: CrashGroup; days: number }) {
   );
 }
 
-export function CrashBreakdownCard() {
+interface CrashBreakdownCardProps {
+  /** Task #925 — pending watchdog logs, used to show "Pending" state on Analizza ⚡. */
+  pendingLogs?: WatchdogLog[];
+  /** Task #925 — called when admin clicks "Analizza ⚡" on a crash pattern row. */
+  onAnalyzeCrash?: (group: CrashGroup) => Promise<void>;
+}
+
+export function CrashBreakdownCard({ pendingLogs = [], onAnalyzeCrash }: CrashBreakdownCardProps = {}) {
   const [days, setDays] = useState(7);
   const key = `/api/admin/watchdog/crash-breakdown?days=${days}&limit=15`;
   const { data, isLoading, isError, refetch, isFetching } = useQuery<BreakdownResp>({
@@ -193,7 +268,13 @@ export function CrashBreakdownCard() {
             {groups.reduce((s, g) => s + g.total, 0)} crash totali · top {groups.length} pattern
           </Text>
           {groups.map((g, i) => (
-            <CrashGroupRow key={`${g.crashType}_${g.appVersion ?? ""}_${i}`} group={g} days={days} />
+            <CrashGroupRow
+              key={`${g.crashType}_${g.appVersion ?? ""}_${i}`}
+              group={g}
+              days={days}
+              pendingLogs={pendingLogs}
+              onAnalyzeCrash={onAnalyzeCrash}
+            />
           ))}
         </View>
       )}
@@ -220,6 +301,15 @@ const styles = StyleSheet.create({
   errorSummary: { color: "#f3f4f6", fontSize: 13, fontWeight: "500" as const, lineHeight: 18 },
   groupMeta: { color: "#6b7280", fontSize: 11, marginTop: 3 },
   totalCount: { color: "#ef4444", fontSize: 18, fontWeight: "700" as const, minWidth: 32, textAlign: "right" as const },
+  // Task #925 — Analizza ⚡ button styles (mirrors ProblemsList fixBtn).
+  analyzeBtn: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: "#374151", paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 6, minWidth: 70, justifyContent: "center",
+  },
+  analyzeBtnDisabled: { opacity: 0.45 },
+  analyzeBtnText: { color: "#f3f4f6", fontSize: 11, fontWeight: "700" as const },
+  analyzeSpinner: { width: 14, height: 14 },
   samplesWrap: { paddingHorizontal: 12, paddingBottom: 12 },
   sampleCard: { backgroundColor: "#111827", borderRadius: 8, padding: 10 },
   sampleHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6, flexWrap: "wrap", gap: 4 },

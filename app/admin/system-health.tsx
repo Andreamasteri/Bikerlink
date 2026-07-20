@@ -468,7 +468,34 @@ export default function SystemHealthScreen() {
           <EmbeddingUsageCard />
 
           <SectionTitle icon="bug-outline">Crash Breakdown</SectionTitle>
-          <CrashBreakdownCard />
+          {/* Task #925 — passa pending logs per il badge "Pending" e il callback
+              per il pulsante "Analizza ⚡" su ogni pattern crash. */}
+          <CrashBreakdownCard
+            pendingLogs={proposalsQ.data?.logs ?? []}
+            onAnalyzeCrash={async (group) => {
+              // Costruisce un syntheticSignalId stabile dallo stesso algoritmo
+              // usato dentro CrashBreakdownCard per la deduplication pending.
+              const normalized = (group.errorSummary ?? "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 36);
+              const syntheticSignalId = `app.crash.${group.crashType}.${normalized}`;
+              const res = await apiRequest(
+                "POST",
+                "/api/admin/watchdog/propose-now",
+                {
+                  signalId: syntheticSignalId,
+                  crashContext: {
+                    crashType: group.crashType,
+                    errorSummary: group.errorSummary ?? null,
+                    count: group.total,
+                    lastVersion: group.appVersion ?? null,
+                    syntheticSignalId,
+                  },
+                },
+                { timeoutMs: 90_000 },
+              );
+              await res.json();
+              await qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"] });
+            }}
+          />
 
           <SectionTitle icon="tune-variant">Soglie segnali diagnostici</SectionTitle>
           <SignalThresholdsCard />

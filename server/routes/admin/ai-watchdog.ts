@@ -162,19 +162,33 @@ router.post("/watchdog/propose-now", async (req, res) => {
   // Task #902 — signalId opzionale: quando presente l'analisi AI si concentra
   // solo su quel segnale invece di guardare l'intero snapshot.
   const signalId = typeof req.body?.signalId === "string" && req.body.signalId ? req.body.signalId : undefined;
+  // Task #925 — crashContext opzionale: quando presente, costruisce il prompt
+  // AI direttamente dal contesto crash (tipo, summary, count, versione) senza
+  // cercare un segnale attivo corrispondente al signalId sintetico.
+  const rawCrash = req.body?.crashContext;
+  const crashContext = rawCrash && typeof rawCrash === "object" && typeof rawCrash.crashType === "string"
+    ? {
+        crashType: rawCrash.crashType as string,
+        errorSummary: typeof rawCrash.errorSummary === "string" ? rawCrash.errorSummary : null,
+        count: typeof rawCrash.count === "number" ? rawCrash.count : 0,
+        lastVersion: typeof rawCrash.lastVersion === "string" ? rawCrash.lastVersion : null,
+        syntheticSignalId: typeof rawCrash.syntheticSignalId === "string" ? rawCrash.syntheticSignalId : (signalId ?? "app.crash.unknown"),
+      }
+    : undefined;
   // Task #25 — genera sia le proposte generiche sia quelle di routing (namespace
   // "horus", gestito dal proposer dedicato di Horus). Le eseguiamo in serie:
   // condividono budget/quota AI e restano poche chiamate.
   // Task #890 — force:true bypassa il fingerprint check così premendo "Proponi"
   // nell'header admin si ottengono sempre nuove proposte, indipendentemente da
   // quante volte è stato premuto di recente.
-  const out = await runProposer(snap, { force: true, signalId });
+  const out = await runProposer(snap, { force: true, signalId, crashContext });
   // Task #892 — force:true bypassa anche il fingerprint check del proposer di
   // routing Horus, così "Proponi" genera sempre nuove proposte routing come fa
   // già il proposer generico. Il filtro signalId non viene propagato al proposer
   // Horus (routing): riguarda segnali source="horus", non il segnale specifico
   // che l'admin sta esaminando.
-  const horusOut = signalId ? null : await runHorusRoutingProposer(snap, { force: true });
+  // Task #925 — se crashContext è presente, non passare al proposer Horus (routing).
+  const horusOut = (signalId || crashContext) ? null : await runHorusRoutingProposer(snap, { force: true });
   const proposals = [...(out?.proposals ?? []), ...(horusOut?.proposals ?? [])];
   return res.json({ proposals, meta: out?.meta ?? horusOut?.meta ?? null });
 });
@@ -668,11 +682,21 @@ router.get("/watchdog/crash-breakdown", async (req, res) => {
 router.get("/watchdog/crash-breakdown/samples", async (req, res) => {
   const crashType = typeof req.query.crashType === "string" ? req.query.crashType : null;
   const appVersion = typeof req.query.appVersion === "string" ? req.query.appVersion : null;
-  const errorSummary = typeof req.query.errorSummary === "string" ? req.query.errorSummary : null;
+  // Task #925 — errorSummary is explicitly null for SYSTEM crashes (error_message IS NULL in DB).
+  // We treat an absent / empty-string query param as null so the NULL case is handled correctly.
+  const rawErrorSummary = typeof req.query.errorSummary === "string" ? req.query.errorSummary : null;
+  const errorSummary = rawErrorSummary === "" ? null : rawErrorSummary;
   const limit = Math.min(20, Math.max(1, Number(req.query.limit ?? 5)));
   const days = Math.min(30, Math.max(1, Number(req.query.days ?? 7)));
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   try {
+    // Task #925 — NULL-safe filter: when errorSummary is null (SYSTEM crashes have
+    // error_message IS NULL) we must use `error_message IS NULL`, because in SQL
+    // `NULL = NULL` is FALSE — not the TRUE we need.  Build the clause in TypeScript
+    // to avoid the double-null-parameter ambiguity entirely.
+    const errorSummaryClause = errorSummary === null
+      ? sql`AND error_message IS NULL`
+      : sql`AND LEFT(error_message, 200) = ${errorSummary}`;
     const result = await db.execute(sql`
       SELECT
         id, crash_type, app_version, platform, os_version, device_model, device_brand,
@@ -680,8 +704,8 @@ router.get("/watchdog/crash-breakdown/samples", async (req, res) => {
       FROM app_crash_logs
       WHERE reported_at >= ${since}
         AND crash_type = ${crashType ?? "crash_js"}
-        AND (${appVersion ?? null} IS NULL OR app_version = ${appVersion ?? null})
-        AND (${errorSummary ?? null} IS NULL OR LEFT(error_message, 200) = ${errorSummary ?? null})
+        AND (${appVersion} IS NULL OR app_version = ${appVersion})
+        ${errorSummaryClause}
       ORDER BY reported_at DESC
       LIMIT ${limit}
     `);
