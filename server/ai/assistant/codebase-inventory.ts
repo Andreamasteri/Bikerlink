@@ -1,21 +1,23 @@
 // Task #86 — Inventario condiviso dei file sorgente + fingerprint per-file.
 //
 // Fonte di verità dell'elenco di file di codice che Horus legge nelle sue due
-// scansioni on-demand (analisi codice+DB e generazione manuale). Legge il
-// checkout LOCALE (non GitHub): il checkout È il codice, è gratis e veloce, e
-// l'esclusione di `.bikerblog-ref` (clone di riferimento su disco) conferma che
-// lo scanning avviene sul filesystem.
+// scansioni on-demand (analisi codice+DB e generazione manuale). Usa `git ls-files`
+// per enumerare i file: lista STABILE e ORDINATA, .gitignore applicato
+// automaticamente (esclude node_modules, dist, .cache, android, ios, ecc. senza
+// dover mantenere EXCLUDE_DIR_NAMES a mano), resume deterministico tramite lo
+// store hash (nessun ricalcolo su file non tracciati).
 //
 // Per-file teniamo un fingerprint (hash del contenuto) + l'esito dell'ultima
 // lettura (la "nota" prodotta da Horus): una passata successiva salta i file il
-// cui hash non è cambiato — a costo zero, per ENTRAMBE le modalità (ognuna ha il
-// suo store, perché la nota prodotta è diversa: osservazioni vs descrizione).
+// cui hash non è cambiato — a costo zero, per TUTTE e tre le modalità (ognuna ha
+// il suo store, perché la nota prodotta è diversa).
 //
 // Nessuna scrittura sul codice: sola lettura del filesystem + persistenza dello
 // store in AppSettings (JSONB nel 3° argomento di upsertAppSetting).
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { storage } from "../../storage";
 
 /** Le tre modalità di scansione condividono l'inventario ma NON lo store. */
@@ -87,6 +89,8 @@ const I18N_DICT_MAX_CHARS = 60_000;
 // asset generati, riferimenti esterni, app annidate come bowie-terminal, servizi
 // separati) è escluso perché non fa parte del codice dell'app principale.
 // NOTA: è una allowlist — qualsiasi cartella non elencata qui è esclusa d'ufficio.
+// Con git ls-files l'esclusione delle directory generate è automatica via .gitignore;
+// SOURCE_ROOTS funge da ulteriore filtro per restringere lo scope.
 export const SOURCE_ROOTS = [
   "server",
   "shared",
@@ -96,29 +100,8 @@ export const SOURCE_ROOTS = [
   "lib",
   "constants",
 ] as const;
-const INCLUDE_DIRS = SOURCE_ROOTS;
 
-const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx"]);
-
-// Directory da NON scandire mai: dipendenze, build, cache, asset generati,
-// riferimenti esterni (.bikerblog-ref = clone read-only del repo gemello).
-const EXCLUDE_DIR_NAMES = new Set([
-  "node_modules",
-  "dist",
-  "build",
-  ".git",
-  ".expo",
-  ".cache",
-  "coverage",
-  "logs",
-  "attached_assets",
-  ".bikerblog-ref",
-  "android",
-  "ios",
-  "__snapshots__",
-]);
-
-/** File da escludere anche se hanno estensione di codice (tipi generati). */
+/** File da escludere anche se tracciati da git (tipi generati). */
 function isExcludedFile(relPath: string): boolean {
   return relPath.endsWith(".d.ts");
 }
@@ -161,35 +144,51 @@ export function isLexiconEligible(rel: string): boolean {
   return p.endsWith(".tsx") && (p.startsWith("app/") || p.startsWith("components/"));
 }
 
-/** Enumera (ricorsivamente) tutti i file di codice sorgente rilevanti, ordinati. */
+/**
+ * Enumera tutti i file di codice sorgente rilevanti usando `git ls-files`.
+ *
+ * Vantaggi rispetto al walker ricorsivo precedente:
+ * - Lista STABILE e ORDINATA ad ogni run (indice = file → cursore lastFile affidabile).
+ * - .gitignore applicato automaticamente: node_modules, dist, .cache, android, ios
+ *   ecc. esclusi senza dover aggiornare EXCLUDE_DIR_NAMES.
+ * - Resume deterministico: lo stesso file ha sempre lo stesso indice nella lista.
+ * - Più veloce: O(git index) invece di O(filesystem).
+ *
+ * Post-filtro JS:
+ * - Solo file sotto SOURCE_ROOTS (allowlist di cartelle sorgente).
+ * - Solo estensioni di codice (.ts, .tsx, .js, .jsx).
+ * - Esclusi i file .d.ts (tipi generati).
+ */
 export async function enumerateSourceFiles(): Promise<string[]> {
+  const result = spawnSync(
+    "git",
+    ["ls-files", "--", "*.ts", "*.tsx", "*.js", "*.jsx"],
+    { cwd: ROOT, encoding: "utf8", maxBuffer: 10 * 1024 * 1024, timeout: 30_000 },
+  );
+
+  if (result.error) {
+    throw new Error(`git ls-files non disponibile: ${result.error.message}`);
+  }
+  if (result.status !== 0 && result.status !== 1) {
+    throw new Error(`git ls-files fallita (exit ${result.status}): ${(result.stderr ?? "").slice(0, 300)}`);
+  }
+
+  const lines = (result.stdout ?? "").split("\n");
   const out: string[] = [];
-
-  async function walk(absDir: string): Promise<void> {
-    let entries;
-    try {
-      entries = await fs.readdir(absDir, { withFileTypes: true });
-    } catch {
-      return; // directory assente/illeggibile: salta senza far fallire l'inventario
-    }
-    for (const entry of entries) {
-      const abs = path.join(absDir, entry.name);
-      if (entry.isDirectory()) {
-        if (EXCLUDE_DIR_NAMES.has(entry.name)) continue;
-        await walk(abs);
-      } else if (entry.isFile()) {
-        if (!CODE_EXTENSIONS.has(path.extname(entry.name))) continue;
-        const rel = path.relative(ROOT, abs);
-        if (isExcludedFile(rel)) continue;
-        out.push(rel);
-      }
-    }
+  for (const rel of lines) {
+    if (!rel) continue;
+    // Normalizza separatori (Windows → unix) per i confronti con SOURCE_ROOTS.
+    const normalized = rel.replace(/\\/g, "/");
+    // Allowlist: solo le cartelle sorgente definite in SOURCE_ROOTS.
+    const inSourceRoot = SOURCE_ROOTS.some(
+      (r) => normalized === r || normalized.startsWith(r + "/"),
+    );
+    if (!inSourceRoot) continue;
+    // Escludi file generati (.d.ts).
+    if (isExcludedFile(normalized)) continue;
+    out.push(normalized);
   }
-
-  for (const dir of INCLUDE_DIRS) {
-    await walk(path.join(ROOT, dir));
-  }
-  out.sort();
+  // git ls-files restituisce già output ordinato; .sort() non necessario.
   return out;
 }
 
