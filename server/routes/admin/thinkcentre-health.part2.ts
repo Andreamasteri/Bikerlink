@@ -20,6 +20,28 @@ import {
 } from "./thinkcentre-health-infra-probes";
 import { isThinkCentreInMaintenance } from "../../lib/thinkcentre-maintenance";
 import { isThinkCentrePoweredOff } from "../../lib/thinkcentre-powered-off";
+import { clearShortCache } from "../../lib/short-cache";
+
+/**
+ * Tracks the last known TC overall status so we can detect offline → online
+ * transitions and evict the metrics short-cache immediately.
+ */
+let _prevTcOverall: CachedDotStatus | null = null;
+
+/**
+ * Called whenever a new TC overall status is computed by a probe.
+ * If the TC just recovered from offline, evict the stale metrics cache so
+ * the next admin poll fetches fresh data rather than serving the last
+ * snapshot from before the outage.
+ */
+function evictMetricsCacheOnRecovery(newOverall: CachedDotStatus): void {
+  if (_prevTcOverall === "offline" && (newOverall === "ok" || newOverall === "degraded")) {
+    clearShortCache("admin:thinkcentre-metrics");
+    clearShortCache("admin:tc-gpu-peaks");
+    console.log("[thinkcentre-health] TC offline→online: evicted thinkcentre-metrics and tc-gpu-peaks short-cache");
+  }
+  _prevTcOverall = newOverall;
+}
 
 /**
  * Snapshot helper for thinkcentre-health.
@@ -53,6 +75,8 @@ export async function updateThinkCentreSystemStatus(
   }
   const tcDot: CachedDotStatus =
     overall === "green" ? "ok" : overall === "yellow" ? "degraded" : overall === "red" ? "offline" : "unknown";
+
+  evictMetricsCacheOnRecovery(tcDot);
 
   const svcMap = new Map(services.map((s) => [s.key, s]));
 
@@ -202,6 +226,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     aihub: svc(aihubInfra),
   };
 
+  evictMetricsCacheOnRecovery(overall);
   updateSystemStatus(snap);
   return snap;
 }
