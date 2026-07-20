@@ -131,19 +131,24 @@ export async function collectScheduler(): Promise<Signal[]> {
         },
       });
 
-      // Task #705 — Zombie lock detection: se il loop è alive ma non completa
-      // un ciclo da >4h, interroga DragonflyDB per vedere se il lock è tenuto
-      // da un processo diverso (PID divergente = istanza morta che non ha
-      // rilasciato). Solo warning + segnale HIGH, NO force-unlock automatico.
-      const RUN_GAP_ZOMBIE_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4 ore
-      if (schedulerAlive && ageMs > RUN_GAP_ZOMBIE_THRESHOLD_MS) {
+      // Task #939 — run_gap_no_lock: scheduler vivo ma nessun ciclo da >=60min e
+      // nessun lock attivo → escalation a HIGH per notifica admin tempestiva.
+      // Threshold separato dal zombie-gate (4h) così il segnale scatta a 60min
+      // indipendentemente dalla durata del gap.
+      // Task #705 — zombie lock detection: dal gate 4h in poi, controlla se il
+      // lock è tenuto da un PID diverso (istanza morta, non rilasciato).
+      // Entrambi i check condividono una singola chiamata a DragonflyDB.
+      const RUN_GAP_NO_LOCK_THRESHOLD_MS = 60 * 60 * 1000; // 1 ora — soglia notifica
+      const RUN_GAP_ZOMBIE_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4 ore — zombie-lock
+      if (schedulerAlive && ageMs > RUN_GAP_NO_LOCK_THRESHOLD_MS) {
         try {
           const ls = await getMatchingLockStatus();
           const remoteHolder = ls.redis.remoteHolder as { pid?: number } | null;
           const isZombieLock = ls.redis.exists
             && remoteHolder?.pid != null
             && remoteHolder.pid !== process.pid;
-          if (isZombieLock) {
+          if (ageMs > RUN_GAP_ZOMBIE_THRESHOLD_MS && isZombieLock) {
+            // Lock tenuto da un PID diverso dopo >4h: possibile zombie da crash.
             signals.push({
               source: "scheduler", metric: "scheduler.lock_zombie_suspected", value: ageMin, unit: "min",
               severity: "high",
@@ -155,9 +160,9 @@ export async function collectScheduler(): Promise<Signal[]> {
                 message: `Lock tenuto da PID ${remoteHolder?.pid} (processo corrente: ${process.pid}) — possibile zombie`,
               },
             });
-          } else if (ls.active) {
-            // Lock attivo ma stesso PID: ciclo in corso (normale), già gestito
-            // da CYCLE_STALE_MS. Aggiungi solo come dettaglio diagnostico.
+          } else if (ageMs > RUN_GAP_ZOMBIE_THRESHOLD_MS && ls.active) {
+            // Lock attivo ma stesso PID dopo >4h: ciclo in corso (normale),
+            // già gestito da CYCLE_STALE_MS. Aggiungi solo come diagnostico.
             signals.push({
               source: "scheduler", metric: "scheduler.lock_active_long_gap", value: ageMin, unit: "min",
               severity: "warn",
@@ -168,12 +173,12 @@ export async function collectScheduler(): Promise<Signal[]> {
                 message: `Lock attivo ma lastRunAt è ${ageMin}min fa — ciclo potenzialmente bloccato`,
               },
             });
-          } else {
-            // Nessun lock attivo: il loop salta i cicli per un'altra ragione
-            // (coordinator, pool saturo). Segnale WARN con contesto diagnostico.
+          } else if (!ls.active) {
+            // Nessun lock attivo: il loop salta per coordinator/pool saturo.
+            // Sempre HIGH a questo punto (già >= 60min senza ciclo — Task #939).
             signals.push({
               source: "scheduler", metric: "scheduler.run_gap_no_lock", value: ageMin, unit: "min",
-              severity: "warn",
+              severity: "high",
               details: {
                 lastRunMinAgo: ageMin,
                 lastSkipReason: parsed?.lastSkipReason ?? null,

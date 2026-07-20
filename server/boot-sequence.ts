@@ -386,6 +386,84 @@ async function runPostReady(needsFakeSeed: boolean): Promise<void> {
 
   ensureCompetitorAnalysisPdf();
 
+  // Task #939 — Cleanup lock orfano al boot: se il processo precedente è
+  // crashato (SIGABRT / unhandledRejection) senza passare per il finally del
+  // lock, il lock distribuito in DragonflyDB può restare vivo per tutta la
+  // durata del TTL (5 min). Ogni tick del nuovo processo fallisce silenziosamente
+  // nell'acquisire il lock e il matching resta fermo.
+  //
+  // Sicurezza distribuita: NON rimuoviamo il lock incondizionatamente —
+  // questo potrebbe cancellare il lock di un'altra istanza sana in un
+  // deployment multi-processo. Puliamo il lock SOLO se possiamo provare che è
+  // orfano:
+  //   a) lock scaduto (expiresAt nel passato) → TTL scaduto naturalmente,
+  //      sicuro da rimuovere indipendentemente dall'istanza.
+  //   b) holder.pid ≠ process.pid → processo precedente (su questa macchina
+  //      è già morto perché Replit avvia una sola istanza per volta). Se
+  //      holder.pid manca del tutto, saltiamo per sicurezza.
+  //   c) cycleInFlight === true → un ciclo è già in volo (non dovrebbe
+  //      accadere a questo punto del boot), evitiamo di interferire.
+  void (async () => {
+    try {
+      const { forceUnlockMatchingLock, getMatchingLockStatus } = await import("./cache/matching-lock");
+      const { getMatchingLockState } = await import("./matching/scheduler.cycle");
+
+      const lockState = getMatchingLockState();
+      if (lockState.isRunning) {
+        // Un ciclo è già in volo — non interferire.
+        return;
+      }
+
+      const status = await getMatchingLockStatus();
+
+      if (!status.redis.exists) {
+        // Nessun lock distribuito attivo. Pulizia in-memory difensiva (no-op
+        // se già libero), senza toccare DragonflyDB.
+        forceUnlockMatchingLock();
+        console.log("[BOOT][POST-READY] No orphan matching lock in Dragonfly — in-memory state cleared");
+        return;
+      }
+
+      // Esiste un lock distribuito: è orfano se scaduto o owned da un PID diverso.
+      // IMPORTANTE: se il metadata dell'holder manca (write best-effort fallita),
+      // NON usiamo il default 0 per expiresAt — quello renderebbe isExpired=true
+      // su un lock potenzialmente valido. Richiediamo metadata esplicito e
+      // trustworthy prima di qualsiasi cleanup basato sulla scadenza.
+      const holder = status.redis.remoteHolder as { pid?: number; expiresAt?: number } | null;
+      const holderPid = holder?.pid ?? null;
+      const holderExpiresAt = holder?.expiresAt; // undefined se metadata assente
+      const hasReliableExpiry = holderExpiresAt != null;
+      const isExpired = hasReliableExpiry && holderExpiresAt < Date.now();
+      const isOwnedByCurrentProcess = holderPid === process.pid;
+
+      if (isExpired) {
+        // Lock scaduto: sicuro da rimuovere a prescindere dall'istanza holder.
+        forceUnlockMatchingLock();
+        console.log(`[BOOT][POST-READY] Orphan matching lock (expired, PID=${holderPid}) cleared`);
+      } else if (holderPid !== null && !isOwnedByCurrentProcess) {
+        // Lock valido ma appartenente a un PID diverso: su Replit (istanza
+        // singola) quel processo è certamente terminato. Puliamo il lock così
+        // il primo tick può acquisirlo subito invece di attendere fino a 5 min.
+        forceUnlockMatchingLock();
+        console.log(`[BOOT][POST-READY] Orphan matching lock (dead PID=${holderPid}, current=${process.pid}) cleared`);
+      } else if (holderPid === null) {
+        // PID assente nel holder metadata — non possiamo determinare l'owner;
+        // saltiamo la pulizia per sicurezza (il TTL scadrà entro 5 min).
+        console.warn(
+          `[BOOT][POST-READY] Matching lock exists but has no holder PID — skipping boot cleanup (TTL will expire naturally, ttlSeconds=${status.redis.ttlSeconds})`,
+        );
+      } else {
+        // holderPid === process.pid ma cycleInFlight=false: stato incoerente,
+        // non tocchiamo il lock.
+        console.warn(
+          `[BOOT][POST-READY] Matching lock held by current PID=${process.pid} but no cycle in flight — skipping cleanup`,
+        );
+      }
+    } catch (err) {
+      console.warn("[BOOT][POST-READY] Orphan lock cleanup failed (non-fatal):", err);
+    }
+  })();
+
   // Auto-resume scan manuale Horus se era in corso al momento del restart.
   // Fire-and-forget: non deve bloccare né fallire il boot post-READY.
   void (async () => {
