@@ -15,6 +15,7 @@ import { resetState as resetOverloadCollector } from "../../ai/watchdog/collecto
 import { resetState as resetErrorCollector } from "../../ai/watchdog/collectors/error-collector";
 import { resetState as resetCrashSignalsCollector } from "../../ai/watchdog/collectors/crash-signals-collector";
 import { streamWatchdogChat } from "../../ai/watchdog/chat";
+import { WATCHDOG_TOOL_KEYS } from "../../ai/watchdog/tools";
 import { isWatchdogEnabled, setWatchdogEnabled } from "../../ai/watchdog/kill-switch";
 import { getWatchdogStats } from "../../ai/watchdog/scheduler";
 import { runAutoFix } from "../../ai/watchdog/auto-fix";
@@ -270,6 +271,43 @@ const chatSchema = z.object({
   })).min(1).max(40),
 });
 
+// Regex unica derivata dalla source-of-truth in tools.ts — nessuna duplicazione manuale.
+const TOOL_NAME_SANITIZE_REGEX = new RegExp(`\\b(${WATCHDOG_TOOL_KEYS.join("|")})\\b`, "g");
+
+// Lunghezza del carryover buffer: massima lunghezza di un nome tool meno 1.
+// Garantisce che un nome spezzato su due chunk adiacenti venga comunque filtrato.
+const TOOL_CARRY_LEN = Math.max(...WATCHDOG_TOOL_KEYS.map((k) => k.length)) - 1;
+
+/**
+ * Sanitizzatore boundary-safe per stream SSE.
+ * Mantiene un buffer carry tra i chunk così i nomi tool spezzati a cavallo
+ * di due chunk vengono comunque sostituiti prima di essere emessi al client.
+ */
+function makeToolNameStreamSanitizer() {
+  let carry = "";
+  return {
+    /** Restituisce il testo sicuro da emettere subito (può essere vuoto). */
+    feed(chunk: string): string {
+      const combined = carry + chunk;
+      // Mantieni gli ultimi TOOL_CARRY_LEN caratteri come nuovo carry.
+      const safeLen = Math.max(0, combined.length - TOOL_CARRY_LEN);
+      const toEmit = combined.slice(0, safeLen);
+      carry = combined.slice(safeLen);
+      return toEmit.replace(TOOL_NAME_SANITIZE_REGEX, "[strumento interno]");
+    },
+    /** Da chiamare una sola volta al termine dello stream — svuota il carry. */
+    flush(): string {
+      const out = carry.replace(TOOL_NAME_SANITIZE_REGEX, "[strumento interno]");
+      carry = "";
+      return out;
+    },
+  };
+}
+
+function sanitizeToolNames(text: string): string {
+  return text.replace(TOOL_NAME_SANITIZE_REGEX, "[strumento interno]");
+}
+
 router.post("/watchdog/chat", async (req: Request, res: Response) => {
   const parsed = chatSchema.safeParse(req.body);
   if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
@@ -284,10 +322,22 @@ router.post("/watchdog/chat", async (req: Request, res: Response) => {
 
   try {
     const { result } = await streamWatchdogChat({ messages: parsed.data.messages, adminId });
+    const sanitizer = makeToolNameStreamSanitizer();
     for await (const chunk of result.textStream) {
-      res.write(`data: ${JSON.stringify({ type: "text", chunk })}\n\n`);
+      const safe = sanitizer.feed(chunk);
+      // Anche se safe è vuoto non emettiamo un evento inutile.
+      if (safe.length > 0) {
+        res.write(`data: ${JSON.stringify({ type: "text", chunk: safe })}\n\n`);
+      }
     }
-    const final = await result.text;
+    // Svuota il carry residuo (nome tool a fine stream).
+    const trailing = sanitizer.flush();
+    if (trailing.length > 0) {
+      res.write(`data: ${JSON.stringify({ type: "text", chunk: trailing })}\n\n`);
+    }
+    // Il testo finale nel payload "done" è sanitizzato indipendentemente
+    // (result.text è l'accumulo completo — nessun chunk-split qui).
+    const final = sanitizeToolNames(await result.text);
     res.write(`event: done\ndata: ${JSON.stringify({ final })}\n\n`);
     res.end();
   } catch (err) {

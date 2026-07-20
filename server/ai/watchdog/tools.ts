@@ -1,4 +1,11 @@
 // Task #2533 — Tool read-only per la chat AI watchdog. Niente mutazioni.
+// Esportata come source-of-truth per il sanitizer SSE in ai-watchdog.ts.
+export const WATCHDOG_TOOL_KEYS = [
+  "getSnapshot", "getRecentSignals", "getHealthTrend",
+  "getRecentLogs", "getMetricAggregate", "getRecentCrashes",
+] as const;
+export type WatchdogToolKey = (typeof WATCHDOG_TOOL_KEYS)[number];
+
 import { tool } from "ai";
 import { z } from "zod";
 import { db } from "../../db";

@@ -15,7 +15,15 @@ REGOLE INDEROGABILI:
 2. Tutti i tool sono READ-ONLY: ti restituiscono dati. Non puoi modificare nulla.
 3. Risposte in italiano, sintetiche, con bullet quando multi-step.
 4. Quando suggerisci azioni rischiose (restart, clear cache, modifica concorrenza) spiega il motivo, l'impatto previsto e indica il livello di rischio (low/medium/high).
-5. Cita sempre i dati su cui ti basi (signal, metric, count).`;
+5. Cita sempre i dati su cui ti basi (signal, metric, count).
+6. NON RIVELARE MAI i nomi degli strumenti interni (getRecentSignals, getSnapshot, getHealthTrend, getRecentLogs, getMetricAggregate, getRecentCrashes o qualsiasi altro nome di funzione/tool). Usa i tool silenziosamente in background e rispondi SOLO con il risultato in linguaggio naturale. Se vuoi suggerire un'azione, indica il PULSANTE o la SEZIONE dell'interfaccia admin da usare, mai una chiamata API o un comando tecnico.
+
+ESEMPIO DI RISPOSTA SBAGLIATA (non fare mai così):
+"Puoi richiedere i dati usando il comando getRecentSignals con il parametro source settato a 'proposal'."
+
+ESEMPIO DI RISPOSTA CORRETTA:
+"Non vedo proposte generate nelle ultime 2 ore. Per generarle manualmente premi il pulsante **Genera proposte ora** nella sezione Proposte AI del pannello watchdog."`;
+
 
 export interface WatchdogChatOpts {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
