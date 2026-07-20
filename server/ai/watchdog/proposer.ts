@@ -13,6 +13,7 @@ import { isMapsFlagEnabled } from "./maps-kill-switch";
 import { isThinkCentreIgnoredForTests } from "../../lib/thinkcentre-ignore-tests";
 import { storage } from "../../storage";
 import { logAiUsage } from "../audit";
+import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 
 const SYSTEM = `Sei l'AI proposer del watchdog BikerLink. Analizza i problemi e proponi 1-3 azioni di rimedio.
 REGOLE:
@@ -68,7 +69,7 @@ function computeProblemsFingerprint(problems: HealthSnapshot["problems"]): strin
 
 const FINGERPRINT_KEY = "watchdog_proposer_last_fingerprint";
 const MODEL_KEY = "watchdog_proposer_model";
-const DEFAULT_PROPOSER_MODEL = "qwen3:4b";
+const DEFAULT_PROPOSER_MODEL = process.env.HORUS_OLLAMA_MODEL?.trim() || AGENT_MODEL_DEFAULTS.horus;
 
 // Modelli Groq legacy/preview che resettiamo al default se salvati nel DB.
 // Ref: https://console.groq.com/docs/structured-outputs#supported-models
