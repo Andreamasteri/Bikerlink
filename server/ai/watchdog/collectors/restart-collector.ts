@@ -11,17 +11,84 @@
 // push per lo stesso evento. Il crash_reason_alert, invece, NON è duplicato dal
 // monitor (che lo persiste ma non lo notifica) e resta l'unica via di alert →
 // mantiene severità "critical".
+//
+// Task #934 — aggiunto segnale backend.crash_rate_1h: legge direttamente
+// logs/uptime-resets.log e conta i riavvii inattesi nell'ultima ora.
+// HIGH se >2, CRITICAL se >4. Permette al pannello admin di vedere un crash
+// loop in corso prima del bounce successivo, senza aspettare che il DB venga
+// saturato (il segnale è filesystem-only, nessuna dipendenza dal pool).
+import fs from "fs";
+import path from "path";
 import { getRecentUnexpectedRestarts, getRecentCrashReasons, RESTART_VISIBLE_WINDOW_MIN } from "../restart-monitor";
 import type { Signal } from "../types";
 
+// Legge logs/uptime-resets.log e conta le righe "CRASH/RIAVVIO INATTESO"
+// con timestamp nell'ultimo windowMs. Non lancia mai: fallisce silenziosamente
+// restituendo 0 (il segnale viene omesso se il file non esiste o è illeggibile).
+function countCrashesInWindow(windowMs: number): { count: number; timestamps: string[] } {
+  try {
+    const logPath = path.resolve(process.cwd(), "logs", "uptime-resets.log");
+    if (!fs.existsSync(logPath)) return { count: 0, timestamps: [] };
+    const content = fs.readFileSync(logPath, "utf8");
+    const cutoff = Date.now() - windowMs;
+    const timestamps: string[] = [];
+    for (const line of content.split("\n")) {
+      if (!line.includes("CRASH/RIAVVIO INATTESO")) continue;
+      // Format: 2026-07-20T18:30:36.345Z BACKEND CRASH/RIAVVIO INATTESO …
+      const isoMatch = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)/.exec(line);
+      if (!isoMatch) continue;
+      const ts = new Date(isoMatch[1]!).getTime();
+      if (!isNaN(ts) && ts >= cutoff) {
+        timestamps.push(isoMatch[1]!);
+      }
+    }
+    return { count: timestamps.length, timestamps };
+  } catch {
+    return { count: 0, timestamps: [] };
+  }
+}
+
 export async function collectRestarts(): Promise<Signal[]> {
+  const signals: Signal[] = [];
+
+  // ── Phase 1: filesystem-only (NO DB dependency) ───────────────────────────
+  // Task #934 — crash_rate_1h è deliberatamente separato dal blocco DB: deve
+  // sopravvivere a pool saturo / circuit-breaker aperto, che è esattamente lo
+  // scenario in cui il segnale è più utile. countCrashesInWindow() è sincrona
+  // e legge solo logs/uptime-resets.log; non può bloccare né fallire con DB.
+  const CRASH_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 ora
+  const crashRate = countCrashesInWindow(CRASH_RATE_WINDOW_MS);
+  if (crashRate.count > 0) {
+    const severity =
+      crashRate.count > 4 ? "critical" :
+      crashRate.count > 2 ? "high" :
+      "warn";
+    signals.push({
+      source: "app",
+      metric: "backend.crash_rate_1h",
+      severity,
+      value: crashRate.count,
+      unit: "crashes/1h",
+      details: {
+        count: crashRate.count,
+        windowH: 1,
+        // max 5 timestamp per non gonfiare il payload
+        timestamps: crashRate.timestamps.slice(-5),
+        thresholdHigh: 2,
+        thresholdCritical: 4,
+      },
+    });
+  }
+
+  // ── Phase 2: DB-backed enrichment (best-effort, fallisce silenziosamente) ──
+  // restart_alert e crash_reason_alert dipendono dal DB. Un fallimento qui NON
+  // deve sopprimere crash_rate_1h (già pushato sopra): usiamo un try/catch
+  // separato che aggiunge solo un collector.error se il DB è irraggiungibile.
   try {
     const [restarts, crashReasons] = await Promise.all([
       getRecentUnexpectedRestarts(),
       getRecentCrashReasons(),
     ]);
-
-    const signals: Signal[] = [];
 
     if (restarts.length > 0) {
       const latest = restarts[0];
@@ -68,16 +135,14 @@ export async function collectRestarts(): Promise<Signal[]> {
         },
       });
     }
-
-    return signals;
   } catch (err) {
-    return [
-      {
-        source: "app",
-        metric: "collector.error",
-        severity: "warn",
-        details: { collector: "restart", error: (err as Error).message?.slice(0, 200) },
-      },
-    ];
+    signals.push({
+      source: "app",
+      metric: "collector.error",
+      severity: "warn",
+      details: { collector: "restart", error: (err as Error).message?.slice(0, 200) },
+    });
   }
+
+  return signals;
 }

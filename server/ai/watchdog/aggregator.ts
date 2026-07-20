@@ -340,6 +340,24 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       const threshold = det?.thresholdSec ?? 90;
       title = `ThinkCentre riavviato lentamente: ${sec}s (soglia ${threshold}s)`;
       suggestion = "Riavvio del ThinkCentre oltre la soglia di 90s. Possibile regressione del kernel (cgroup_drain_dying deadlock su Ubuntu 26.04 kernel ≤7.0.0-22-generic). Verifica la versione kernel con `uname -r` e considera l'upgrade a un kernel LTS dove il bug è confermato risolto. Il fix `ollama.service` ExecPreStop riduce l'esposizione ma non elimina il bug kernel.";
+    } else if (s.metric === "backend.crash_rate_1h") {
+      // Task #934 — segnale crash_rate_1h: letto direttamente da logs/uptime-resets.log.
+      const count = Number(s.value ?? 0);
+      const det = s.details as {
+        count?: number; windowH?: number; thresholdHigh?: number; thresholdCritical?: number;
+      } | undefined;
+      const tHigh = det?.thresholdHigh ?? 2;
+      const tCrit = det?.thresholdCritical ?? 4;
+      if (s.severity === "critical") {
+        title = `Crash loop backend: ${count} riavvii inattesi nell'ultima ora (soglia critica: >${tCrit})`;
+        suggestion = "Crash loop in corso. Verifica logs/uptime-resets.log, logs/cerbero.log e Sentry per la causa del crash. Il DB può saturarsi come effetto a cascata.";
+      } else if (s.severity === "high") {
+        title = `Tasso crash backend elevato: ${count} riavvii inattesi nell'ultima ora (soglia: >${tHigh})`;
+        suggestion = "Frequenza di riavvio inattesa. Verifica logs/backend-crashes.log e Sentry. Possibile regressione recente o esaurimento di una risorsa nativa.";
+      } else {
+        title = `Crash backend recenti: ${count} riavvii nell'ultima ora`;
+        suggestion = "Monitorare — entro la soglia ma sopra lo zero. Verifica logs/uptime-resets.log per la causa.";
+      }
     } else if (s.metric === "server.restart_alert") {
       const count = s.value ?? 1;
       const det = s.details as { minutesSinceLast?: number; latestAt?: string } | undefined;

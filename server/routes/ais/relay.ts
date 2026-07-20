@@ -149,6 +149,12 @@ function startHeartbeatWatch() {
       wsClient.removeAllListeners();
       wsClient.terminate();
       wsClient = null;
+      // Clear own timer immediately: the next startHeartbeatWatch() call (in
+      // the 'open' handler of the new connection) will create a fresh one.
+      // Without this, the interval keeps firing until the reconnect opens,
+      // triggering redundant terminate() calls on a null wsClient (harmless but noisy).
+      clearInterval(heartbeatTimer!);
+      heartbeatTimer = null;
       scheduleReconnect(" (heartbeat timeout)");
     }
   }, 30_000);
@@ -247,8 +253,16 @@ async function connectAisStream() {
 
     wsClient.on("error", (err) => {
       console.error("[ais-relay] ws error:", err.message);
-      wsClient?.terminate();
-      wsClient = null;
+      // removeAllListeners before terminate so the close handler does NOT fire
+      // a second scheduleReconnect on top of the one below — prevents timer
+      // accumulation and double-reconnect races over a long-running session.
+      if (wsClient) {
+        wsClient.removeAllListeners();
+        wsClient.terminate();
+        wsClient = null;
+      }
+      if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+      scheduleReconnect(" (ws error)");
     });
   } catch (err) {
     console.error("[ais-relay] connect error:", err);
