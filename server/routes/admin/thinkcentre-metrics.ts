@@ -20,6 +20,7 @@ import { tcMetricsHistory } from "@shared/db";
 import { gte, asc, desc, and, isNotNull } from "drizzle-orm";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { hubGet, HUB_VRAM_TIMEOUT_MS } from "../../lib/ai-hub-client";
+import { withShortCache } from "../../lib/short-cache";
 
 const router = Router();
 
@@ -28,6 +29,8 @@ const MAX_HISTORY_POINTS = 300;
 
 // Env letta per-richiesta (non a module-load): un secret appena provisioning-ato
 // prende effetto al semplice restart, senza redeploy del codice.
+// Cacheato 10 s (withShortCache) per evitare chiamate HTTP ridondanti quando il
+// pannello admin effettua polling rapido su più componenti contemporaneamente.
 router.get("/thinkcentre-metrics", async (_req: Request, res: Response) => {
   const metricsBase = process.env.THINKCENTRE_METRICS_URL?.trim().replace(/\/$/, "");
   const METRICS_URL = metricsBase ? `${metricsBase}/sys-metrics` : null;
@@ -37,62 +40,66 @@ router.get("/thinkcentre-metrics", async (_req: Request, res: Response) => {
     return res.json({ online: false, reason: "THINKCENTRE_METRICS_URL non configurato" });
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const payload = await withShortCache("admin:thinkcentre-metrics", 10_000, async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  // tc.biker-link.net è dietro Cloudflare Access (oltre all'X-Agent-Token
-  // applicativo): senza il Service Token CF la richiesta viene bloccata all'edge
-  // con 401/403 e il TC risulta erroneamente "offline". Gli header CF sono
-  // innocui se la policy Access non è attiva (l'origine li ignora).
-  const headers: Record<string, string> = { ...cfAccessHeaders() };
-  if (AGENT_TOKEN) headers["X-Agent-Token"] = AGENT_TOKEN;
+    // tc.biker-link.net è dietro Cloudflare Access (oltre all'X-Agent-Token
+    // applicativo): senza il Service Token CF la richiesta viene bloccata all'edge
+    // con 401/403 e il TC risulta erroneamente "offline". Gli header CF sono
+    // innocui se la policy Access non è attiva (l'origine li ignora).
+    const headers: Record<string, string> = { ...cfAccessHeaders() };
+    if (AGENT_TOKEN) headers["X-Agent-Token"] = AGENT_TOKEN;
 
-  try {
-    const upstream = await fetch(METRICS_URL, { signal: controller.signal, headers });
-    clearTimeout(timer);
-    if (!upstream.ok) {
-      return res.json({ online: false, reason: `HTTP ${upstream.status}` });
+    try {
+      const upstream = await fetch(METRICS_URL, { signal: controller.signal, headers });
+      clearTimeout(timer);
+      if (!upstream.ok) {
+        return { online: false, reason: `HTTP ${upstream.status}` };
+      }
+      const raw = await upstream.json() as Record<string, unknown>;
+      // Normalizza esplicitamente i campi attesi: se il TC agent cambia shape
+      // (es. rinomina loadAvg1 → loadAvg) il client riceve undefined per quel campo
+      // e la guard client-side degrada a "offline banner" senza crash.
+      // Passare il raw spread non-validato può introdurre campi inattesi o shape
+      // annidate che rompono le assunzioni di ThinkCentreEfficiencyCard.
+      const num = (v: unknown): number | undefined =>
+        typeof v === "number" ? v : undefined;
+      const normalized: Record<string, unknown> = {
+        online: true,
+        loadAvg1:   num(raw.loadAvg1),
+        loadAvg5:   num(raw.loadAvg5),
+        loadAvg15:  num(raw.loadAvg15),
+        ramUsedMb:  num(raw.ramUsedMb),
+        ramTotalMb: num(raw.ramTotalMb),
+        uptimeSec:  num(raw.uptimeSec),
+        cpuTempC:   num(raw.cpuTempC),
+        gpuTempC:   num(raw.gpuTempC),
+        gpuUtilPct: num(raw.gpuUtilPct),
+        vramUsedMb: num(raw.vramUsedMb),
+        vramTotalMb:num(raw.vramTotalMb),
+        checkedAt:  num(raw.checkedAt),
+      };
+      // diskMounts: valida che sia un array di oggetti con la shape attesa
+      if (Array.isArray(raw.diskMounts)) {
+        normalized.diskMounts = raw.diskMounts
+          .filter((m): m is Record<string, unknown> => m !== null && typeof m === "object")
+          .map((m) => ({
+            path:    typeof m.path    === "string" ? m.path    : "?",
+            usedGb:  num(m.usedGb)  ?? 0,
+            totalGb: num(m.totalGb) ?? 0,
+            usedPct: num(m.usedPct) ?? 0,
+          }));
+      }
+      return normalized;
+    } catch (err: unknown) {
+      clearTimeout(timer);
+      const isTimeout = err instanceof Error && err.name === "AbortError";
+      return { online: false, reason: isTimeout ? "timeout" : "unreachable" };
     }
-    const raw = await upstream.json() as Record<string, unknown>;
-    // Normalizza esplicitamente i campi attesi: se il TC agent cambia shape
-    // (es. rinomina loadAvg1 → loadAvg) il client riceve undefined per quel campo
-    // e la guard client-side degrada a "offline banner" senza crash.
-    // Passare il raw spread non-validato può introdurre campi inattesi o shape
-    // annidate che rompono le assunzioni di ThinkCentreEfficiencyCard.
-    const num = (v: unknown): number | undefined =>
-      typeof v === "number" ? v : undefined;
-    const normalized: Record<string, unknown> = {
-      online: true,
-      loadAvg1:   num(raw.loadAvg1),
-      loadAvg5:   num(raw.loadAvg5),
-      loadAvg15:  num(raw.loadAvg15),
-      ramUsedMb:  num(raw.ramUsedMb),
-      ramTotalMb: num(raw.ramTotalMb),
-      uptimeSec:  num(raw.uptimeSec),
-      cpuTempC:   num(raw.cpuTempC),
-      gpuTempC:   num(raw.gpuTempC),
-      gpuUtilPct: num(raw.gpuUtilPct),
-      vramUsedMb: num(raw.vramUsedMb),
-      vramTotalMb:num(raw.vramTotalMb),
-      checkedAt:  num(raw.checkedAt),
-    };
-    // diskMounts: valida che sia un array di oggetti con la shape attesa
-    if (Array.isArray(raw.diskMounts)) {
-      normalized.diskMounts = raw.diskMounts
-        .filter((m): m is Record<string, unknown> => m !== null && typeof m === "object")
-        .map((m) => ({
-          path:    typeof m.path    === "string" ? m.path    : "?",
-          usedGb:  num(m.usedGb)  ?? 0,
-          totalGb: num(m.totalGb) ?? 0,
-          usedPct: num(m.usedPct) ?? 0,
-        }));
-    }
-    return res.json(normalized);
-  } catch (err: unknown) {
-    clearTimeout(timer);
-    const isTimeout = err instanceof Error && err.name === "AbortError";
-    return res.json({ online: false, reason: isTimeout ? "timeout" : "unreachable" });
-  }
+  });
+
+  return res.json(payload);
 });
 
 // ── Picchi GPU 24h ────────────────────────────────────────────────────────
@@ -107,41 +114,47 @@ interface VramResponse {
   agentPeaks24h?: Record<string, AgentPeak>;
 }
 
+// Cacheato 30 s: i picchi 24h cambiano lentamente e la card è spesso
+// in polling; evita query DB + HTTP verso ai-hub ad ogni poll rapido.
 router.get("/tc-gpu-peaks", async (_req: Request, res: Response) => {
-  const cutoff24h = new Date(Date.now() - 24 * 60 * 60_000);
+  const payload = await withShortCache("admin:tc-gpu-peaks", 30_000, async () => {
+    const cutoff24h = new Date(Date.now() - 24 * 60 * 60_000);
 
-  // ── Picco temperatura GPU da storico DB ──────────────────────────────────
-  let gpuTempPeak: { valueC: number; at: string } | null = null;
-  try {
-    const rows = await withBgDbSlot(() =>
-      withDbRetry(() =>
-        db
-          .select({ gpuTempC: tcMetricsHistory.gpuTempC, sampledAt: tcMetricsHistory.sampledAt })
-          .from(tcMetricsHistory)
-          .where(and(gte(tcMetricsHistory.sampledAt, cutoff24h), isNotNull(tcMetricsHistory.gpuTempC)))
-          .orderBy(desc(tcMetricsHistory.gpuTempC))
-          .limit(1),
-      ),
-    );
-    if (rows.length > 0 && rows[0].gpuTempC != null) {
-      gpuTempPeak = { valueC: rows[0].gpuTempC, at: rows[0].sampledAt.toISOString() };
+    // ── Picco temperatura GPU da storico DB ──────────────────────────────────
+    let gpuTempPeak: { valueC: number; at: string } | null = null;
+    try {
+      const rows = await withBgDbSlot(() =>
+        withDbRetry(() =>
+          db
+            .select({ gpuTempC: tcMetricsHistory.gpuTempC, sampledAt: tcMetricsHistory.sampledAt })
+            .from(tcMetricsHistory)
+            .where(and(gte(tcMetricsHistory.sampledAt, cutoff24h), isNotNull(tcMetricsHistory.gpuTempC)))
+            .orderBy(desc(tcMetricsHistory.gpuTempC))
+            .limit(1),
+        ),
+      );
+      if (rows.length > 0 && rows[0].gpuTempC != null) {
+        gpuTempPeak = { valueC: rows[0].gpuTempC, at: rows[0].sampledAt.toISOString() };
+      }
+    } catch (err) {
+      console.warn("[tc-gpu-peaks] DB query error:", err);
     }
-  } catch (err) {
-    console.warn("[tc-gpu-peaks] DB query error:", err);
-  }
 
-  // ── Picchi VRAM per-agente da ai-hub /vram ───────────────────────────────
-  let agentPeaks24h: Record<string, AgentPeak> | null = null;
-  try {
-    const result = await hubGet<VramResponse>("/vram", undefined, HUB_VRAM_TIMEOUT_MS);
-    if (result.ok && result.data?.agentPeaks24h) {
-      agentPeaks24h = result.data.agentPeaks24h;
+    // ── Picchi VRAM per-agente da ai-hub /vram ───────────────────────────────
+    let agentPeaks24h: Record<string, AgentPeak> | null = null;
+    try {
+      const result = await hubGet<VramResponse>("/vram", undefined, HUB_VRAM_TIMEOUT_MS);
+      if (result.ok && result.data?.agentPeaks24h) {
+        agentPeaks24h = result.data.agentPeaks24h;
+      }
+    } catch (err) {
+      console.warn("[tc-gpu-peaks] ai-hub /vram error:", err);
     }
-  } catch (err) {
-    console.warn("[tc-gpu-peaks] ai-hub /vram error:", err);
-  }
 
-  return res.json({ gpuTempPeak, agentPeaks24h });
+    return { gpuTempPeak, agentPeaks24h };
+  });
+
+  return res.json(payload);
 });
 
 // ── Storico metriche TC ────────────────────────────────────────────────────

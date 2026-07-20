@@ -3,15 +3,29 @@
  *
  * `withShortCache` is the single canonical implementation for all admin
  * routes that need short-TTL caching on frequently-polled endpoints
- * (server-metrics, server-logs, uptime crash-count, …).
+ * (server-metrics, server-logs, uptime crash-count, thinkcentre-metrics, …).
+ *
+ * Usage pattern
+ * -------------
+ * Any admin route file that needs polling-friendly caching should import
+ * `withShortCache` from this module rather than defining a local Map:
+ *
+ *   import { withShortCache } from "../lib/short-cache";
+ *   const data = await withShortCache("admin:my-key", 10_000, async () => { ... });
+ *
+ * Reference implementations:
+ *   • server/routes/more-routes.ts     — server-metrics, server-logs, uptime
+ *   • server/routes/admin/thinkcentre-metrics.ts — TC agent proxy + GPU peaks
  *
  * Stampede protection
  * -------------------
  * When N parallel requests all arrive while the cache is cold, only the
  * first one executes fn(); the rest attach to the already-running Promise
- * instead of each issuing their own query/syscall.  This is the same
- * pattern used in admin-auth-cache (getOrFetchAdminCached) and resolves
- * the cache stampede that caused 26 Sentry events on /api/admin/uptime.
+ * instead of each issuing their own query/syscall.
+ *
+ * Sister pattern: server/lib/admin-auth-cache.ts (getOrFetchAdminCached)
+ * uses the identical three-path logic (fast/dedup/slow) for per-user admin
+ * auth lookups.  Consult that file for the user-keyed variant of this pattern.
  */
 
 const _shortCache = new Map<string, { value: unknown; expiresAt: number }>();
