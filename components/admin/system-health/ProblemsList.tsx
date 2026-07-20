@@ -1,6 +1,7 @@
 // Task #2533 — Lista problemi del watchdog.
 // Task #902 — pulsante "Fix ⚡" per i problemi HIGH/CRITICAL.
-import React, { useState } from "react";
+// Task #910 — safety timeout: actingId si azzera da solo se la promessa non si risolve.
+import React, { useState, useRef } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { CrashTypeBadge } from "@/components/admin/crash-logs/CrashLogTypes";
 
@@ -33,6 +34,12 @@ export function ProblemsList({
 }) {
   // Task #902 — traccia quale riga è in attesa di risposta AI.
   const [actingId, setActingId] = useState<string | null>(null);
+  // Task #910 — timer di sicurezza: se la promessa non si risolve entro
+  // SAFETY_TIMEOUT_MS (leggermente oltre il timeout API di 90s), azzera
+  // actingId automaticamente per evitare che il pulsante resti bloccato
+  // in caso di body non-JSON, network hang, o errore non propagato.
+  const SAFETY_TIMEOUT_MS = 95_000;
+  const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (!problems.length) {
     return <Text style={styles.empty}>Nessun problema rilevato.</Text>;
@@ -41,9 +48,17 @@ export function ProblemsList({
   const handleQuickPropose = async (id: string) => {
     if (!onQuickPropose || actingId !== null) return;
     setActingId(id);
+    safetyTimerRef.current = setTimeout(() => {
+      setActingId(null);
+      safetyTimerRef.current = null;
+    }, SAFETY_TIMEOUT_MS);
     try {
       await onQuickPropose(id);
     } finally {
+      if (safetyTimerRef.current !== null) {
+        clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+      }
       setActingId(null);
     }
   };
