@@ -132,13 +132,21 @@ export interface HorusProposerResult {
   meta: { provider: string; model: string; costUsd: number };
 }
 
+export interface HorusProposerOptions {
+  /** Se true, bypassa il fingerprint check (chiamata manuale "Proponi"). */
+  force?: boolean;
+}
+
 /**
  * Genera proposte di correzione per i problemi di routing (namespace Horus).
  * Prova PRIMA il modello di Horus (Ollama sul ThinkCentre) e, se non disponibile
  * o in errore, ricade sulla chain cloud (Groq→Gemini→OpenAI). La proposta è
  * firmata persona:"horus" nei details così la UI la attribuisce a Horus.
  */
-export async function runHorusRoutingProposer(snap: HealthSnapshot): Promise<HorusProposerResult | null> {
+export async function runHorusRoutingProposer(
+  snap: HealthSnapshot,
+  opts: HorusProposerOptions = {},
+): Promise<HorusProposerResult | null> {
   if (!(await isWatchdogEnabled())) return null;
 
   const horus = filterHorusProblems(snap.problems);
@@ -151,14 +159,21 @@ export async function runHorusRoutingProposer(snap: HealthSnapshot): Promise<Hor
     return null;
   }
 
-  // Fingerprint: non rigenerare se il set di problemi routing è invariato.
+  // Fingerprint: non rigenerare se il set di problemi routing è invariato,
+  // a meno che force=true (chiamata manuale "Proponi" dall'header admin).
   const currentFp = computeFingerprint(snap.problems);
-  const lastFp = await getLastFingerprint();
-  if (lastFp !== null && lastFp === currentFp) {
+  if (!opts.force) {
+    const lastFp = await getLastFingerprint();
+    if (lastFp !== null && lastFp === currentFp) {
+      console.info(
+        `[watchdog/horus-proposer] skip — problemi routing invariati (${horus.length} high/critical, stesso set)`,
+      );
+      return null;
+    }
+  } else {
     console.info(
-      `[watchdog/horus-proposer] skip — problemi routing invariati (${horus.length} high/critical, stesso set)`,
+      `[watchdog/horus-proposer] force=true — bypass fingerprint check (chiamata manuale "Proponi")`,
     );
-    return null;
   }
 
   const prompt = buildHorusProposerPrompt(snap.problems, snap);

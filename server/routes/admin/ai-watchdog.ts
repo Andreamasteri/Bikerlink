@@ -165,7 +165,10 @@ router.post("/watchdog/propose-now", async (_req, res) => {
   // nell'header admin si ottengono sempre nuove proposte, indipendentemente da
   // quante volte è stato premuto di recente.
   const out = await runProposer(snap, { force: true });
-  const horusOut = await runHorusRoutingProposer(snap);
+  // Task #892 — force:true bypassa anche il fingerprint check del proposer di
+  // routing Horus, così "Proponi" genera sempre nuove proposte routing come fa
+  // già il proposer generico.
+  const horusOut = await runHorusRoutingProposer(snap, { force: true });
   const proposals = [...(out?.proposals ?? []), ...(horusOut?.proposals ?? [])];
   return res.json({ proposals, meta: out?.meta ?? horusOut?.meta ?? null });
 });

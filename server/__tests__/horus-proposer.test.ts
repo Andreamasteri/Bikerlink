@@ -236,4 +236,35 @@ describe("horus routing proposer (Task #25)", () => {
     // La prima chiamata invoca l'AI, la seconda è saltata dal fingerprint.
     expect(generateStructuredMock).toHaveBeenCalledTimes(1);
   });
+
+  it("force=true bypassa il fingerprint: rigenera proposte anche se il set di problemi è invariato (Task #892)", async () => {
+    // Arrange — stessa snapshot chiamata due volte con force=true.
+    generateStructuredMock.mockResolvedValue({
+      object: {
+        proposals: [{
+          title: "Rebuild tile Valhalla sul ThinkCentre",
+          reasoning: "Valhalla restituisce percorsi implausibili.",
+          riskLevel: "high",
+          action: { kind: "manual_only", target: "valhalla", params: null },
+          affectedComponents: ["valhalla"],
+          rollbackHint: "Ripristina i tile dal backup.",
+        }],
+      },
+      usage: { inputTokens: 100, outputTokens: 80 },
+    });
+
+    // Prima chiamata con force=true.
+    const first = await runHorusRoutingProposer(snapshot([valhallaKO]), { force: true });
+    expect(first).not.toBeNull();
+    expect(first!.proposals).toHaveLength(1);
+
+    // Seconda chiamata con gli STESSI problemi e force=true — il fingerprint è
+    // identico, ma force deve bypassarlo e generare di nuovo.
+    const second = await runHorusRoutingProposer(snapshot([valhallaKO]), { force: true });
+    expect(second).not.toBeNull();
+    expect(second!.proposals).toHaveLength(1);
+
+    // L'AI è stata invocata in ENTRAMBE le chiamate (nessuna saltata dal fingerprint).
+    expect(generateStructuredMock).toHaveBeenCalledTimes(2);
+  });
 });
