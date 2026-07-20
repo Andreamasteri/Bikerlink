@@ -10,6 +10,30 @@ import {
   filterUserIdsByPreference,
   getAppPushTokens,
 } from "./push-notifications-internal";
+import { storage } from "./storage";
+
+// Task #940 — Webhook fallback: invia un POST JSON al webhook configurato in
+// AppSetting `admin_alert_webhook_url` quando nessun admin ha token push.
+// Silenzioso su qualsiasi errore (best-effort).
+async function trySendAdminWebhook(
+  title: string,
+  body: string,
+  data: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const row = await storage.getAppSetting("admin_alert_webhook_url");
+    const url = row?.value?.trim() || (row?.valueJson as string | null | undefined)?.trim();
+    if (!url) return;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, body, data, sentAt: new Date().toISOString() }),
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch {
+    // best-effort: non bloccare mai il percorso degli alert
+  }
+}
 
 export async function sendModeratorReportPush(opts: {
   reportedNickname: string;
@@ -154,7 +178,13 @@ export async function sendSystemAlertPushToAdmins(
       }
     }
 
-    if (messages.length === 0) return 0;
+    // Task #940 — Webhook fallback: se nessun token push è disponibile, tenta
+    // la consegna via webhook configurabile. Non blocca; non modifica il
+    // return value (0 = nessuna push Expo inviata, il fallback è trasparente).
+    if (messages.length === 0) {
+      await trySendAdminWebhook(title, body, data);
+      return 0;
+    }
     await sendExpoMessages(messages, userIdByToken);
     return messages.length;
   } catch (err) {

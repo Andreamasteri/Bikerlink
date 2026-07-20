@@ -29,6 +29,7 @@ import { collectAiHub } from "./collectors/ai-hub-collector";
 import { collectTcReboot } from "./collectors/tc-reboot-collector";
 import { collectMatchingDragonflyBlocked } from "./collectors/matching-dragonfly-blocked-collector";
 import { collectGhContainerRestarts } from "./collectors/gh-container-restart-collector";
+import { collectPushTokens } from "./collectors/push-tokens-collector";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { setHealthState } from "../../lib/health-arbiter";
@@ -141,6 +142,8 @@ async function runAggregatorCycleInner(): Promise<HealthSnapshot> {
     // Task #575 — blocco matching da lock DragonflyDB. Zero I/O di rete; una
     // sola query AppSetting (cachata 10min) → dentro withBgDbSlot.
     withBgDbSlot(() => collectMatchingDragonflyBlocked()),
+    // Task #940 — conta i token push admin; severity "warn" se 0 → banner UI + webhook fallback.
+    withBgDbSlot(() => collectPushTokens()),
   ]);
   const signals: Signal[] = [];
   for (const r of collectors) {

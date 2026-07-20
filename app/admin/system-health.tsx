@@ -324,6 +324,26 @@ export default function SystemHealthScreen() {
         </View>
       )}
 
+      {/* Task #940 — Banner token push admin mancanti: visibile quando nessun
+          admin ha token push registrati (segnale admin.push_tokens_count === 0).
+          Avvisa che gli alert critici non vengono recapitati via push e suggerisce
+          di configurare un canale di fallback o di accedere dall'app mobile. */}
+      {snap && snap.metrics["admin.push_tokens_count"] === 0 && (
+        <View style={styles.noPushBanner}>
+          <MaterialCommunityIcons name="bell-off-outline" size={20} color="#fff" />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.noPushBannerTitle}>
+              Nessun dispositivo admin registrato
+            </Text>
+            <Text style={styles.noPushBannerBody}>
+              Gli alert critici (crash, DB, routing) non arrivano sul telefono.{"\n"}
+              Accedi dall'app mobile con un account admin, oppure configura un webhook in{" "}
+              <Text style={styles.noPushBannerCode}>admin_alert_webhook_url</Text>.
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Kill-switch */}
       <View style={styles.card}>
         <View style={styles.headerRow}>
@@ -572,4 +592,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#3b82f6", borderRadius: 6, alignSelf: "center" as const,
   },
   snoozeCancelText: { color: "#fff", fontSize: 12, fontWeight: "700" as const },
+  // Task #940 — No push token banner styles
+  noPushBanner: {
+    flexDirection: "row" as const, alignItems: "flex-start",
+    backgroundColor: "#78350f", borderRadius: 10, padding: 12, marginBottom: 12,
+    borderWidth: 1, borderColor: "#f59e0b",
+  },
+  noPushBannerTitle: { color: "#fef3c7", fontSize: 13, fontWeight: "700" as const },
+  noPushBannerBody: { color: "#fde68a", fontSize: 12, marginTop: 2, lineHeight: 18 },
+  noPushBannerCode: { color: "#fbbf24", fontWeight: "600" as const },
 });
