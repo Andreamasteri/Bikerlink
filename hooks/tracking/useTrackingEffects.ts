@@ -34,11 +34,9 @@ const PENDING_POINTS_BUDGET_MS = 15_000;
 // main thread between batches via setTimeout(0) to prevent multi-second freezes
 // on resume. A Samsung S24 Ultra with 29 minutes of background tracking produced
 // ~1758 synchronous onNativeLocation calls that blocked the thread for 29 minutes.
-// Cap the total replay at BG_REPLAY_MAX_POINTS so a very long background session
-// can't OOM the device; excess (oldest) points are silently discarded — distance
-// continuity is maintained via dead-reckoning which ran live during the blackout.
+// All points are always replayed (no truncation) so route distance and geometry
+// are fully preserved; the yield between batches keeps the app responsive.
 const BG_REPLAY_BATCH_SIZE = 20;
-const BG_REPLAY_MAX_POINTS = 300; // ~5 minutes at 1 Hz; beyond this DR was already estimating
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface EffectDeps {
@@ -282,12 +280,11 @@ export function useTrackingEffects(deps: EffectDeps) {
           await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => {});
           const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
           if (raw) {
-            const allBgPoints: GpsPoint[] = JSON.parse(raw); await AsyncStorage.removeItem(BG_POINTS_KEY);
+            const bgPoints: GpsPoint[] = JSON.parse(raw); await AsyncStorage.removeItem(BG_POINTS_KEY);
             // Task #938 — async batched replay to prevent JS thread freeze on resume.
-            // Excess oldest points are dropped (DR already estimated that distance).
-            const bgPoints = allBgPoints.length > BG_REPLAY_MAX_POINTS
-              ? allBgPoints.slice(allBgPoints.length - BG_REPLAY_MAX_POINTS)
-              : allBgPoints;
+            // All points are replayed (no truncation) so route fidelity is preserved;
+            // yielding between batches keeps the app responsive for arbitrarily long
+            // background sessions (tested pattern: 29-min ride ≈ 1758 points).
             for (let i = 0; i < bgPoints.length; i += BG_REPLAY_BATCH_SIZE) {
               const batch = bgPoints.slice(i, i + BG_REPLAY_BATCH_SIZE);
               for (const p of batch) {
