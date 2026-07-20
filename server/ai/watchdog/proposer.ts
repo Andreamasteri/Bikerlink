@@ -68,14 +68,9 @@ function computeProblemsFingerprint(problems: HealthSnapshot["problems"]): strin
 
 const FINGERPRINT_KEY = "watchdog_proposer_last_fingerprint";
 const MODEL_KEY = "watchdog_proposer_model";
-const DEFAULT_PROPOSER_MODEL = "llama-3.3-70b-versatile";
+const DEFAULT_PROPOSER_MODEL = "qwen3:4b";
 
 // Modelli Groq legacy/preview che resettiamo al default se salvati nel DB.
-// NOTA (Task #4857): anche il DEFAULT_PROPOSER_MODEL (llama-3.3-70b-versatile) NON
-// supporta json_schema su Groq — come tutti i llama-3.x. Non per questo va resettato:
-// generateStructured() lo instrada su output:"no-schema" (JSON-object mode) + validazione
-// Zod, quindi funziona. Questo set elenca solo modelli che NON vogliamo usare comunque
-// (8b/preview/whisper), per ricadere sul default llama-3.3 più capace.
 // Ref: https://console.groq.com/docs/structured-outputs#supported-models
 const GROQ_UNSUPPORTED_STRUCTURED_MODELS = new Set([
   "llama-3.1-8b-instant",
@@ -86,6 +81,13 @@ const GROQ_UNSUPPORTED_STRUCTURED_MODELS = new Set([
   "llama-3.2-90b-vision-preview",
   "whisper-large-v3",
   "whisper-large-v3-turbo",
+]);
+
+// Valori legacy salvati nel DB che migriamo one-shot al nuovo default (qwen3:4b).
+// "llama-3.3-70b-versatile" era il vecchio DEFAULT_PROPOSER_MODEL — se trovato nel DB
+// viene sovrascritto silenziosamente con il nuovo default senza richiedere una migration SQL.
+const LEGACY_DEFAULT_MODELS_TO_MIGRATE = new Set([
+  "llama-3.3-70b-versatile",
 ]);
 
 let _cachedFingerprint: string | null = null;
@@ -115,8 +117,19 @@ async function getProposerModel(): Promise<string> {
     if (GROQ_UNSUPPORTED_STRUCTURED_MODELS.has(saved)) {
       console.warn(
         `[watchdog/proposer] modello salvato "${saved}" è legacy/preview — ` +
-        `reset al default ${DEFAULT_PROPOSER_MODEL} (llama-3.x via JSON-object mode)`,
+        `reset al default ${DEFAULT_PROPOSER_MODEL}`,
       );
+      return DEFAULT_PROPOSER_MODEL;
+    }
+    // One-shot migration: vecchio default (llama-3.3-70b-versatile) → nuovo default (qwen3:4b).
+    if (LEGACY_DEFAULT_MODELS_TO_MIGRATE.has(saved)) {
+      console.info(
+        `[watchdog/proposer] migrazione one-shot: "${saved}" → "${DEFAULT_PROPOSER_MODEL}" ` +
+        `(vecchio default Groq rimpiazzato da Horus TC)`,
+      );
+      try {
+        await storage.upsertAppSetting(MODEL_KEY, DEFAULT_PROPOSER_MODEL);
+      } catch {/* best-effort */}
       return DEFAULT_PROPOSER_MODEL;
     }
     return saved;
