@@ -344,7 +344,13 @@ export async function runProposer(snap: HealthSnapshot, opts: ProposerOptions = 
         const logId = await writeWatchdogLog({
           kind: "proposal", scope: p.action.kind, status: "pending",
           // Task #158 — actionType/actionLabel per la card admin (classificazione keyword).
-          summary: p.title, details: { ...p, ...classifyProposal(`${p.title}. ${p.reasoning}`) },
+          // Task #923 — signalId: salvato quando la proposta è stata generata via Fix ⚡
+          // su un segnale specifico; usato dal client per mostrare "⏳ Pending".
+          summary: p.title, details: {
+            ...p,
+            ...classifyProposal(`${p.title}. ${p.reasoning}`),
+            ...(opts.signalId ? { signalId: opts.signalId } : {}),
+          },
           costUsd: meta.costUsd / Math.max(1, proposals.length),
         });
         withIds.push({ ...p, logId });

@@ -1,6 +1,7 @@
 // Task #2533 — Lista problemi del watchdog.
 // Task #902 — pulsante "Fix ⚡" per i problemi HIGH/CRITICAL.
 // Task #910 — safety timeout: actingId si azzera da solo se la promessa non si risolve.
+// Task #923 — feedback inline post-Fix + badge "proposte già pending".
 import React, { useState, useRef } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { CrashTypeBadge } from "@/components/admin/crash-logs/CrashLogTypes";
@@ -25,15 +26,24 @@ function extractCrashSignalType(id: string): string | null {
   return null;
 }
 
+/** Stato del fix per una singola card: null = non ancora tentato. */
+type FixResult = { count: number } | "none" | null;
+
 export function ProblemsList({
   problems,
   onQuickPropose,
+  pendingSignalIds,
 }: {
   problems: Problem[];
-  onQuickPropose?: (problemId: string) => void;
+  /** Restituisce il numero di proposte generate (0 = nessuna). */
+  onQuickPropose?: (problemId: string) => Promise<number | undefined> | void;
+  /** Task #923 — insieme di signalId che hanno già proposte pending in DB. */
+  pendingSignalIds?: ReadonlySet<string>;
 }) {
   // Task #902 — traccia quale riga è in attesa di risposta AI.
   const [actingId, setActingId] = useState<string | null>(null);
+  // Task #923 — risultato post-Fix per ogni card (signalId → FixResult).
+  const [fixResults, setFixResults] = useState<Record<string, FixResult>>({});
   // Task #910 — timer di sicurezza: se la promessa non si risolve entro
   // SAFETY_TIMEOUT_MS (leggermente oltre il timeout API di 90s), azzera
   // actingId automaticamente per evitare che il pulsante resti bloccato
@@ -53,7 +63,12 @@ export function ProblemsList({
       safetyTimerRef.current = null;
     }, SAFETY_TIMEOUT_MS);
     try {
-      await onQuickPropose(id);
+      const count = await onQuickPropose(id);
+      // Task #923 — salva il risultato per mostrare il banner inline.
+      const result: FixResult = typeof count === "number" && count > 0
+        ? { count }
+        : "none";
+      setFixResults((prev) => ({ ...prev, [id]: result }));
     } finally {
       if (safetyTimerRef.current !== null) {
         clearTimeout(safetyTimerRef.current);
@@ -63,6 +78,10 @@ export function ProblemsList({
     }
   };
 
+  const dismissResult = (id: string) => {
+    setFixResults((prev) => ({ ...prev, [id]: null }));
+  };
+
   return (
     <View>
       {problems.map((p) => {
@@ -70,6 +89,10 @@ export function ProblemsList({
         const isActionable = p.severity === "high" || p.severity === "critical";
         const isBusy = actingId === p.id;
         const isDisabled = actingId !== null;
+        // Task #923 — segnale con proposte già pending in DB.
+        const hasPending = pendingSignalIds?.has(p.id) ?? false;
+        const fixResult = fixResults[p.id] ?? null;
+
         return (
           <View key={p.id} style={[styles.row, { borderLeftColor: SEV_COLOR[p.severity] }]}>
             <View style={styles.headerRow}>
@@ -84,23 +107,47 @@ export function ProblemsList({
                 )}
               </View>
               {isActionable && onQuickPropose ? (
-                <TouchableOpacity
-                  style={[styles.fixBtn, isDisabled && styles.fixBtnDisabled]}
-                  onPress={() => { void handleQuickPropose(p.id); }}
-                  disabled={isDisabled}
-                  activeOpacity={0.7}
-                >
-                  {isBusy ? (
-                    <ActivityIndicator size="small" color="#fff" style={styles.fixSpinner} />
-                  ) : (
-                    <Text style={styles.fixBtnText}>Fix ⚡</Text>
-                  )}
-                </TouchableOpacity>
+                hasPending ? (
+                  // Task #923 — proposte già presenti: bottone disabled con testo diverso.
+                  <View style={[styles.fixBtn, styles.fixBtnPending]}>
+                    <Text style={styles.fixBtnPendingText}>⏳ Pending</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.fixBtn, isDisabled && styles.fixBtnDisabled]}
+                    onPress={() => { void handleQuickPropose(p.id); }}
+                    disabled={isDisabled}
+                    activeOpacity={0.7}
+                  >
+                    {isBusy ? (
+                      <ActivityIndicator size="small" color="#fff" style={styles.fixSpinner} />
+                    ) : (
+                      <Text style={styles.fixBtnText}>Fix ⚡</Text>
+                    )}
+                  </TouchableOpacity>
+                )
               ) : null}
             </View>
             <Text style={styles.title}>{p.title}</Text>
             {p.detail ? <Text style={styles.detail} numberOfLines={2}>{p.detail}</Text> : null}
             {p.suggestion ? <Text style={styles.sugg}>→ {p.suggestion}</Text> : null}
+
+            {/* Task #923 — banner inline post-Fix */}
+            {fixResult !== null && (
+              <View style={[
+                styles.fixBanner,
+                fixResult === "none" ? styles.fixBannerNone : styles.fixBannerOk,
+              ]}>
+                <Text style={styles.fixBannerText}>
+                  {fixResult === "none"
+                    ? "Nessuna proposta automatica disponibile"
+                    : `${fixResult.count} ${fixResult.count === 1 ? "proposta pronta" : "proposte pronte"} — scorri alle Proposte AI`}
+                </Text>
+                <TouchableOpacity onPress={() => dismissResult(p.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={styles.fixBannerDismiss}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         );
       })}
@@ -130,4 +177,16 @@ const styles = StyleSheet.create({
   fixBtnDisabled: { opacity: 0.45 },
   fixBtnText: { color: "#f3f4f6", fontSize: 12, fontWeight: "700" as const },
   fixSpinner: { width: 16, height: 16 },
+  // Task #923 — stato "proposte già pending"
+  fixBtnPending: { backgroundColor: "#1e3a5f", opacity: 0.8 },
+  fixBtnPendingText: { color: "#93c5fd", fontSize: 12, fontWeight: "600" as const },
+  // Task #923 — banner inline post-Fix
+  fixBanner: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    marginTop: 8, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6,
+  },
+  fixBannerOk: { backgroundColor: "#14532d" },
+  fixBannerNone: { backgroundColor: "#374151" },
+  fixBannerText: { color: "#d1fae5", fontSize: 12, flex: 1 },
+  fixBannerDismiss: { color: "#9ca3af", fontSize: 12, marginLeft: 8 },
 });

@@ -116,6 +116,14 @@ export default function SystemHealthScreen() {
 
   const pendingProposals = (proposalsQ.data?.logs ?? []).filter((p) => p.status === "pending");
 
+  // Task #923 — insieme di signalId che hanno già proposte pending: usato da
+  // ProblemsList per mostrare "⏳ Pending" invece di "Fix ⚡".
+  const pendingSignalIds = new Set(
+    pendingProposals
+      .map((p) => (p.details as { signalId?: string } | null)?.signalId)
+      .filter((id): id is string => typeof id === "string" && id.length > 0),
+  );
+
   const toggle = useMutation({
     mutationFn: async (enabled: boolean) => {
       await apiRequest("POST", "/api/admin/watchdog/enabled", { enabled });
@@ -157,7 +165,9 @@ export default function SystemHealthScreen() {
 
   // Task #902 — "Fix ⚡" su ogni riga HIGH/CRITICAL: chiama propose-now con un
   // filtro signalId così l'AI si concentra sul singolo problema.
-  const onQuickPropose = async (signalId: string) => {
+  // Task #923 — restituisce il conteggio proposte generate (0 = nessuna) così
+  // ProblemsList può mostrare il banner inline corretto.
+  const onQuickPropose = async (signalId: string): Promise<number> => {
     try {
       const res = await apiRequest(
         "POST",
@@ -165,8 +175,9 @@ export default function SystemHealthScreen() {
         { signalId },
         { timeoutMs: 90_000 },
       );
-      await res.json();
+      const data = await res.json() as { proposals?: Array<unknown> };
       await qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"] });
+      return data.proposals?.length ?? 0;
     } catch (err) {
       const e = err as Error;
       const isTimeout = e.name === "AbortError" || e.message.includes("timeout");
@@ -396,7 +407,11 @@ export default function SystemHealthScreen() {
           </View>
 
           <SectionTitle icon="alert-circle-outline">Problemi rilevati</SectionTitle>
-          <ProblemsList problems={snap.problems} onQuickPropose={onQuickPropose} />
+          <ProblemsList
+            problems={snap.problems}
+            onQuickPropose={onQuickPropose}
+            pendingSignalIds={pendingSignalIds}
+          />
 
           <SectionTitle icon="chart-box-outline">Metriche</SectionTitle>
           <MetricsGrid metrics={snap.metrics} />
