@@ -202,6 +202,18 @@ function pickActiveDirective(effective: {
 }
 
 export async function getCoordinatorState(): Promise<{ state: CoordinatorState; reason: string }> {
+  // Task #935 — Boot-race guard: se il pool DB non è sano saltiamo TUTTE le
+  // query (loadDirectiveIfNeeded + auto_matching_enabled). Questo previene il
+  // pattern di errori Sentry "Failed query: select … from app_settings where
+  // key = 'auto_matching_enabled'" causati da query transitori fallite al boot
+  // del managed Postgres di Replit, che vengono catturate dall'auto-strumentazione
+  // pg di @sentry/node anche se il try/catch sottostante le gestisce già.
+  // directivesLoaded rimane false così vengono caricate alla prima chiamata
+  // successiva con pool sano.
+  if (!isPoolHealthy()) {
+    return { state: "paused_by_killswitch", reason: "pool DB saturo — query auto_matching_enabled saltata" };
+  }
+
   await loadDirectiveIfNeeded();
 
   let autoMatchSetting: Awaited<ReturnType<typeof storage.getAppSetting>>;
@@ -228,10 +240,6 @@ export async function getCoordinatorState(): Promise<{ state: CoordinatorState; 
         ? activePauses[0].reason
         : activePauses.map((d) => `${d.issuedBy}: ${d.reason}`).join(" | ");
     return { state: "paused_by_ai", reason };
-  }
-
-  if (!isPoolHealthy()) {
-    return { state: "paused_by_killswitch", reason: "pool DB saturo" };
   }
 
   return { state: "running", reason: "nessun blocco attivo" };

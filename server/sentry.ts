@@ -25,6 +25,16 @@ export async function initSentry(): Promise<void> {
         "BgDbSlowKillSwitchError",
         "BgDbQueueTimeoutError",
         "BgDbQueueOverflowError",
+        // Task #935 — Errori DB transitori già gestiti con fallback conservativo
+        // nel Matching Coordinator (→ paused_by_killswitch). L'auto-strumentazione
+        // pg di @sentry/node li cattura a livello driver anche quando il codice
+        // applicativo li gestisce tramite try/catch: aggiungere qui previene il
+        // rumore in Sentry senza rimuovere la gestione applicativa.
+        "DbTimeoutError",
+        /DB query timeout/,
+        /connection timeout/i,
+        /connection terminated/i,
+        /connection reset/i,
       ],
     });
     sentryReady = true;

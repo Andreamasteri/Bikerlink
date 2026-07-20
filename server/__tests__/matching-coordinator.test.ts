@@ -71,13 +71,21 @@ describe("getCoordinatorState — nessuna regressione sul comportamento determin
     expect(state).toBe("stopped");
   });
 
-  it("paused_by_killswitch quando il pool DB è saturo", async () => {
+  it("paused_by_killswitch quando il pool DB è saturo — NESSUNA query su auto_matching_enabled tentata", async () => {
+    // Task #935 — boot-race guard: se il pool non è sano, il coordinator deve
+    // restituire paused_by_killswitch SENZA tentare alcuna query DB, così
+    // l'auto-strumentazione pg di Sentry non cattura errori di connessione
+    // transitori come bug reali.
     isPoolHealthyMock.mockReturnValue(false);
-    const { state } = await getCoordinatorState();
+    const { state, reason } = await getCoordinatorState();
     expect(state).toBe("paused_by_killswitch");
+    expect(reason).toMatch(/pool DB saturo/);
+    // Nessuna query su app_settings deve essere stata tentata.
+    expect(getAppSettingMock).not.toHaveBeenCalledWith("auto_matching_enabled");
   });
 
   it("paused_by_killswitch (senza eccezione) quando getAppSetting lancia un errore di timeout", async () => {
+    // Pool sano ma query transient-fail: il catch conservativo deve scattare.
     getAppSettingMock.mockRejectedValue(new Error("connection timeout"));
     const result = await getCoordinatorState();
     expect(result.state).toBe("paused_by_killswitch");
