@@ -30,6 +30,16 @@ const IDLE_THRESHOLD_KMH = 2;
 const PENDING_POINTS_REQUEST_TIMEOUT_MS = 8_000;
 const PENDING_POINTS_BUDGET_MS = 15_000;
 
+// Task #938 — bg-point replay: process in batches of this size, yielding the JS
+// main thread between batches via setTimeout(0) to prevent multi-second freezes
+// on resume. A Samsung S24 Ultra with 29 minutes of background tracking produced
+// ~1758 synchronous onNativeLocation calls that blocked the thread for 29 minutes.
+// Cap the total replay at BG_REPLAY_MAX_POINTS so a very long background session
+// can't OOM the device; excess (oldest) points are silently discarded — distance
+// continuity is maintained via dead-reckoning which ran live during the blackout.
+const BG_REPLAY_BATCH_SIZE = 20;
+const BG_REPLAY_MAX_POINTS = 300; // ~5 minutes at 1 Hz; beyond this DR was already estimating
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface EffectDeps {
   t: (key: string) => string;
@@ -272,11 +282,25 @@ export function useTrackingEffects(deps: EffectDeps) {
           await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => {});
           const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
           if (raw) {
-            const bgPoints: GpsPoint[] = JSON.parse(raw); await AsyncStorage.removeItem(BG_POINTS_KEY);
-            bgPoints.forEach((p) => onNativeLocation({
-              coords: { latitude: p.latitude, longitude: p.longitude, altitude: p.altitude, speed: p.speedKmh / 3.6, accuracy: 0, heading: 0, altitudeAccuracy: 0 },
-              timestamp: new Date(p.timestamp).getTime(),
-            } as Location.LocationObject));
+            const allBgPoints: GpsPoint[] = JSON.parse(raw); await AsyncStorage.removeItem(BG_POINTS_KEY);
+            // Task #938 — async batched replay to prevent JS thread freeze on resume.
+            // Excess oldest points are dropped (DR already estimated that distance).
+            const bgPoints = allBgPoints.length > BG_REPLAY_MAX_POINTS
+              ? allBgPoints.slice(allBgPoints.length - BG_REPLAY_MAX_POINTS)
+              : allBgPoints;
+            for (let i = 0; i < bgPoints.length; i += BG_REPLAY_BATCH_SIZE) {
+              const batch = bgPoints.slice(i, i + BG_REPLAY_BATCH_SIZE);
+              for (const p of batch) {
+                onNativeLocation({
+                  coords: { latitude: p.latitude, longitude: p.longitude, altitude: p.altitude, speed: p.speedKmh / 3.6, accuracy: 0, heading: 0, altitudeAccuracy: 0 },
+                  timestamp: new Date(p.timestamp).getTime(),
+                } as Location.LocationObject);
+              }
+              // Yield the JS main thread between batches so the app stays responsive.
+              if (i + BG_REPLAY_BATCH_SIZE < bgPoints.length) {
+                await new Promise<void>((r) => setTimeout(r, 0));
+              }
+            }
             if (bgPoints.length > 0) {
               if (deps.isTabFocusedRef.current) {
                 bg.setBgToastCount(bgPoints.length); bg.setBgToastVisible(true);
