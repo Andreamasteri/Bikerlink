@@ -249,4 +249,53 @@ describe("ServerEfficiencyCard — resilienza alla shape del payload API", () =>
     expect(texts.some((t) => t.includes("0.45"))).toBe(false);
   });
 
+  it("4. payload con cpu: {} (oggetto vuoto) — nessun TypeError, '—' per loadAvg1", async () => {
+    // Questo è il crash storico di Task #900:
+    //   "Cannot read property 'loadAvg1' of undefined"
+    // Si verificava quando il server restituiva `cpu: {}` (oggetto vuoto) invece di
+    // `cpu: undefined`. In quel caso `cpu` era truthy ma `cpu.loadAvg1` era undefined,
+    // e il ramo `{cpu ? cpu.loadAvg1.toFixed(2) : "—"}` chiamava .toFixed() su undefined.
+    //
+    // Il fix usa optional chaining: `cpu?.loadAvg1 != null ? cpu.loadAvg1.toFixed(2) : "—"`.
+    const emptyCpuPayload = {
+      cpu: {}, // oggetto truthy ma senza i campi numerici
+      memory: {
+        total: 4 * 1024 * 1024 * 1024,
+        free: 1 * 1024 * 1024 * 1024,
+        used: 3 * 1024 * 1024 * 1024,
+        usedPercent: 75,
+        processRss: 200 * 1024 * 1024,
+        processHeapUsed: 100 * 1024 * 1024,
+        processHeapTotal: 150 * 1024 * 1024,
+      },
+      network: {
+        rxBytes: 1024 * 1024 * 10,
+        txBytes: 1024 * 1024 * 2,
+        rxRate: 1024,
+        txRate: 512,
+      },
+      uptimeSec: 600,
+      serverNow: Date.now(),
+    };
+
+    mockBothQueries(buildMetricsReturn(emptyCpuPayload));
+
+    // Nessun TypeError deve essere lanciato — né durante il mount né all'espansione.
+    await expect(
+      (async () => {
+        await mount();
+        await expandCard();
+      })(),
+    ).resolves.toBeUndefined();
+
+    const texts = getTextContents();
+
+    // loadAvg1 è undefined → il guard mostra "—" (non crasha con .toFixed on undefined)
+    expect(texts.some((t) => t === "—")).toBe(true);
+
+    // Nessun valore numerico da loadAvg1 deve apparire (sarebbe "NaN" o "undefined" se rotto)
+    expect(texts.some((t) => t.includes("NaN"))).toBe(false);
+    expect(texts.some((t) => t.includes("undefined"))).toBe(false);
+  });
+
 });

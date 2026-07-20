@@ -162,14 +162,14 @@ export function ServerEfficiencyCard() {
           <View style={srvStyles.statsRow}>
             <View style={srvStyles.stat}>
               <Text style={srvStyles.statValue}>
-                {cpu ? `${cpu.loadAvg1.toFixed(2)}` : "—"}
+                {cpu?.loadAvg1 != null ? `${cpu.loadAvg1.toFixed(2)}` : "—"}
               </Text>
               <Text style={srvStyles.statLabel}>Load 1m</Text>
             </View>
             <View style={srvStyles.divider} />
             <View style={srvStyles.stat}>
               <Text style={srvStyles.statValue}>
-                {cpu ? `${cpu.loadAvg5.toFixed(2)} / ${cpu.loadAvg15.toFixed(2)}` : "—"}
+                {cpu ? `${(cpu.loadAvg5 ?? 0).toFixed(2)} / ${(cpu.loadAvg15 ?? 0).toFixed(2)}` : "—"}
               </Text>
               <Text style={srvStyles.statLabel}>Load 5m / 15m</Text>
             </View>
@@ -179,7 +179,7 @@ export function ServerEfficiencyCard() {
                 {cpu ? `${(loadPerCore * 100).toFixed(0)}%` : "—"}
               </Text>
               <Text style={srvStyles.statLabel}>
-                {cpu ? `${cpu.cores} core · Node ${cpu.processCpuPercent.toFixed(0)}%` : "Carico"}
+                {cpu ? `${cpu.cores ?? 0} core · Node ${(cpu.processCpuPercent ?? 0).toFixed(0)}%` : "Carico"}
               </Text>
             </View>
           </View>
