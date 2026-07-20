@@ -40,20 +40,38 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 // Cache in-process breve per le risposte degli endpoint admin letti con polling
 // frequente. TTL configurabile per endpoint; evita query/filesystem ripetuti.
 const _shortCache = new Map<string, { value: unknown; expiresAt: number }>();
+// In-flight deduplication: se N richieste parallele arrivano a cache fredda,
+// solo la prima lancia fn(); le altre si agganciamo alla stessa Promise.
+// Questo è il pattern già usato in admin-auth-cache (getOrFetchAdminCached)
+// e risolve il cache stampede che causava N query DB su /api/admin/uptime.
+const _shortCacheInflight = new Map<string, Promise<unknown>>();
 
 /** Esposto solo per i test — azzera cache e campione precedente. */
 export function __resetServerMetricsCacheForTests(): void {
   _shortCache.delete("admin:server-metrics");
+  _shortCacheInflight.delete("admin:server-metrics");
   lastServerSample = null;
 }
 async function withShortCache<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+  // Fast path: cache valida.
   const cached = _shortCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.value as T;
   }
-  const value = await fn();
-  _shortCache.set(key, { value, expiresAt: Date.now() + ttlMs });
-  return value;
+  // Dedup path: una richiesta parallela sta già eseguendo fn().
+  const inflight = _shortCacheInflight.get(key);
+  if (inflight) return inflight as Promise<T>;
+  // Slow path: esegui fn(), popola la cache, rimuovi l'in-flight.
+  const promise = fn().then((value) => {
+    _shortCacheInflight.delete(key);
+    _shortCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+    return value;
+  }).catch((err: unknown) => {
+    _shortCacheInflight.delete(key);
+    throw err;
+  });
+  _shortCacheInflight.set(key, promise as Promise<unknown>);
+  return promise;
 }
 
 // Task #2851 — Monitor Efficienza Server: campionamento rete + CPU processo.
