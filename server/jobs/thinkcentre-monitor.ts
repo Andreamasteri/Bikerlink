@@ -178,12 +178,20 @@ async function handlePerServiceNotifications(
       void recordHealthEvent(s.key, prevOk ? "ok" : "ko", currentOk ? "ok" : "ko");
     }
 
-    // Se la probe DragonflyDB torna OK (false → true), avvia reInit anche quando il TC
-    // non era "red" (altri servizi ancora up) — evita che ioredis resti disconnesso a
-    // tempo indeterminato dopo la race ECONNREFUSED al boot del bridge cloudflared.
-    if (s.key === "dragonfly" && prevOk === false && currentOk === true) {
-      void reInitRedis();
-      console.log("[thinkcentre-monitor] DragonflyDB probe tornata OK — reInit avviato");
+    // Per-service DragonflyDB lifecycle hooks (TC green/yellow — not handled by the red path):
+    if (s.key === "dragonfly") {
+      if (prevOk === false && currentOk === true) {
+        // Probe tornata OK (false → true): avvia reInit anche quando il TC non era "red"
+        // (altri servizi ancora up) — evita che ioredis resti disconnesso a tempo
+        // indeterminato dopo la race ECONNREFUSED al boot del bridge cloudflared.
+        void reInitRedis();
+        console.log("[thinkcentre-monitor] DragonflyDB probe tornata OK — reInit avviato");
+      } else if (prevOk === true && currentOk === false) {
+        // Probe andata KO (true → false): sospendi subito per azzerare state.client e
+        // bloccare il flooding "Stream isn't writeable" da matching-lock/Redlock.
+        console.log("[thinkcentre-monitor] DragonflyDB probe KO (TC green) — suspendRedis avviato");
+        void suspendRedis();
+      }
     }
 
     if (!pushEnabled) continue;
@@ -254,6 +262,9 @@ export async function runThinkCentreProbe(): Promise<void> {
       console.log(`[thinkcentre-monitor] notifica offline inviata a ${n} admin`);
     }
     // TC offline → sospendi DragonflyDB (evita flooding di errori di connessione).
+    // Nota: esiste anche un path per-servizio in handlePerServiceNotifications che
+    // chiama suspendRedis() quando la sola probe DragonflyDB transisce ok→ko mentre
+    // TC non è ancora "red". suspendRedis() è idempotente (guard su state.client==null).
     void suspendRedis();
     return;
   }
