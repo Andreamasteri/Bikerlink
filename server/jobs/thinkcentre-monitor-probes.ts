@@ -98,6 +98,12 @@ export interface ServiceProbeResult {
   key: ServiceKey;
   label: string;
   ok: boolean | null;
+  /**
+   * Causa leggibile quando `ok` è false — es. "token non configurato",
+   * "CF Access bloccato", "token non valido (401)", "offline / non raggiungibile".
+   * Assente quando `ok` è true o null.
+   */
+  reason?: string;
 }
 
 export interface AggregateProbeResult {
@@ -245,13 +251,65 @@ async function probeOllamaOk(): Promise<boolean | null> {
   return httpProbe(`${base}/api/tags`, headers);
 }
 
-async function probeWhisperOk(): Promise<boolean | null> {
+/**
+ * Risultato strutturato del probe Whisper.
+ * Distingue le cause di fallimento anziché collassarle in un generico boolean.
+ */
+export interface WhisperProbeResult {
+  /** null = servizio non configurato (WHISPER_URL assente) */
+  ok: boolean | null;
+  /** Causa leggibile del fallimento, assente se ok è true o null. */
+  reason?: string;
+  /** true se WHISPER_TOKEN è assente o vuoto. */
+  tokenMissing?: boolean;
+  /** true se il 401/403 proviene da Cloudflare Access (non dal token applicativo). */
+  cfAccessBlocked?: boolean;
+}
+
+async function probeWhisperOk(): Promise<WhisperProbeResult> {
   const base = process.env.WHISPER_URL?.replace(/\/$/, "");
-  if (!base) return null;
+  if (!base) return { ok: null };
+
+  const token = process.env.WHISPER_TOKEN?.trim();
+  if (!token) {
+    // Token assente: la fetch produrrebbe sempre un 401 applicativo.
+    // Restituiamo subito il motivo senza fare la richiesta.
+    return { ok: false, tokenMissing: true, reason: "token non configurato" };
+  }
+
   const headers: Record<string, string> = { ...cfAccessHeaders() };
-  const token = process.env.WHISPER_TOKEN;
-  if (token) headers["X-Whisper-Token"] = token;
-  return httpProbe(`${base}/`, headers, (s) => s < 500);
+  headers["X-Whisper-Token"] = token;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${base}/`, { method: "GET", headers, signal: controller.signal });
+    if (res.status < 500) {
+      // 2xx-4xx: il server risponde. Distingui 401/403 per causa.
+      if (res.status === 401 || res.status === 403) {
+        let bodyText = "";
+        try { bodyText = (await res.text()).slice(0, 400); } catch { /* noop */ }
+        const cfAccessBlocked =
+          res.headers.get("cf-access-error") !== null ||
+          /access denied|cloudflare access/i.test(bodyText);
+        if (cfAccessBlocked) {
+          return { ok: false, cfAccessBlocked: true, reason: "CF Access bloccato" };
+        }
+        return { ok: false, reason: "token non valido (401)" };
+      }
+      return { ok: true };
+    }
+    return { ok: false, reason: "offline / non raggiungibile" };
+  } catch (err: unknown) {
+    const isAbort = err instanceof Error && err.name === "AbortError";
+    const isNetwork = err instanceof Error && /fetch failed|ECONNREFUSED|ENOTFOUND/i.test(err.message);
+    if (isAbort || isNetwork) {
+      return { ok: false, reason: "offline / non raggiungibile" };
+    }
+    return { ok: false, reason: "offline / non raggiungibile" };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function probePhotonOk(): Promise<boolean | null> {
@@ -364,9 +422,9 @@ async function probeUptimeKumaOk(): Promise<boolean | null> {
 }
 
 export async function runAllProbes(): Promise<AggregateProbeResult> {
+  // Probe generiche (boolean | null): non richiedono diagnostica strutturata.
   const probes: Array<{ key: ServiceKey; label: string; fn: () => Promise<boolean | null> }> = [
     { key: "ollama",      label: "Ollama AI",      fn: probeOllamaOk },
-    { key: "whisper",     label: "Whisper ASR",    fn: probeWhisperOk },
     { key: "photon",      label: "Photon",         fn: probePhotonOk },
     { key: "valhalla",    label: "Valhalla",       fn: probeValhallaOk },
     { key: "ufw",         label: "Firewall (ufw)", fn: probeUfwOk },
@@ -375,8 +433,10 @@ export async function runAllProbes(): Promise<AggregateProbeResult> {
     { key: "uptimekuma",  label: "Uptime Kuma",    fn: probeUptimeKumaOk },
   ];
 
-  const [otherResults, gh] = await Promise.all([
+  // Whisper è eseguita separatamente per ottenere il risultato strutturato.
+  const [otherResults, whisperResult, gh] = await Promise.all([
     Promise.allSettled(probes.map((p) => p.fn())),
+    probeWhisperOk(),
     probeGraphHopperAreas(),
   ]);
 
@@ -386,8 +446,20 @@ export async function runAllProbes(): Promise<AggregateProbeResult> {
     return { key: p.key, label: p.label, ok };
   });
 
-  const services: ServiceProbeResult[] = [...otherServices, ...gh.areas];
-  const logicalUnits: Array<boolean | null> = [...otherServices.map((s) => s.ok), gh.unitOk];
+  // Costruisci il ServiceProbeResult per Whisper con il campo `reason` strutturato.
+  const whisperService: ServiceProbeResult = {
+    key: "whisper",
+    label: "Whisper ASR",
+    ok: whisperResult.ok,
+    ...(whisperResult.reason !== undefined ? { reason: whisperResult.reason } : {}),
+  };
+
+  const services: ServiceProbeResult[] = [...otherServices, whisperService, ...gh.areas];
+  const logicalUnits: Array<boolean | null> = [
+    ...otherServices.map((s) => s.ok),
+    whisperResult.ok,
+    gh.unitOk,
+  ];
   const overall = computeOverallStatus(logicalUnits);
 
   return { overall, services };

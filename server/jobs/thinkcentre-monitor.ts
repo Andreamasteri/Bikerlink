@@ -200,9 +200,12 @@ async function handlePerServiceNotifications(
 
     if (!shouldNotifyService(s.key)) continue;
 
+    const body = s.reason
+      ? `Il servizio ${s.label} sul ThinkCentre non risponde: ${s.reason}`
+      : `Il servizio ${s.label} sul ThinkCentre non risponde`;
     const n = await sendSystemAlertPushToAdmins(
       `🔴 ${s.label} offline`,
-      `Il servizio ${s.label} sul ThinkCentre non risponde`,
+      body,
       { type: "thinkcentre_service_offline", service: s.key },
     );
     console.log(`[thinkcentre-monitor] notifica per-servizio inviata: ${s.key} offline → ${n} admin`);
