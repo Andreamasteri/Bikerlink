@@ -40,6 +40,12 @@ function probeToSignal(metric: string, r: CorrectnessProbeResult, recentErrors?:
   };
 }
 
+// Task #952 — Latch per il segnale di recupero plausibilità routing.
+// Tracciamo quale engine aveva una sonda non-plausibile al ciclo precedente
+// così il segnale ".recovered" viene emesso SOLO sulla transizione failing→ok
+// (non ad ogni ciclo ok), riducendo il numero di metric info nel snapshot.
+const prevRoutingFailing = new Map<string, boolean>();
+
 export async function collectRoutingCorrectness(): Promise<Signal[]> {
   const signals: Signal[] = [];
   try {
@@ -51,8 +57,44 @@ export async function collectRoutingCorrectness(): Promise<Signal[]> {
     const photon = byEngine.get("photon");
     const pipeline = byEngine.get("pipeline");
 
-    if (gh) signals.push(probeToSignal("routing.graphhopper.correct", gh, safeHistory("graphhopper")));
-    if (valhalla) signals.push(probeToSignal("routing.valhalla.correct", valhalla, safeHistory("valhalla")));
+    if (gh) {
+      signals.push(probeToSignal("routing.graphhopper.correct", gh, safeHistory("graphhopper")));
+      // Task #952 — emette il segnale di recupero sulla transizione failing→ok.
+      // Il segnale è "info" (non crea un Problem): alerts.ts lo legge dai metrics
+      // e invia la push "all-clear" solo se il latch start era armato.
+      const wasFailing = prevRoutingFailing.get("graphhopper") ?? false;
+      const isOkNow = gh.configured && !gh.skipped && gh.ok;
+      if (wasFailing && isOkNow) {
+        signals.push({
+          source: "horus",
+          metric: "routing.graphhopper.correct.recovered",
+          value: gh.latencyMs ?? null,
+          unit: gh.latencyMs != null ? "ms" : null,
+          severity: "info",
+          details: { recovered: true, latencyMs: gh.latencyMs },
+        });
+      }
+      prevRoutingFailing.set("graphhopper", gh.configured && !gh.skipped && !gh.ok);
+    }
+
+    if (valhalla) {
+      signals.push(probeToSignal("routing.valhalla.correct", valhalla, safeHistory("valhalla")));
+      // Task #952 — stessa logica del blocco GH per Valhalla.
+      const wasFailing = prevRoutingFailing.get("valhalla") ?? false;
+      const isOkNow = valhalla.configured && !valhalla.skipped && valhalla.ok;
+      if (wasFailing && isOkNow) {
+        signals.push({
+          source: "horus",
+          metric: "routing.valhalla.correct.recovered",
+          value: valhalla.latencyMs ?? null,
+          unit: valhalla.latencyMs != null ? "ms" : null,
+          severity: "info",
+          details: { recovered: true, latencyMs: valhalla.latencyMs },
+        });
+      }
+      prevRoutingFailing.set("valhalla", valhalla.configured && !valhalla.skipped && !valhalla.ok);
+    }
+
     if (photon) signals.push(probeToSignal("geocoding.photon.correct", photon, safeHistory("photon")));
     if (pipeline) signals.push(probeToSignal("pipeline.correct", pipeline));
     // area_resolver: errore SQL nella fase pre-GH — segnale separato per non

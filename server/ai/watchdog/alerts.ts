@@ -37,6 +37,12 @@ let backendOverloadAlertSent = false;
 // riceve un "all-clear" per un blocco mai notificato (es. TC spento sopprimeva
 // il segnale a "warn" prima che la soglia 60min venisse raggiunta).
 let matchingDragonflyBlockedAlertSent = false;
+// Task #952 — latch per il segnale "high" routing plausibility (GH e Valhalla
+// separati). Stesso schema dei latch overload: la push di rientro
+// ("✅ routing ripristinato") parte SOLO se lo start alert era stato realmente
+// emesso (severity "high", non declassato a "warn" dalla soppressione downstream).
+let ghRoutingPlausibilityAlertSent = false;
+let valhallaRoutingPlausibilityAlertSent = false;
 
 interface AdminWsBroadcast { (msg: { type: string; payload: unknown }): void }
 let wsBroadcast: AdminWsBroadcast | null = null;
@@ -439,6 +445,11 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
       (p) => p.id === `horus.routing.${routingEngine}.correct` && p.severity === "high",
     );
     if (routingPlausibilityProblem) {
+      // Task #952 — arma il latch: uno start alert reale (high, non soppresso) è
+      // presente. Impostato prima di shouldSend così resta armato anche quando la
+      // push è throttled ma l'anomalia di plausibilità è comunque in corso.
+      if (routingEngine === "graphhopper") ghRoutingPlausibilityAlertSent = true;
+      else valhallaRoutingPlausibilityAlertSent = true;
       await emitWatchdogAlert({ problem: routingPlausibilityProblem, score: snap.score, status: snap.status });
       if (shouldSend(`routing.${routingEngine}.correct.high`)) {
         let detail: { reason?: string; distanceKm?: number; durationMin?: number; impliedKmh?: number } = {};
@@ -457,6 +468,52 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
         });
       }
     }
+  }
+
+  // Rientro dalla plausibilità routing non valida (Task #952) — il
+  // routing-correctness-collector emette un segnale info
+  // "routing.<engine>.correct.recovered" sulla transizione failing→ok.
+  // Info → non è un Problem: lo leggiamo dai metrics dello snapshot.
+  // Gate latch: la push di rientro parte SOLO se lo start alert era stato
+  // realmente emesso (latch armato sopra), così l'admin non riceve un
+  // "✅ ripristinato" per un'anomalia mai notificata (es. TC spento sopprimeva
+  // il segnale a "warn"). Latch e throttle per GH e Valhalla sono separati.
+  if (
+    snap.metrics["horus.routing.graphhopper.correct.recovered"] != null &&
+    ghRoutingPlausibilityAlertSent &&
+    shouldSend("routing.graphhopper.correct.recovered")
+  ) {
+    ghRoutingPlausibilityAlertSent = false; // consuma il latch GH
+    const n = await sendSystemAlertPushToAdmins(
+      `✅ GraphHopper routing ripristinato`,
+      "GraphHopper risponde nuovamente con percorsi plausibili. Nessun intervento ulteriore necessario.",
+      { type: "watchdog_routing_plausibility_recovered", engine: "graphhopper", score: snap.score },
+    );
+    sentCount += n;
+    await writeWatchdogLog({
+      kind: "alert", scope: "horus.routing.graphhopper.correct.recovered", status: "ok",
+      summary: `Alert rientro routing GraphHopper plausibile inviato a ${n} admin`,
+      details: { sent: n },
+    });
+  }
+
+  if (
+    snap.metrics["horus.routing.valhalla.correct.recovered"] != null &&
+    valhallaRoutingPlausibilityAlertSent &&
+    shouldSend("routing.valhalla.correct.recovered")
+  ) {
+    valhallaRoutingPlausibilityAlertSent = false; // consuma il latch Valhalla
+    const n = await sendSystemAlertPushToAdmins(
+      `✅ Valhalla routing ripristinato`,
+      "Valhalla risponde nuovamente con percorsi plausibili. Nessun intervento ulteriore necessario.",
+      { type: "watchdog_routing_plausibility_recovered", engine: "valhalla", score: snap.score },
+    );
+    sentCount += n;
+    await writeWatchdogLog({
+      kind: "alert", scope: "horus.routing.valhalla.correct.recovered", status: "ok",
+      summary: `Alert rientro routing Valhalla plausibile inviato a ${n} admin`,
+      details: { sent: n },
+    });
   }
 
   // Crash-free rate 24h (Task #395) — segnale critical/warn emesso dall'error-collector
@@ -629,5 +686,7 @@ export function _resetThrottleForTests(): void {
   dbOverloadAlertSent = false;
   backendOverloadAlertSent = false;
   matchingDragonflyBlockedAlertSent = false;
+  ghRoutingPlausibilityAlertSent = false;
+  valhallaRoutingPlausibilityAlertSent = false;
   lastKnownAdminTokenCount = -1;
 }

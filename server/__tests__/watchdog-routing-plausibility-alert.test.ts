@@ -207,3 +207,151 @@ describe("watchdog routing plausibility alerts (Task #946)", () => {
     expect(plausibilityCalls).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task #952 — recovery ("all-clear") per il segnale di plausibilità routing.
+// Il collector emette horus.routing.<engine>.correct.recovered quando l'engine
+// torna a rispondere con percorsi plausibili. alerts.ts legge il metric dallo
+// snapshot e invia la push di rientro SOLO se il latch start era armato
+// (cioè se una push "high" era stata realmente emessa).
+// ---------------------------------------------------------------------------
+function makeRecoverySnapshot(
+  problems: Problem[],
+  recoveredEngines: Array<"graphhopper" | "valhalla"> = [],
+): HealthSnapshot {
+  const metrics: Record<string, number> = {};
+  for (const eng of recoveredEngines) {
+    metrics[`horus.routing.${eng}.correct.recovered`] = 1;
+  }
+  return {
+    status: "yellow",
+    score: 90,
+    problems,
+    metrics,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+describe("watchdog routing plausibility recovery alerts (Task #952)", () => {
+  beforeEach(() => {
+    sendPushMock.mockClear();
+    getAdminPushTokenCountMock.mockClear();
+    _resetThrottleForTests();
+  });
+
+  it("invia la push di rientro GH se il latch start era armato", async () => {
+    // Ciclo 1: problema high → arma il latch
+    await dispatchAlerts(makeSnapshot([ghPlausibilityProblem]));
+    sendPushMock.mockClear();
+
+    // Ciclo 2: nessun problema, ma metric recovered presente
+    await dispatchAlerts(makeRecoverySnapshot([], ["graphhopper"]));
+
+    const recoveryCalls = sendPushMock.mock.calls.filter(
+      ([, , payload]) => (payload as { type?: string })?.type === "watchdog_routing_plausibility_recovered",
+    );
+    expect(recoveryCalls).toHaveLength(1);
+    const [title, , payload] = recoveryCalls[0];
+    expect(title).toContain("GraphHopper");
+    expect((payload as { engine?: string })?.engine).toBe("graphhopper");
+  });
+
+  it("invia la push di rientro Valhalla se il latch start era armato", async () => {
+    await dispatchAlerts(makeSnapshot([valhallaPlausibilityProblem]));
+    sendPushMock.mockClear();
+
+    await dispatchAlerts(makeRecoverySnapshot([], ["valhalla"]));
+
+    const recoveryCalls = sendPushMock.mock.calls.filter(
+      ([, , payload]) => (payload as { type?: string })?.type === "watchdog_routing_plausibility_recovered",
+    );
+    expect(recoveryCalls).toHaveLength(1);
+    const [title, , payload] = recoveryCalls[0];
+    expect(title).toContain("Valhalla");
+    expect((payload as { engine?: string })?.engine).toBe("valhalla");
+  });
+
+  it("NON invia la push di rientro GH se il latch start non era armato", async () => {
+    // Nessun ciclo "high" precedente → latch non armato
+    await dispatchAlerts(makeRecoverySnapshot([], ["graphhopper"]));
+
+    const recoveryCalls = sendPushMock.mock.calls.filter(
+      ([, , payload]) => (payload as { type?: string })?.type === "watchdog_routing_plausibility_recovered",
+    );
+    expect(recoveryCalls).toHaveLength(0);
+  });
+
+  it("NON invia la push di rientro Valhalla se il latch start non era armato", async () => {
+    await dispatchAlerts(makeRecoverySnapshot([], ["valhalla"]));
+
+    const recoveryCalls = sendPushMock.mock.calls.filter(
+      ([, , payload]) => (payload as { type?: string })?.type === "watchdog_routing_plausibility_recovered",
+    );
+    expect(recoveryCalls).toHaveLength(0);
+  });
+
+  it("latch GH non arma il rientro Valhalla e viceversa", async () => {
+    // Arma solo GH
+    await dispatchAlerts(makeSnapshot([ghPlausibilityProblem]));
+    sendPushMock.mockClear();
+
+    // Recovered per Valhalla: latch GH armato ma Valhalla mai notificato → 0 push Valhalla
+    await dispatchAlerts(makeRecoverySnapshot([], ["valhalla"]));
+
+    const recoveryCalls = sendPushMock.mock.calls.filter(
+      ([, , payload]) => (payload as { type?: string })?.type === "watchdog_routing_plausibility_recovered",
+    );
+    expect(recoveryCalls).toHaveLength(0);
+  });
+
+  it("throttle rientro GH: non reinvia la push di rientro entro il TTL di 10 min", async () => {
+    // Arm → recover → secondo recover subito dopo (stesso TTL): deve essere bloccato
+    await dispatchAlerts(makeSnapshot([ghPlausibilityProblem]));
+    await dispatchAlerts(makeRecoverySnapshot([], ["graphhopper"]));
+    sendPushMock.mockClear();
+
+    // Secondo ciclo con problema → re-arma il latch
+    await dispatchAlerts(makeSnapshot([ghPlausibilityProblem]));
+    sendPushMock.mockClear();
+
+    // Secondo rientro entro il TTL → throttled
+    await dispatchAlerts(makeRecoverySnapshot([], ["graphhopper"]));
+
+    const recoveryCalls = sendPushMock.mock.calls.filter(
+      ([, , payload]) => (payload as { type?: string })?.type === "watchdog_routing_plausibility_recovered",
+    );
+    expect(recoveryCalls).toHaveLength(0);
+  });
+
+  it("il latch viene consumato: un secondo rientro senza nuovo start non invia push", async () => {
+    // Start → recover (consuma latch)
+    await dispatchAlerts(makeSnapshot([ghPlausibilityProblem]));
+    _resetThrottleForTests(); // resetta throttle per poter ritestare il rientro
+    // Simula: latch resettato (non armato) + metric recovered presente
+    await dispatchAlerts(makeRecoverySnapshot([], ["graphhopper"]));
+
+    const recoveryCalls = sendPushMock.mock.calls.filter(
+      ([, , payload]) => (payload as { type?: string })?.type === "watchdog_routing_plausibility_recovered",
+    );
+    // _resetThrottleForTests azzera anche i latch → nessuna push
+    expect(recoveryCalls).toHaveLength(0);
+  });
+
+  it("rientro GH e Valhalla contemporanei: due push separate se entrambi i latch erano armati", async () => {
+    await dispatchAlerts(makeSnapshot([ghPlausibilityProblem, valhallaPlausibilityProblem]));
+    sendPushMock.mockClear();
+
+    await dispatchAlerts(makeRecoverySnapshot([], ["graphhopper", "valhalla"]));
+
+    const ghRecovery = sendPushMock.mock.calls.filter(
+      ([, , payload]) => (payload as { engine?: string })?.engine === "graphhopper" &&
+        (payload as { type?: string })?.type === "watchdog_routing_plausibility_recovered",
+    );
+    const vRecovery = sendPushMock.mock.calls.filter(
+      ([, , payload]) => (payload as { engine?: string })?.engine === "valhalla" &&
+        (payload as { type?: string })?.type === "watchdog_routing_plausibility_recovered",
+    );
+    expect(ghRecovery).toHaveLength(1);
+    expect(vRecovery).toHaveLength(1);
+  });
+});
