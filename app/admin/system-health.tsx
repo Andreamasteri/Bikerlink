@@ -132,10 +132,27 @@ export default function SystemHealthScreen() {
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
+  // Task #893 — timeout client-side a 90s: l'AI (Ollama/Ares) può impiegare
+  // fino a 170s a freddo, ma 90s è un limite ragionevole per evitare che il
+  // pulsante rimanga bloccato su "Generazione…" indefinitamente. L'errore di
+  // abort viene tradotto in un messaggio azionabile per l'admin.
   const proposeNow = useMutation({
-    mutationFn: async () => (await apiRequest("POST", "/api/admin/watchdog/propose-now")).json(),
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/watchdog/propose-now", undefined, {
+        timeoutMs: 90_000,
+      });
+      return res.json();
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"] }),
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => {
+      const isTimeout = err.name === "AbortError" || err.message.includes("timeout");
+      Alert.alert(
+        isTimeout ? "Timeout generazione" : "Errore",
+        isTimeout
+          ? "L'AI ha impiegato troppo tempo a rispondere (>90s). Riprova tra qualche istante o verifica che il ThinkCentre sia online."
+          : err.message,
+      );
+    },
   });
 
   // Task #154 — Svuota lista: azzera i contatori interni dei collector lato
