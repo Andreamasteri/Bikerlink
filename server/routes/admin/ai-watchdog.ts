@@ -155,21 +155,26 @@ router.get("/watchdog/logs", async (req, res) => {
   })) });
 });
 
-router.post("/watchdog/propose-now", async (_req, res) => {
+router.post("/watchdog/propose-now", async (req, res) => {
   if (!(await isWatchdogEnabled())) return sendError(res, 409, "Watchdog disabilitato");
   const snap = getLatestSnapshot();
   if (!snap) return sendError(res, 503, "Nessun snapshot ancora generato");
+  // Task #902 — signalId opzionale: quando presente l'analisi AI si concentra
+  // solo su quel segnale invece di guardare l'intero snapshot.
+  const signalId = typeof req.body?.signalId === "string" && req.body.signalId ? req.body.signalId : undefined;
   // Task #25 — genera sia le proposte generiche sia quelle di routing (namespace
   // "horus", gestito dal proposer dedicato di Horus). Le eseguiamo in serie:
   // condividono budget/quota AI e restano poche chiamate.
   // Task #890 — force:true bypassa il fingerprint check così premendo "Proponi"
   // nell'header admin si ottengono sempre nuove proposte, indipendentemente da
   // quante volte è stato premuto di recente.
-  const out = await runProposer(snap, { force: true });
+  const out = await runProposer(snap, { force: true, signalId });
   // Task #892 — force:true bypassa anche il fingerprint check del proposer di
   // routing Horus, così "Proponi" genera sempre nuove proposte routing come fa
-  // già il proposer generico.
-  const horusOut = await runHorusRoutingProposer(snap, { force: true });
+  // già il proposer generico. Il filtro signalId non viene propagato al proposer
+  // Horus (routing): riguarda segnali source="horus", non il segnale specifico
+  // che l'admin sta esaminando.
+  const horusOut = signalId ? null : await runHorusRoutingProposer(snap, { force: true });
   const proposals = [...(out?.proposals ?? []), ...(horusOut?.proposals ?? [])];
   return res.json({ proposals, meta: out?.meta ?? horusOut?.meta ?? null });
 });

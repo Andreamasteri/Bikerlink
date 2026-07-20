@@ -154,6 +154,14 @@ export interface ProposerOptions {
    * manuale non passa per lo scheduler, quindi non ha cooldown da bypassare.
    */
   force?: boolean;
+  /**
+   * Task #902 — Quando presente, filtra hiSev al solo problema con questo id.
+   * Usato dal pulsante "Fix ⚡" su ogni riga HIGH/CRITICAL: l'AI si concentra
+   * su quel segnale invece di analizzare l'intero snapshot.
+   * Se l'id non corrisponde ad alcun problema high/critical (es. il segnale è
+   * già rientrato) il proposer restituisce null senza chiamare l'AI.
+   */
+  signalId?: string;
 }
 
 export async function runProposer(snap: HealthSnapshot, opts: ProposerOptions = {}): Promise<ProposerResult | null> {
@@ -165,6 +173,21 @@ export async function runProposer(snap: HealthSnapshot, opts: ProposerOptions = 
     // Task #23 — il namespace "horus" (correttezza routing) ha un proposer dedicato
     // (Task #25). Escludilo qui per non generare proposte premature dal proposer generico.
     .filter((p) => p.source !== "horus");
+
+  // Task #902 — se signalId è specificato, limita l'analisi al solo problema
+  // corrispondente. Se l'id non è in hiSev (segnale rientrato o WARN) evitiamo
+  // di chiamare l'AI per niente.
+  if (opts.signalId) {
+    const targeted = hiSev.filter((p) => p.id === opts.signalId);
+    if (targeted.length === 0) {
+      console.info(
+        `[watchdog/proposer] signalId="${opts.signalId}" non trovato tra i problemi high/critical — skip`,
+      );
+      return null;
+    }
+    hiSev = targeted;
+  }
+
   if (hiSev.length === 0) return null;
 
   // Se il flag "ThinkCentre offline per test" è attivo, rimuovi i problemi ThinkCentre

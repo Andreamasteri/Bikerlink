@@ -155,6 +155,31 @@ export default function SystemHealthScreen() {
     },
   });
 
+  // Task #902 — "Fix ⚡" su ogni riga HIGH/CRITICAL: chiama propose-now con un
+  // filtro signalId così l'AI si concentra sul singolo problema.
+  const onQuickPropose = async (signalId: string) => {
+    try {
+      const res = await apiRequest(
+        "POST",
+        "/api/admin/watchdog/propose-now",
+        { signalId },
+        { timeoutMs: 90_000 },
+      );
+      await res.json();
+      await qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"] });
+    } catch (err) {
+      const e = err as Error;
+      const isTimeout = e.name === "AbortError" || e.message.includes("timeout");
+      Alert.alert(
+        isTimeout ? "Timeout generazione" : "Errore",
+        isTimeout
+          ? "L'AI ha impiegato troppo tempo a rispondere (>90s). Riprova o verifica che il ThinkCentre sia online."
+          : e.message,
+      );
+      throw err; // propaga così ProblemsList resetta actingId via finally
+    }
+  };
+
   // Task #154 — Svuota lista: azzera i contatori interni dei collector lato
   // backend e rigenera uno snapshot pulito, poi invalida snapshot e log.
   const resetState = useMutation({
@@ -371,7 +396,7 @@ export default function SystemHealthScreen() {
           </View>
 
           <SectionTitle icon="alert-circle-outline">Problemi rilevati</SectionTitle>
-          <ProblemsList problems={snap.problems} />
+          <ProblemsList problems={snap.problems} onQuickPropose={onQuickPropose} />
 
           <SectionTitle icon="chart-box-outline">Metriche</SectionTitle>
           <MetricsGrid metrics={snap.metrics} />
