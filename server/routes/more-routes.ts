@@ -40,6 +40,12 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 // Cache in-process breve per le risposte degli endpoint admin letti con polling
 // frequente. TTL configurabile per endpoint; evita query/filesystem ripetuti.
 const _shortCache = new Map<string, { value: unknown; expiresAt: number }>();
+
+/** Esposto solo per i test — azzera cache e campione precedente. */
+export function __resetServerMetricsCacheForTests(): void {
+  _shortCache.delete("admin:server-metrics");
+  lastServerSample = null;
+}
 async function withShortCache<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
   const cached = _shortCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
