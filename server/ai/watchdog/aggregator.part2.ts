@@ -28,6 +28,7 @@ import { collectOverload } from "./collectors/overload-collector";
 import { collectAiHub } from "./collectors/ai-hub-collector";
 import { collectTcReboot } from "./collectors/tc-reboot-collector";
 import { collectMatchingDragonflyBlocked } from "./collectors/matching-dragonfly-blocked-collector";
+import { collectGhContainerRestarts } from "./collectors/gh-container-restart-collector";
 import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { setHealthState } from "../../lib/health-arbiter";
@@ -121,6 +122,9 @@ async function runAggregatorCycleInner(): Promise<HealthSnapshot> {
     // lenti (>90s) causati da bug kernel (cgroup_drain_dying). Probe HTTP leggera,
     // nessuna query DB → FUORI da withBgDbSlot.
     collectTcReboot(),
+    // Container routing restart (Task #947): HTTP leggero verso TC agent /container-restarts;
+    // nessuna query DB → FUORI da withBgDbSlot. Salta silenziosamente se TC non configurato.
+    collectGhContainerRestarts(),
     // Routing-correctness (namespace "horus"): sonde di rete lente come collectMaps,
     // quindi FUORI da withBgDbSlot (le sue eventuali query DB sono già cachate/interne).
     collectRoutingCorrectness(),

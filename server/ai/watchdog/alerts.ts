@@ -384,6 +384,47 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     }
   }
 
+  // Container routing riavviati (Task #947) — un segnale PER container (metric
+  // = "tc.gh_container_restarted.<containerKey>") emesso dal collector quando
+  // RestartCount cresce tra un tick e il successivo. Un problema per segnale
+  // → detail JSON piccolo (<200 char), nessun rischio di troncamento a 300.
+  // Severity "high" → NON catturato dal loop critical-only: blocco dedicato.
+  // Throttle per-container (chiave include containerKey); riavvii simultanei
+  // di container diversi generano push separate.
+  const ghContainerRestartProblems = snap.problems.filter(
+    (p) => p.id.startsWith("tc.tc.gh_container_restarted.") && p.severity === "high",
+  );
+  for (const problem of ghContainerRestartProblems) {
+    await emitWatchdogAlert({ problem, score: snap.score, status: snap.status });
+    // containerKey ricavato dall'ID come fallback sicuro (non richiede parsing JSON)
+    const containerKey = problem.id.replace("tc.tc.gh_container_restarted.", "");
+    let ghDetail: { name?: string; restartCount?: number; delta?: number } = {};
+    try { ghDetail = JSON.parse(problem.detail ?? "{}"); } catch { /* use ID fallback below */ }
+    const containerName = ghDetail.name ?? `bikerlink-${containerKey}`;
+    const shortName = containerName.replace("bikerlink-", "");
+    const delta = ghDetail.delta ?? snap.metrics[`tc.tc.gh_container_restarted.${containerKey}`] ?? "?";
+    const totalRestarts = ghDetail.restartCount ?? "?";
+    if (shouldSend(`tc.gh_container_restart.${containerKey}`)) {
+      const n = await sendSystemAlertPushToAdmins(
+        `🔄 Container ${shortName} riavviato (+${delta})`,
+        `Il container Docker ${containerName} si è riavviato inaspettatamente (restart tot: ${totalRestarts}). Controlla i log sul ThinkCentre: docker logs ${containerName} --tail 100`,
+        {
+          type: "watchdog_gh_container_restart",
+          container: containerName,
+          restartCount: totalRestarts,
+          delta,
+          score: snap.score,
+        },
+      );
+      sentCount += n;
+      await writeWatchdogLog({
+        kind: "alert", scope: `tc.gh_container_restart.${containerKey}`, status: "ok",
+        summary: `Alert riavvio container ${containerName}: +${delta} restart (tot: ${totalRestarts})`,
+        details: { sent: n, container: containerName, restartCount: totalRestarts, delta },
+      });
+    }
+  }
+
   // Routing self-hosted non plausibile (Task #941) — segnale "high" emesso dal
   // routing-correctness-collector quando GH o Valhalla rispondono 2xx ma il
   // percorso restituito non è plausibile (distanza/durata anomale o fuori range).

@@ -377,6 +377,42 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── GET /container-restarts ────────────────────────────────────────────────
+  // Restituisce RestartCount e stato di ogni container di routing chiave.
+  // Usato dal watchdog Replit per rilevare riavvii non pianificati (Task #947).
+  // Risposta: JSON array di { name, restartCount, status, startedAt }.
+  // I container non trovati vengono saltati silenziosamente (non errori).
+  if (req.method === "GET" && req.url === "/container-restarts") {
+    const ROUTING_CONTAINERS = [
+      "bikerlink-gh-arco-alpino",
+      "bikerlink-gh-balcani",
+      "bikerlink-gh-est",
+      "bikerlink-gh-francia-benelux",
+      "bikerlink-gh-germania-centro",
+      "bikerlink-gh-grecia",
+      "bikerlink-gh-iberia",
+      "bikerlink-valhalla",
+      "bikerlink-valhalla-serve",
+    ];
+    const results = [];
+    for (const name of ROUTING_CONTAINERS) {
+      try {
+        const raw = execSync(
+          `docker inspect --format '{"restartCount":{{.RestartCount}},"status":"{{.State.Status}}","startedAt":"{{.State.StartedAt}}"}' "${name}"`,
+          { timeout: 5_000, stdio: ["ignore", "pipe", "ignore"] },
+        ).toString().trim();
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        results.push({ name, ...parsed });
+      } catch {
+        // Container non trovato o docker non disponibile: salta silenziosamente.
+      }
+    }
+    res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+    res.end(JSON.stringify(results));
+    return;
+  }
+
   if (req.method !== "GET" || req.url !== "/sys-metrics") {
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "not found" }));

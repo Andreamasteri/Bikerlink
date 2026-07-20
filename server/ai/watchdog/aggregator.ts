@@ -358,6 +358,16 @@ export function deriveProblems(signals: Signal[]): Problem[] {
         title = `Crash backend recenti: ${count} riavvii nell'ultima ora`;
         suggestion = "Monitorare — entro la soglia ma sopra lo zero. Verifica logs/uptime-resets.log per la causa.";
       }
+    } else if (s.metric.startsWith("tc.gh_container_restarted.")) {
+      // Un segnale per container riavviato (metric = "tc.gh_container_restarted.<containerKey>").
+      // detail è piccolo (<200 char) → nessun rischio di troncamento a 300 char.
+      const det = s.details as { name?: string; restartCount?: number; delta?: number } | undefined;
+      const containerKey = s.metric.replace("tc.gh_container_restarted.", "");
+      const name = det?.name ?? `bikerlink-${containerKey}`;
+      const delta = det?.delta ?? s.value ?? "?";
+      const totalRestarts = det?.restartCount ?? "?";
+      title = `Container routing riavviato: ${name.replace("bikerlink-", "")} (+${delta} restart, tot: ${totalRestarts})`;
+      suggestion = `Il container Docker ${name} si è riavviato inaspettatamente. Controlla i log sul ThinkCentre: \`docker logs ${name} --tail 100\`. Verifica memoria disponibile e OOM-killer con \`dmesg | grep -i oom\`.`;
     } else if (s.metric === "server.restart_alert") {
       const count = s.value ?? 1;
       const det = s.details as { minutesSinceLast?: number; latestAt?: string } | undefined;
