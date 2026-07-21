@@ -93,6 +93,27 @@ function findMissingBin(): string | null {
 /** Flag one-shot: impedisce di inviare la push più di una volta per sessione. */
 let missingBinAlertSent = false;
 
+// --- Alert push per il sync scheduler ---
+// Latch: armato quando una push di FALLIMENTO sync è stata realmente inviata.
+// La push di RIENTRO ("✅ sync ripristinato") parte SOLO se il latch è armato,
+// così l'admin non riceve un all-clear per un fallimento mai notificato.
+// Il latch viene consumato (riportato a false) quando la push di rientro parte.
+let syncFailAlertSent = false;
+
+// Throttle semplice per le push di fallimento: evita di spammare se il sync
+// viene triggerato manualmente più volte in pochi minuti.
+// TTL: 30 minuti — inferiore all'intervallo schedulato (6h), ma protegge dai
+// trigger manuali ravvicinati.
+const SYNC_FAIL_ALERT_TTL_MS = 30 * 60 * 1000;
+let syncFailAlertLastSentAt = 0;
+
+function shouldSendSyncFailAlert(): boolean {
+  const now = Date.now();
+  if (now - syncFailAlertLastSentAt < SYNC_FAIL_ALERT_TTL_MS) return false;
+  syncFailAlertLastSentAt = now;
+  return true;
+}
+
 export function isSyncAvailable(): boolean {
   if (isProductionEnvironment()) return false;
   const urls = getSyncUrls();
@@ -266,8 +287,35 @@ export function startSyncScheduler() {
 
   syncTimer = setInterval(async () => {
     try {
-      await syncProdToDev();
+      const result = await syncProdToDev();
       await upsertSetting("sync.next_at", new Date(Date.now() + INTERVAL_MS).toISOString(), "Prossimo sync prod→dev");
+
+      if (!result.ok) {
+        // Fallimento sync — arma il latch e invia push (throttled).
+        syncFailAlertSent = true;
+        if (shouldSendSyncFailAlert()) {
+          const errSnippet = result.error
+            ? result.error.slice(0, 200)
+            : "Errore sconosciuto";
+          sendSystemAlertPushToAdmins(
+            "⚠️ Sync prod→dev fallito",
+            `Il sync automatico del database di sviluppo ha fallito: ${errSnippet}`,
+            { type: "sync_prod_to_dev_failed", error: result.error ?? null, ts: new Date().toISOString() },
+          ).catch((pushErr: unknown) => {
+            console.warn("[sync-service] Impossibile inviare push notifica fallimento sync:", pushErr);
+          });
+        }
+      } else if (syncFailAlertSent) {
+        // Sync tornato OK dopo uno o più fallimenti — invia all-clear e consuma il latch.
+        syncFailAlertSent = false;
+        sendSystemAlertPushToAdmins(
+          "✅ Sync prod→dev ripristinato",
+          "Il sync automatico del database di sviluppo è tornato operativo con successo.",
+          { type: "sync_prod_to_dev_recovered", ts: new Date().toISOString() },
+        ).catch((pushErr: unknown) => {
+          console.warn("[sync-service] Impossibile inviare push notifica ripristino sync:", pushErr);
+        });
+      }
     } catch (err) {
       console.error("[sync-service] Scheduled sync failed:", err);
     }
