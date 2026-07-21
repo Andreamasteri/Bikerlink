@@ -1,3 +1,4 @@
+- [Ollama GBNF grammar complexity — 400 su schemi annidati](ollama-gbnf-grammar-complexity.md) — Ollama 0.32+ esplode su JSON Schema annidati → usare sempre no-schema mode per Ollama in generateStructured.
 - [import.meta.dirname esbuild CJS crash](import-meta-dirname-esbuild.md) — esbuild trasforma import.meta in {} → dirname=undefined → path.resolve crash al boot; usare sempre __dirname.
 - [Drizzle uniqueIndex vs Replit publish](drizzle-unique-index-publish-conflict.md) — Replit diff bypassa il dedup DELETE della migration e crea l'indice direttamente → UNIQUE fail su dati duplicati; pattern: mai uniqueIndex() in schema se la creazione richiede pre-processing.
 - [BikerBlog/TC agent ecosystem](bikerblog-agent-ecosystem.md) — mappa completa Horus/Bowie/Nadir/Quebracho/Ares/Coder: modelli, VRAM budget, invarianti stream/think/keep_alive, pattern evict+restore on-demand.

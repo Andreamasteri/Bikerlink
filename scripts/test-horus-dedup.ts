@@ -45,9 +45,14 @@ function section(title: string): void {
 
 // ─── Passo 1: Genera backlog da .local/tasks/*.md ─────────────────────────────
 
-function generateBacklog(): { titles: string[]; fileCount: number } {
+/**
+ * Scrive il backlog in `outputDir` (isolato) invece che in `.local/`,
+ * evitando la race condition con il workflow Triage Horus che può
+ * scrivere/troncare `.local/horus-backlog.json` mentre il test lo legge.
+ */
+function generateBacklog(outputDir: string): { titles: string[]; fileCount: number } {
   const tasksDir = path.join(ROOT, ".local", "tasks");
-  const backlogFile = path.join(ROOT, ".local", "horus-backlog.json");
+  const backlogFile = path.join(outputDir, "horus-backlog.json");
 
   const files = fs.readdirSync(tasksDir).filter((f) => f.endsWith(".md"));
   const titles: string[] = [];
@@ -65,7 +70,7 @@ function generateBacklog(): { titles: string[]; fileCount: number } {
     }
   }
 
-  fs.mkdirSync(path.dirname(backlogFile), { recursive: true });
+  fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(
     backlogFile,
     JSON.stringify(
@@ -136,9 +141,18 @@ function runProposeScript(
   reportPath: string,
   manifestDir: string,
 ): ProposeResult {
+  // backlogFile è sempre in manifestDir (isolato dal file di produzione .local/)
+  const backlogFile = path.join(manifestDir, "horus-backlog.json");
   const result = spawnSync(
     "npx",
-    ["tsx", "scripts/horus-propose-tasks.ts", "--report", reportPath],
+    [
+      "tsx", "scripts/horus-propose-tasks.ts",
+      "--report", reportPath,
+      // Punta al backlog isolato in /tmp, NON a .local/horus-backlog.json:
+      // evita la race condition con il workflow Triage Horus che può
+      // scrivere/troncare il file condiviso mentre questo test lo legge.
+      "--backlog-file", backlogFile,
+    ],
     {
       cwd: ROOT,
       encoding: "utf8",
@@ -263,16 +277,22 @@ async function main(): Promise<void> {
 
   const allErrors: string[] = [];
 
+  // ── tmpDir creata subito: usata sia per backlog sia per report/manifest ──
+  // Isolamento totale da .local/horus-backlog.json (produzione): evita la
+  // race condition con il workflow Triage Horus che può scrivere/troncare
+  // il file condiviso mentre questo test lo legge.
+  const tmpDir = fs.mkdtempSync("/tmp/horus-dedup-test-");
+
   // ── Passo 1: Genera backlog ──
   section("1/6 — Generazione backlog da .local/tasks/*.md");
-  const { titles: backlogTitles, fileCount } = generateBacklog();
+  const { titles: backlogTitles, fileCount } = generateBacklog(tmpDir);
   console.log(`  ${fileCount} file scansionati, ${backlogTitles.length} titoli estratti.`);
   if (backlogTitles.length === 0) {
     console.error("  ❌ ERRORE FATALE: backlog vuoto — impossibile testare la deduplicazione.");
     process.exitCode = 1;
     return;
   }
-  console.log(`  📋 Backlog scritto in .local/horus-backlog.json`);
+  console.log(`  📋 Backlog scritto in ${path.join(tmpDir, "horus-backlog.json")} (isolato)`);
 
   // ── Passo 2: Candidati duplicati ──
   section("2/6 — Selezione candidati duplicati dal backlog reale");
@@ -296,8 +316,6 @@ async function main(): Promise<void> {
   // ── Passo 3: Mock report ──
   section("3/6 — Creazione mock report Horus");
   const mockReport = buildMockReport(duplicateCandidates, newTitles);
-  // Usa /tmp per isolamento totale: nessun file in logs/ può "aiutare" il test
-  const tmpDir = fs.mkdtempSync("/tmp/horus-dedup-test-");
   const mockReportPath = path.join(tmpDir, "horus-log-analysis-test.md");
   const header =
     `# Triage AI BikerLink — TEST DEDUP\n\n` +

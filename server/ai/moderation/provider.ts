@@ -520,8 +520,15 @@ export async function generateStructured<T>(
           ollama: { ...(opts.providerOptions?.ollama ?? {}), think: false },
         }
       : opts.providerOptions;
-  if (m.objectMode === "json") {
-    // Modello senza json_schema (Groq llama-3.x): no-schema + Zod parse manuale.
+  // Ollama 0.32+ converte il JSON Schema in grammar GBNF per vincolare l'output.
+  // Schemi annidati complessi (array di oggetti con proprietà obbligatorie multiple)
+  // superano il limite del parser GBNF ("number of rules multiplied by repetitions
+  // exceeds sane defaults") → 400 Bad Request. Fix: usare output:"no-schema" e
+  // includere lo schema come testo nel prompt, poi validare con Zod manualmente.
+  // Stesso path già usato per i modelli Groq llama-3.x (objectMode:"json").
+  // Vedi: .agents/memory/qwen3-ollama-think-quirk.md
+  if (m.objectMode === "json" || m.id === "ollama") {
+    // Modello senza json_schema nativo (Groq llama-3.x, Ollama): no-schema + Zod parse manuale.
     let shape = "";
     try {
       shape = JSON.stringify(z.toJSONSchema(opts.schema as unknown as z.ZodType));
