@@ -18,6 +18,7 @@
     "i18n:translate:dry-run": "tsx scripts/translate-i18n.ts --dry-run",
     "i18n:translate:lang": "tsx scripts/translate-i18n.ts",
     "start": "npx expo start",
+    "check:boot": "npx tsx scripts/check-boot-signals.ts",
     "lint": "npx oxlint -c .oxlintrc.json .",
     "lint:fix": "npx oxlint -c .oxlintrc.json --fix-suggestions .",
     "android": "expo run:android",
