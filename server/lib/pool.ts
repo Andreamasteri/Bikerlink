@@ -24,7 +24,11 @@ import {
 
 const { Pool } = pg;
 
-if (!process.env.DATABASE_URL) {
+// DATABASE_URL_DEV ha priorità in workspace dev (Neon dev branch).
+// In produzione DATABASE_URL_DEV non è impostata → fallback su DATABASE_URL (Neon prod).
+const dbUrl = process.env.DATABASE_URL_DEV ?? process.env.DATABASE_URL;
+
+if (!dbUrl) {
   throw new Error(
     "DATABASE_URL must be set. Did you forget to provision a database?",
   );
@@ -33,12 +37,12 @@ if (!process.env.DATABASE_URL) {
 // ── Pool principale ──────────────────────────────────────────────────────────
 
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: dbUrl,
   application_name: APP_NAME,
   keepAlive: true,
   // Neon richiede TLS esplicito (Neon Frankfurt, eu-central-1). Il flag è condizionale per
   // mantenere compatibilità con ambienti locali (senza neon.tech nell'URL).
-  ssl: process.env.DATABASE_URL?.includes("neon.tech")
+  ssl: dbUrl.includes("neon.tech")
     ? { rejectUnauthorized: true }
     : false,
   // Rete di sicurezza lato SERVER contro il leak "idle in transaction": qualsiasi
@@ -155,13 +159,13 @@ export function getCheckedOutConnections(minAgeMs = 0): CheckedOutConnection[] {
 // per le query di diagnostica) — vedi task Fasi 4-7.
 
 const monitoringPool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: dbUrl,
   application_name: MONITOR_APP_NAME,
   max: MONITORING_POOL_MAX,
   idleTimeoutMillis: MONITORING_POOL_IDLE_TIMEOUT_MS,
   connectionTimeoutMillis: MONITORING_POOL_CONNECTION_TIMEOUT_MS,
   statement_timeout: MONITORING_POOL_STATEMENT_TIMEOUT_MS,
-  ssl: process.env.DATABASE_URL?.includes("neon.tech")
+  ssl: dbUrl.includes("neon.tech")
     ? { rejectUnauthorized: true }
     : false,
 });

@@ -1,6 +1,10 @@
 import { defineConfig } from "drizzle-kit";
 
-if (!process.env.DATABASE_URL) {
+// DATABASE_URL_DEV ha priorità in workspace dev (Neon dev branch).
+// In produzione DATABASE_URL_DEV non è impostata → fallback su DATABASE_URL (Neon prod).
+const dbUrl = process.env.DATABASE_URL_DEV ?? process.env.DATABASE_URL;
+
+if (!dbUrl) {
   throw new Error("DATABASE_URL, ensure the database is provisioned");
 }
 
@@ -9,7 +13,7 @@ export default defineConfig({
   schema: "./shared/db/index.ts",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL,
+    url: dbUrl,
   },
   // IMPORTANTE — questo file NON serve a far girare `drizzle-kit push` nel deploy.
   // Le migration runtime sono gestite da server/migrate.ts (file .sql numerati).
