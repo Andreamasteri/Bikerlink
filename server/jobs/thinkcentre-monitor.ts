@@ -32,8 +32,11 @@ import { appSettings, thinkcentreHealthEvents } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { dedupWarn } from "../lib/dedup-logger";
 import { isThinkCentreOffline } from "../lib/thinkcentre-offline";
+import { isThinkCentrePoweredOff } from "../lib/thinkcentre-powered-off";
 import { isThinkCentreIgnoredForTests } from "../lib/thinkcentre-ignore-tests";
 import { sendSystemAlertPushToAdmins } from "../push-notifications";
+import { cfAccessHeaders } from "../lib/cf-access";
+import { writeWatchdogLog } from "../ai/watchdog/log";
 import {
   type OverallStatus,
   type ServiceProbeResult,
@@ -56,6 +59,8 @@ const PROBE_INTERVAL_MS = 5 * 60 * 1000;
 const FIRST_PROBE_DELAY_MS = 2 * 60 * 1000;
 const NOTIFY_COOLDOWN_MS = 10 * 60 * 1000;
 const SERVICE_NOTIFY_COOLDOWN_MS = 15 * 60 * 1000;
+// Throttle per l'alert "flag powered_off stantio" — non spam ad ogni ciclo.
+const STALE_FLAG_COOLDOWN_MS = 30 * 60 * 1000;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 type ServiceKey = string;
@@ -212,6 +217,61 @@ async function handlePerServiceNotifications(
   }
 }
 
+// ── Probe leggera per flag powered_off stantio ────────────────────────────────
+/**
+ * Chiamata SOLO quando `isThinkCentrePoweredOff()` è true (non manutenzione).
+ * Esegue una singola richiesta HTTP a /health del TC agent (5s timeout, stessa
+ * auth di tc-metrics-sampler). Se risponde 2xx il flag è stantio: notifica gli
+ * admin con throttle 30 min così non si spamma ad ogni ciclo del monitor.
+ */
+async function checkStalePoweredOffFlag(): Promise<void> {
+  const agentBase = process.env.THINKCENTRE_METRICS_URL?.trim().replace(/\/$/, "");
+  if (!agentBase) return; // TC agent non configurato → skip silenzioso
+
+  const agentToken = process.env.THINKCENTRE_AGENT_TOKEN ?? "";
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
+  if (agentToken) headers["X-Agent-Token"] = agentToken;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5_000);
+  let reachable = false;
+  try {
+    const res = await fetch(`${agentBase}/health`, {
+      method: "GET",
+      headers,
+      signal: controller.signal,
+    });
+    reachable = res.status >= 200 && res.status < 300;
+  } catch {
+    reachable = false;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!reachable) return; // TC non raggiungibile → flag corretto, nessuna azione
+
+  // TC raggiungibile ma flag ancora attivo → controlla throttle ed emetti alert.
+  const now = Date.now();
+  const lastStaleFlagAlert = lastNotifiedAt.get("tc.flag_stale") ?? 0;
+  if (now - lastStaleFlagAlert < STALE_FLAG_COOLDOWN_MS) return;
+  lastNotifiedAt.set("tc.flag_stale", now);
+
+  console.log("[thinkcentre-monitor] TC raggiungibile ma flag powered_off attivo — notifica admin");
+  const n = await sendSystemAlertPushToAdmins(
+    "⚠️ ThinkCentre raggiungibile — flag 'spento' ancora attivo",
+    "Il ThinkCentre risponde ma il flag 'spento' è ancora attivo. Apri la health screen per resettarlo e riabilitare le probe.",
+    { type: "thinkcentre_stale_powered_off_flag" },
+  );
+  await writeWatchdogLog({
+    kind: "alert",
+    scope: "tc.flag_stale",
+    status: "ok",
+    summary: `TC raggiungibile ma flag powered_off attivo — notificati ${n} admin`,
+    details: { sent: n },
+  });
+  console.log(`[thinkcentre-monitor] notifica flag stale inviata a ${n} admin`);
+}
+
 // ── Ciclo principale ──────────────────────────────────────────────────────────
 export async function runThinkCentreProbe(): Promise<void> {
   if (await isThinkCentreIgnoredForTests()) {
@@ -221,6 +281,11 @@ export async function runThinkCentreProbe(): Promise<void> {
   // Una sola lettura cache-throttlata (TTL 3min) copre powered_off OR maintenance:
   // niente più read AppSetting a ogni ciclo (~65s) — vedi step 2b/4 del task.
   if (await isThinkCentreOffline()) {
+    // Probe leggera stale-flag: se il TC è marcato "spento" (non manutenzione),
+    // verifichiamo se risponde già. Se sì, il flag è stantio → notifica admin.
+    if (await isThinkCentrePoweredOff()) {
+      await checkStalePoweredOffFlag();
+    }
     console.log("[thinkcentre-monitor] ThinkCentre offline (spento o manutenzione) — probe e notifiche saltate");
     return;
   }
