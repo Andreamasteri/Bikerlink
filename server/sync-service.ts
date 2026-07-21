@@ -1,8 +1,9 @@
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import { storage } from "./storage";
+import { sendSystemAlertPushToAdmins } from "./push-notifications";
 
 const INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 ore
 
@@ -71,10 +72,32 @@ function getSyncUrls(): { prodUrl: string; devUrl: string } | null {
   return { prodUrl, devUrl };
 }
 
+/**
+ * Verifica che pg_dump e psql siano disponibili nel PATH.
+ * Restituisce il nome del primo binario mancante, oppure null se entrambi
+ * sono presenti.
+ *
+ * Usa `which` in modo sincrono — chiamato solo al boot e a ogni
+ * `isSyncAvailable()`, non nel percorso critico delle richieste HTTP.
+ */
+function findMissingBin(): string | null {
+  for (const bin of ["pg_dump", "psql"]) {
+    const result = spawnSync("which", [bin], { encoding: "utf8" });
+    if (result.status !== 0 || !result.stdout?.trim()) {
+      return bin;
+    }
+  }
+  return null;
+}
+
+/** Flag one-shot: impedisce di inviare la push più di una volta per sessione. */
+let missingBinAlertSent = false;
+
 export function isSyncAvailable(): boolean {
   if (isProductionEnvironment()) return false;
   const urls = getSyncUrls();
-  return urls !== null;
+  if (urls === null) return false;
+  return findMissingBin() === null;
 }
 
 /**
@@ -117,6 +140,13 @@ function runProcess(bin: string, args: string[]): Promise<{ stdout: string; stde
 export async function syncProdToDev(): Promise<{ ok: boolean; error?: string }> {
   if (isProductionEnvironment()) {
     const msg = "Sync bloccato: ambiente di produzione rilevato";
+    console.warn("[sync-service]", msg);
+    return { ok: false, error: msg };
+  }
+
+  const missingBin = findMissingBin();
+  if (missingBin) {
+    const msg = `Sync non disponibile: ${missingBin} non trovato nel PATH`;
     console.warn("[sync-service]", msg);
     return { ok: false, error: msg };
   }
@@ -183,7 +213,10 @@ export async function syncProdToDev(): Promise<{ ok: boolean; error?: string }> 
 }
 
 export async function getSyncStatus() {
-  const available = isSyncAvailable();
+  const inProduction = isProductionEnvironment();
+  const urls = getSyncUrls();
+  const missingBin = (!inProduction && urls !== null) ? findMissingBin() : null;
+  const available = !inProduction && urls !== null && missingBin === null;
   const inProgress = isSyncing;
   const [lastMeta, nextAt] = await Promise.all([
     readJsonSetting<SyncMeta>("sync.last"),
@@ -192,6 +225,7 @@ export async function getSyncStatus() {
 
   return {
     available,
+    unavailableReason: missingBin ? `${missingBin} non trovato nel PATH` : null,
     inProgress,
     lastSync: lastMeta ?? null,
     nextScheduledAt: nextAt ?? null,
@@ -205,6 +239,23 @@ export function startSyncScheduler() {
   }
   if (!getSyncUrls()) {
     console.log("[sync-service] DATABASE_URL_DEV non configurato o uguale a DATABASE_URL — scheduler sync non avviato");
+    return;
+  }
+
+  const missingBin = findMissingBin();
+  if (missingBin) {
+    const msg = `Sync prod→dev non disponibile: ${missingBin} non trovato nel PATH. Installare postgresql-client nel container.`;
+    console.warn("[sync-service]", msg);
+    if (!missingBinAlertSent) {
+      missingBinAlertSent = true;
+      sendSystemAlertPushToAdmins(
+        "Sync prod→dev non disponibile",
+        `${missingBin} non trovato nel PATH — il sync automatico non partirà finché non viene installato postgresql-client.`,
+        { type: "sync_missing_bin", bin: missingBin },
+      ).catch((err: unknown) => {
+        console.warn("[sync-service] Impossibile inviare push notifica admin:", err);
+      });
+    }
     return;
   }
 
