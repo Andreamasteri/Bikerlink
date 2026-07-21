@@ -277,7 +277,22 @@ function checkReady(entries: BootLogEntry[], summary: BootLogResponse["summary"]
 
 // ── Report ────────────────────────────────────────────────────────────────────
 
-function printReport(checks: CheckResult[]): void {
+/**
+ * Stampa il report dei check e restituisce true se il boot è "clean"
+ * (tutti i check superati E nessun errore nel summary).
+ *
+ * Con hasError=true i 3 check principali possono passare, ma il boot non è
+ * completamente sano — viene emesso un ⚠ warning con l'elenco delle entry
+ * con ok=false.
+ *
+ * L'exit code rimane 0 (WARN non è fatale), a meno che non sia passato
+ * --strict, nel qual caso hasError=true causa exit 1.
+ */
+function printReport(
+  checks: CheckResult[],
+  summary: BootLogResponse["summary"],
+  entries: BootLogEntry[],
+): { allPassed: boolean; hasError: boolean } {
   const LINE = "═".repeat(62);
   console.log(`\n${LINE}`);
   console.log("  check-boot-signals — Segnali chiave boot produzione");
@@ -295,20 +310,41 @@ function printReport(checks: CheckResult[]): void {
     }
   }
 
+  // ── hasError warning ──────────────────────────────────────────────────────
+  if (allPassed && summary.hasError) {
+    const failedEntries = entries.filter((e) => e.ok === false);
+    console.log(`\n  ⚠ ATTENZIONE — READY raggiunto ma con errori nel boot log:`);
+    for (const e of failedEntries) {
+      console.log(`    • [${e.phase}] ${e.msg} (elapsed ${e.elapsed_ms}ms)`);
+    }
+    console.log(
+      `\n    Il server è operativo ma alcune fasi non critiche hanno fallito.`,
+    );
+    console.log(
+      `    Usa --strict per uscire con codice 1 in presenza di hasError=true.`,
+    );
+  }
+
   console.log(`\n${LINE}`);
-  if (allPassed) {
+  if (allPassed && !summary.hasError) {
     console.log("  ✅ TUTTI I CHECK SUPERATI — boot produzione sano");
+  } else if (allPassed && summary.hasError) {
+    console.log("  ⚠  CHECK SUPERATI CON AVVISI — READY ma con errori nel log");
   } else {
     const failed = checks.filter((c) => !c.passed).map((c) => c.label).join(", ");
     console.log(`  ❌ CHECK FALLITI: ${failed}`);
   }
   console.log(`${LINE}\n`);
+
+  return { allPassed, hasError: summary.hasError };
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  console.log(`[check-boot-signals] Server: ${BASE}`);
+  const strict = process.argv.includes("--strict");
+
+  console.log(`[check-boot-signals] Server: ${BASE}${strict ? " [--strict]" : ""}`);
 
   await setupAuth();
 
@@ -333,12 +369,18 @@ async function main(): Promise<void> {
     checkReady(entries, summary),
   ];
 
-  printReport(checks);
+  const { allPassed, hasError } = printReport(checks, summary, entries);
 
   await cleanupAuth();
 
-  const allPassed = checks.every((c) => c.passed);
-  process.exit(allPassed ? 0 : 1);
+  if (!allPassed) {
+    process.exit(1);
+  }
+  if (strict && hasError) {
+    console.error("[check-boot-signals] --strict: uscita 1 per hasError=true");
+    process.exit(1);
+  }
+  process.exit(0);
 }
 
 main().catch((err) => {
