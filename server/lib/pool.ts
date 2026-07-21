@@ -36,9 +36,8 @@ export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   application_name: APP_NAME,
   keepAlive: true,
-  // Neon richiede TLS esplicito; usato da entrambe le region Neon (eu-central-1 Frankfurt,
-  // us-west-2 US-West — ora migrata a Frankfurt). Il flag è condizionale per mantenere
-  // compatibilità con ambienti locali (senza neon.tech nell'URL).
+  // Neon richiede TLS esplicito (Neon Frankfurt, eu-central-1). Il flag è condizionale per
+  // mantenere compatibilità con ambienti locali (senza neon.tech nell'URL).
   ssl: process.env.DATABASE_URL?.includes("neon.tech")
     ? { rejectUnauthorized: true }
     : false,
