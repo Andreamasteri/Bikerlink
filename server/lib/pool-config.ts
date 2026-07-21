@@ -102,8 +102,10 @@ export const BG_DB_QUEUE_TIMEOUT_MS =
 /**
  * Numero di ping lenti consecutivi prima di attivare il kill-switch adattivo.
  * Quando il DB è lento, il governor rifiuta i job non critici per scaricarlo.
+ * Neon ha latenze più alte di Postgres managed → soglia alzata a 8.
  */
-export const BG_DB_SLOW_THRESHOLD = 2;
+export const BG_DB_SLOW_THRESHOLD =
+  Number.parseInt(process.env.BG_DB_SLOW_THRESHOLD ?? "", 10) || 8;
 
 // ── Saturazione sostenuta (backpressure gate) ────────────────────────────────
 
