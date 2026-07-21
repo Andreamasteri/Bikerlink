@@ -6,20 +6,29 @@ import { queryClient, apiRequest } from "@/lib/query-client";
 import { appendFileToForm } from "@/lib/image-picker-utils";
 
 export function useAdminSettingsMaintenance(isAdmin: boolean, t: (k: string) => string) {
-  const { data: syncStatus, refetch: refetchSyncStatus } = useQuery<{
+  const SYNC_STATUS_KEY = ["/api/admin/db/sync/status"] as const;
+
+  const { data: syncStatus } = useQuery<{
     available: boolean;
     inProgress: boolean;
     lastSync: { startedAt: string; finishedAt?: string; ok: boolean; error?: string } | null;
     nextScheduledAt: string | null;
   }>({
-    queryKey: ["/api/admin/sync-status"],
-    refetchInterval: 10000,
+    queryKey: SYNC_STATUS_KEY,
+    // Poll ogni 3s quando il sync è in corso, altrimenti ogni 30s.
+    refetchInterval: (query) =>
+      (query.state.data as { inProgress?: boolean } | undefined)?.inProgress ? 3000 : 30000,
   });
 
   const syncMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/admin/sync-prod-to-dev", {}),
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/db/sync/run", {});
+      return res.json();
+    },
     onSuccess: () => {
-      refetchSyncStatus();
+      // Il POST è sincrono: ritorna solo quando il sync è terminato.
+      // Invalidiamo lo status così la card aggiorna senza reload.
+      queryClient.invalidateQueries({ queryKey: SYNC_STATUS_KEY });
       Alert.alert(t("admin.syncCompleted"), t("admin.devSyncMsg"));
     },
     onError: (e: Error) => Alert.alert("Errore sync", (e as Error).message),
