@@ -11,10 +11,8 @@
 # ============================================================
 set -euo pipefail
 
-OUT=".env.backup"
+OUT="/home/runner/workspace/BackSecr"
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-
-echo "# BikerLink — Backup secrets" > "$OUT"
 echo "# Generato: $TIMESTAMP" >> "$OUT"
 echo "# ATTENZIONE: file sensibile — non condividere, non committare" >> "$OUT"
 echo "" >> "$OUT"
@@ -160,7 +158,7 @@ echo ""
 echo "╔════════════════════════════════════════════╗"
 echo "║  BikerLink — Backup secrets completato     ║"
 echo "╠════════════════════════════════════════════╣"
-printf "║  File       : %-29s║\n" "$OUT"
+printf "║  File       : %-29s║\n" "BackSecr (root progetto)"
 printf "║  Secrets    : %-3s compilati / %-3s totali  ║\n" "$FILLED" "$TOTAL"
 printf "║  Vuoti      : %-3s (non configurati)       ║\n" "$EMPTY"
 echo "╠════════════════════════════════════════════╣"
