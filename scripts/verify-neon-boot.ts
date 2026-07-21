@@ -1,11 +1,14 @@
 /**
- * verify-neon-boot.ts — Task #996
+ * verify-neon-boot.ts — Task #996 / Task #1009
  *
- * Verifica le 4 condizioni "Done looks like" per il boot su Neon:
+ * Verifica le 5 condizioni "Done looks like" per il boot su Neon:
  *   1. Nessun "[DB] Pool connection error" (SSL handshake OK)
  *   2. "[migrate] All migrations already applied" (no re-run)
  *   3. Pool principale si connette correttamente
  *   4. monitoringPool si connette e snapshotBlockedQueries() restituisce righe
+ *   5. HNSW index self-heal: pgvector extension presente, indice creato/già
+ *      esistente senza errori, connessione restituita al pool senza
+ *      "[DB/monitor] pool error"
  *
  * Usa DATABASE_URL_DEV (la stringa Neon) per il test.
  * Non tocca DATABASE_URL di produzione.
@@ -41,7 +44,7 @@ console.log("──────────────────────�
 let allPassed = true;
 
 // ── Check 1: Pool principale — SSL handshake + SELECT 1 ─────────────────────
-console.log("\n[1/4] Pool principale — SSL handshake + SELECT 1");
+console.log("\n[1/5] Pool principale — SSL handshake + SELECT 1");
 
 const mainPool = new Pool({
   connectionString: NEON_URL,
@@ -78,7 +81,7 @@ try {
 if (!check1Passed) allPassed = false;
 
 // ── Check 2: Migrations — schema_migrations intatto, nessun re-run ───────────
-console.log("\n[2/4] Migrations — schema_migrations intatto, nessun re-run");
+console.log("\n[2/5] Migrations — schema_migrations intatto, nessun re-run");
 
 const MIGRATIONS_DIR = path.resolve(process.cwd(), "migrations");
 const MIGRATIONS_HASH_CACHE = path.resolve(process.cwd(), "server_dist", ".migrations-hash");
@@ -161,7 +164,7 @@ try {
 if (!check2Passed) allPassed = false;
 
 // ── Check 3: Pool di monitoraggio (max:1) ────────────────────────────────────
-console.log("\n[3/4] Pool di monitoraggio (max:1) — connessione separata");
+console.log("\n[3/5] Pool di monitoraggio (max:1) — connessione separata");
 
 const monitorPool = new Pool({
   connectionString: NEON_URL,
@@ -199,7 +202,7 @@ try {
 if (!check3Passed) allPassed = false;
 
 // ── Check 4: snapshotBlockedQueries() — monitoring pool query pg_stat_activity ─
-console.log("\n[4/4] snapshotBlockedQueries() — query pg_stat_activity via pool monitor");
+console.log("\n[4/5] snapshotBlockedQueries() — query pg_stat_activity via pool monitor");
 
 let check4Passed = false;
 let snapClient: pg.PoolClient | null = null;
@@ -250,6 +253,152 @@ try {
 }
 
 if (!check4Passed) allPassed = false;
+
+// ── Check 5: HNSW index self-heal (mirrors boot-phase3-db-init.ts) ───────────
+// Replicates the two-step logic from runBootPhase3DbInit():
+//   a) CREATE EXTENSION IF NOT EXISTS vector  (non-fatal if already present)
+//   b) rebuildHnswIndex() logic:
+//      - Dedicated connection, statement_timeout=0 (build can take minutes)
+//      - Check pg_indexes + pg_index.indisvalid
+//      - CREATE INDEX CONCURRENTLY IF NOT EXISTS when missing
+//      - Restore statement_timeout=5000 before release
+// A "[DB/monitor] pool error" during this phase would mark the health degraded.
+console.log("\n[5/5] HNSW index self-heal — pgvector extension + indice cosine");
+
+const HNSW_INDEX_NAME = "embeddings_vec_hnsw_cosine_idx";
+let check5Passed = false;
+let hnswClient: pg.PoolClient | null = null;
+try {
+  // Step 5a: ensure pgvector extension (same as boot-phase3-db-init.ts line 6-15)
+  let extClient: pg.PoolClient | null = null;
+  try {
+    extClient = await mainPool.connect();
+    await extClient.query("CREATE EXTENSION IF NOT EXISTS vector");
+    console.log("  ✓ pgvector extension: presente (CREATE EXTENSION IF NOT EXISTS OK)");
+  } catch (extErr) {
+    // Non-fatal at boot — log a clear warning but don't fail the check yet
+    console.warn(
+      "  ⚠ pgvector extension ensure fallito (non-fatale al boot):",
+      extErr instanceof Error ? extErr.message : extErr,
+    );
+  } finally {
+    extClient?.release();
+  }
+
+  // Step 5b: HNSW index check + create — dedicated connection, no statement_timeout
+  hnswClient = await mainPool.connect();
+
+  // Disable statement_timeout so CREATE INDEX CONCURRENTLY is not killed at 5s
+  try {
+    await hnswClient.query("SET statement_timeout = 0");
+    console.log("  ✓ statement_timeout=0 impostato sulla connessione dedicata");
+  } catch {
+    console.warn("  ⚠ SET statement_timeout=0 fallito (best-effort, continuiamo)");
+  }
+
+  // Mirror the index existence + validity check from rebuildHnswIndex()
+  const idxCheck = await hnswClient.query<{ exists: boolean; valid: boolean }>(
+    `SELECT
+       EXISTS (
+         SELECT 1 FROM pg_indexes
+         WHERE schemaname = 'public'
+           AND tablename  = 'embeddings'
+           AND indexname  = $1
+       ) AS exists,
+       COALESCE(
+         (SELECT i.indisvalid
+          FROM pg_class  c
+          JOIN pg_index  i  ON i.indrelid  = c.oid
+          JOIN pg_class  ic ON ic.oid      = i.indexrelid
+          WHERE c.relname  = 'embeddings'
+            AND ic.relname = $1
+            AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+         ),
+         false
+       ) AS valid`,
+    [HNSW_INDEX_NAME],
+  );
+
+  const idxExists = idxCheck.rows[0]?.exists ?? false;
+  const idxValid  = idxCheck.rows[0]?.valid  ?? false;
+  console.log(`  Index '${HNSW_INDEX_NAME}': exists=${idxExists} valid=${idxValid}`);
+
+  let hnswAction: "created" | "rebuilt" | "noop";
+  if (!idxExists) {
+    console.log("  Index mancante — eseguo CREATE INDEX CONCURRENTLY IF NOT EXISTS …");
+    await hnswClient.query(
+      `CREATE INDEX CONCURRENTLY IF NOT EXISTS "${HNSW_INDEX_NAME}"
+         ON "embeddings" USING hnsw ("embedding" vector_cosine_ops)`,
+    );
+    hnswAction = "created";
+    console.log("  ✓ HNSW self-heal: index mancante creato con successo (action=created)");
+  } else if (!idxValid) {
+    console.log("  Index INVALIDO (build interrotta?) — DROP + CREATE …");
+    await hnswClient.query(`DROP INDEX CONCURRENTLY IF EXISTS "${HNSW_INDEX_NAME}"`);
+    await hnswClient.query(
+      `CREATE INDEX CONCURRENTLY IF NOT EXISTS "${HNSW_INDEX_NAME}"
+         ON "embeddings" USING hnsw ("embedding" vector_cosine_ops)`,
+    );
+    hnswAction = "rebuilt";
+    console.log("  ✓ HNSW self-heal: index invalido rimosso e ricreato (action=rebuilt)");
+  } else {
+    hnswAction = "noop";
+    console.log("  ✓ HNSW index verificato OK — exists=true, valid=true (action=noop)");
+  }
+
+  // Post-create verification: confirm index now exists AND is valid
+  const postCheck = await hnswClient.query<{ exists: boolean; valid: boolean }>(
+    `SELECT
+       EXISTS (
+         SELECT 1 FROM pg_indexes
+         WHERE schemaname = 'public'
+           AND tablename  = 'embeddings'
+           AND indexname  = $1
+       ) AS exists,
+       COALESCE(
+         (SELECT i.indisvalid
+          FROM pg_class  c
+          JOIN pg_index  i  ON i.indrelid  = c.oid
+          JOIN pg_class  ic ON ic.oid      = i.indexrelid
+          WHERE c.relname  = 'embeddings'
+            AND ic.relname = $1
+            AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
+         ),
+         false
+       ) AS valid`,
+    [HNSW_INDEX_NAME],
+  );
+  const postExists = postCheck.rows[0]?.exists ?? false;
+  const postValid  = postCheck.rows[0]?.valid  ?? false;
+
+  if (postExists && postValid) {
+    console.log(`  ✓ Post-check: index presente e valido dopo action=${hnswAction}`);
+    check5Passed = true;
+  } else {
+    console.error(
+      `  ✗ Post-check FAIL: index exists=${postExists} valid=${postValid} dopo action=${hnswAction}`,
+    );
+  }
+} catch (err) {
+  console.error(
+    "  ✗ FAIL — HNSW self-heal:",
+    err instanceof Error ? err.message : err,
+  );
+} finally {
+  // Restore default statement_timeout (5s) before returning connection to pool,
+  // matching the finally block in store.ts rebuildHnswIndex().
+  if (hnswClient) {
+    try {
+      await hnswClient.query("SET statement_timeout = 5000");
+    } catch {
+      /* best-effort */
+    }
+    hnswClient.release();
+    hnswClient = null;
+  }
+}
+
+if (!check5Passed) allPassed = false;
 
 // ── Check pool errors accumulated ────────────────────────────────────────────
 await new Promise((r) => setTimeout(r, 200)); // flush async pool events
