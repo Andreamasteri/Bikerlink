@@ -62,9 +62,7 @@ function isProductionEnvironment(): boolean {
 }
 
 function getSyncUrls(): { prodUrl: string; devUrl: string } | null {
-  // Dopo il cutover Neon: DATABASE_URL = Neon main (produzione),
-  // DATABASE_URL_DEV = branch dev Neon (creato in task #991).
-  // PROD_DATABASE_URL era il vecchio DB Replit managed — non più usato.
+  // DATABASE_URL = Neon main (produzione), DATABASE_URL_DEV = branch dev Neon.
   const prodUrl = process.env.DATABASE_URL;
   const devUrl = process.env.DATABASE_URL_DEV;
   if (!prodUrl || !devUrl) return null;

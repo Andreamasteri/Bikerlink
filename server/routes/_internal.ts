@@ -224,7 +224,7 @@ router.post("/purge-fake-users", async (req: Request, res: Response) => {
   const FAKE_EMAIL_DOMAIN = "@fakeuser.bikerlink.it";
 
   try {
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL_DEV ?? process.env.DATABASE_URL });
 
     const statsRows = await pool.query<{
       total: string; by_is_fake: string; by_email_domain: string; by_invitation_code: string;

@@ -503,7 +503,7 @@ async function runDefault(): Promise<number> {
     console.error("[deep-parity] DATABASE_URL non impostata.");
     return 2;
   }
-  const compareUrl = process.env.COMPARE_DATABASE_URL ?? process.env.PROD_DATABASE_URL;
+  const compareUrl = process.env.COMPARE_DATABASE_URL;
   let targetArg: string | undefined;
   if (compareUrl) targetArg = compareUrl;
   else if (existsSync(DEFAULT_PROD_BASELINE)) targetArg = DEFAULT_PROD_BASELINE;
@@ -513,7 +513,7 @@ async function runDefault(): Promise<number> {
     console.error("[deep-parity] Nessun target di confronto disponibile.");
     console.error("──────────────────────────────────────────────────────────────");
     console.error("Fornisci uno di:");
-    console.error("  • env COMPARE_DATABASE_URL (o PROD_DATABASE_URL) con la connection string del target");
+    console.error("  • env COMPARE_DATABASE_URL con la connection string del target");
     console.error(`  • un file baseline a ${DEFAULT_PROD_BASELINE} (firme prod catturate)`);
     console.error("  • oppure usa la modalità esplicita: compare <source> <target>");
     console.error("\nSu Replit la prod non ha connection string: cattura le firme prod");

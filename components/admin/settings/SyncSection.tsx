@@ -42,7 +42,7 @@ export function SyncSection({
       </RNView>
       {!syncStatus?.available ? (
         <RNText style={styles.synecoDesc}>
-          Non disponibile — impostare PROD_DATABASE_URL (diverso da DATABASE_URL) nell'ambiente di sviluppo.
+          Non disponibile — impostare DATABASE_URL_DEV (branch dev Neon, diverso da DATABASE_URL) nell'ambiente di sviluppo.
         </RNText>
       ) : (
         <>

@@ -38,7 +38,7 @@
  *
  * Secret/env: ARES_OLLAMA_URL, ARES_OLLAMA_MODEL, ARES_OLLAMA_TOKEN (opz.),
  *   DIAG_GITHUB_TOKEN (fallback GITHUB_TOKEN), CF_ACCESS_CLIENT_ID/SECRET,
- *   DATABASE_URL, PROD_DATABASE_URL.
+ *   DATABASE_URL, COMPARE_DATABASE_URL.
  */
 
 import fs from "fs";
@@ -164,7 +164,7 @@ async function runStep(c: StepCtx): Promise<boolean> {
     console.log("  🗄️  Dump database dev + prod (sola lettura)...");
     const [dev, prod] = await Promise.all([
       dumpDatabase("DEV", process.env.DATABASE_URL, false),
-      dumpDatabase("PROD", process.env.PROD_DATABASE_URL, false),
+      dumpDatabase("PROD", process.env.COMPARE_DATABASE_URL, false),
     ]);
     state.dbRaw = `${dev}\n\n${prod}`;
     saveState(c.dir, state);

@@ -61,7 +61,6 @@ echo "" >> "$OUT"
 
 # ── Database / Redis ─────────────────────────────────────────
 echo "# --- Database / Redis ---" >> "$OUT"
-echo "PROD_DATABASE_URL=${PROD_DATABASE_URL:-}" >> "$OUT"
 echo "TC_DRAGONFLY_URL=${TC_DRAGONFLY_URL:-}" >> "$OUT"
 echo "TC_REDIS_URL=${TC_REDIS_URL:-}" >> "$OUT"
 echo "REDIS_PROBE_HOST=${REDIS_PROBE_HOST:-}" >> "$OUT"
