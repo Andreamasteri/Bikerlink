@@ -89,7 +89,7 @@ log "Workspace iniziale: $(size .) totali"
 # Questi file non servono a runtime: il server Express non li serve.
 # La pulizia avviene PRIMA del build così il layer risultante è snello.
 STEP_TS_1=$(date -u +%s)
-log "=== [1/15] Pulizia asset workspace non necessari — $(elapsed) elapsed ==="
+log "=== [1/16] Pulizia asset workspace non necessari — $(elapsed) elapsed ==="
 log "  attached_assets/ prima: $(size attached_assets)"
 rm -rf attached_assets/
 mkdir -p attached_assets   # ricrea la dir vuota (evita errori se qualcuno la referenzia)
@@ -104,7 +104,7 @@ log "  attached_assets/ svuotata → $(size attached_assets)"
 # Misurato: .local/state/replit/ = 504 MB → Repl layer totale ~1.7 GB → KO.
 # Dopo la pulizia: ~1.2 GB → ampiamente sotto il limite.
 STEP_TS_2=$(date -u +%s)
-log "=== [2/15] Pulizia .local/state/ (transcript agente + log DB) — $(elapsed) elapsed ==="
+log "=== [2/16] Pulizia .local/state/ (transcript agente + log DB) — $(elapsed) elapsed ==="
 log "  .local/state/ prima: $(size .local/state)"
 rm -rf .local/state/replit/
 rm -rf .local/state/scribe/
@@ -120,7 +120,7 @@ log "  .local/state/ dopo:  $(size .local/state) (replit/, scribe/, workflow-log
 # - tmp_review_frames/, tmp_check/, logs/ → artefatti temporanei
 # NB: uploads/ e assets/ NON si toccano — sono serviti a runtime (express.static).
 STEP_TS_3=$(date -u +%s)
-log "=== [3/15] Pulizia directory transitorie non runtime — $(elapsed) elapsed ==="
+log "=== [3/16] Pulizia directory transitorie non runtime — $(elapsed) elapsed ==="
 log "  backups=$(size .local/backups) dist=$(size dist) dist-ota-env=$(size dist-ota-env) logs=$(size logs)"
 rm -rf .local/backups/
 rm -rf dist/
@@ -131,7 +131,7 @@ rm -rf logs/
 log "  backups, dist, dist-ota-env e artefatti temporanei rimossi."
 
 STEP_TS_4=$(date -u +%s)
-log "=== [4/15] Gate Index Drift (DESC/WHERE — regressioni migration, solo statico) — $(elapsed) elapsed ==="
+log "=== [4/16] Gate Index Drift (DESC/WHERE — regressioni migration, solo statico) — $(elapsed) elapsed ==="
 # Verifica che nessuna migration SQL abbia introdotto una regressione sugli
 # indici speciali (DESC / WHERE) dichiarati nello schema Drizzle TS.
 #
@@ -173,14 +173,14 @@ fi
 # - .git/    → storia git (~3.4 GB di cui ~1.9 GB LFS objects), non necessaria a runtime
 #              Il server non esegue comandi git; il repository completo è su GitHub.
 STEP_TS_5=$(date -u +%s)
-log "=== [5/15] Pulizia exports/ e .git/ per rispettare il limite Repl layer — $(elapsed) elapsed ==="
+log "=== [5/16] Pulizia exports/ e .git/ per rispettare il limite Repl layer — $(elapsed) elapsed ==="
 log "  exports=$(size exports) .git=$(size .git)"
 rm -rf exports/
 rm -rf .git/
 log "  exports/ e .git/ rimossi — Repl layer ora sotto il limite ~2 GB."
 
 STEP_TS_6=$(date -u +%s)
-log "=== [6/15] Gate Lint Migration Indexes (CREATE IF NOT EXISTS senza DROP) — $(elapsed) elapsed ==="
+log "=== [6/16] Gate Lint Migration Indexes (CREATE IF NOT EXISTS senza DROP) — $(elapsed) elapsed ==="
 # ── Gate Lint Migration Indexes (drift silenzioso CREATE IF NOT EXISTS) ──────
 # check-index-drift --static-only NON cattura il drift "silenzioso": una migration
 # che crea un indice speciale con `CREATE INDEX IF NOT EXISTS ... DESC` SENZA un
@@ -205,7 +205,7 @@ else
 fi
 
 STEP_TS_7=$(date -u +%s)
-log "=== [7/15] Gate Dedup Pattern (DELETE…NOT IN → ROW_NUMBER CTE) — $(elapsed) elapsed ==="
+log "=== [7/16] Gate Dedup Pattern (DELETE…NOT IN → ROW_NUMBER CTE) — $(elapsed) elapsed ==="
 # Verifica che nessuna migration SQL usi il pattern NULL-unsafe
 # `DELETE FROM <t> WHERE id NOT IN (SELECT id FROM <t>)` per deduplicare
 # righe prima di aggiungere un vincolo UNIQUE.
@@ -236,7 +236,7 @@ else
 fi
 
 STEP_TS_8=$(date -u +%s)
-log "=== [8/15] Gate Undefined Route Handlers (.next.ts stubs) — $(elapsed) elapsed ==="
+log "=== [8/16] Gate Undefined Route Handlers (.next.ts stubs) — $(elapsed) elapsed ==="
 # Rileva file .next.ts senza `export default` che siano importati come handler
 # di default in un file router. Questi causano:
 #   TypeError: argument handler must be a function
@@ -257,7 +257,7 @@ else
 fi
 
 STEP_TS_9=$(date -u +%s)
-log "=== [9/15] Gate Hardcoded Agent Model Names — $(elapsed) elapsed ==="
+log "=== [9/16] Gate Hardcoded Agent Model Names — $(elapsed) elapsed ==="
 # Verifica che nessun file .ts/.tsx fuori da server/lib/agent-constants.ts
 # contenga i nomi dei modelli Ollama come letterali stringa hardcoded.
 # La sorgente di verità è AGENT_MODEL_DEFAULTS in agent-constants.ts;
@@ -281,7 +281,7 @@ else
 fi
 
 STEP_TS_10=$(date -u +%s)
-log "=== [10/15] Gate Quebracho Bridge Import (modulo eliminato) — $(elapsed) elapsed ==="
+log "=== [10/16] Gate Quebracho Bridge Import (modulo eliminato) — $(elapsed) elapsed ==="
 # Verifica che nessun file importi da quebracho-bridge, rimosso quando
 # Quebracho è stato assorbito in Horus (Task #591 / #597).
 # Un re-import produrrebbe un "module not found" senza spiegazione;
@@ -299,7 +299,7 @@ else
 fi
 
 STEP_TS_11=$(date -u +%s)
-log "=== [11/15] Gate Quebracho Question Import (modulo eliminato) — $(elapsed) elapsed ==="
+log "=== [11/16] Gate Quebracho Question Import (modulo eliminato) — $(elapsed) elapsed ==="
 # Verifica che nessun file importi da quebracho-question, rimosso insieme
 # a Quebracho (Task #591). Il flusso di composizione domanda non esiste più.
 QUEBRACHO_QUESTION_EXIT=0
@@ -316,7 +316,7 @@ else
 fi
 
 STEP_TS_12=$(date -u +%s)
-log "=== [12/15] Verifica versioni stabili dipendenze critiche (non-bloccante) — $(elapsed) elapsed ==="
+log "=== [12/16] Verifica versioni stabili dipendenze critiche (non-bloccante) — $(elapsed) elapsed ==="
 # Avvisa se esistono versioni major/minor più recenti per le dipendenze critiche.
 # Non blocca il deploy: exit sempre 0.
 # Interroga il registry npm — se la rete è irraggiungibile, lo step viene saltato
@@ -328,7 +328,31 @@ if [ "$STABLE_VER_EXIT" -ne 0 ]; then
 fi
 
 STEP_TS_13=$(date -u +%s)
-log "=== [13/15] Build server TypeScript — $(elapsed) elapsed ==="
+log "=== [13/16] Gate Neon DB Branching (dev≠prod, solo in CI) — $(elapsed) elapsed ==="
+# Verifica che DATABASE_URL_DEV e DATABASE_URL puntino a branch Neon SEPARATI.
+# Il guard è attivo SOLO in ambienti CI (REPLIT_DEPLOYMENT impostato): in locale
+# DATABASE_URL_DEV potrebbe non essere settata e non vogliamo bloccare il flusso
+# di sviluppo. In produzione invece la separazione dev≠prod è obbligatoria.
+# Parsing-only: nessuna connessione TCP, sicuro da eseguire in FASE 2.
+if [ -n "${REPLIT_DEPLOYMENT:-}" ]; then
+  NEON_BRANCH_EXIT=0
+  npx tsx scripts/verify-neon-branching.ts 2>&1 || NEON_BRANCH_EXIT=$?
+  if [ "$NEON_BRANCH_EXIT" -eq 0 ]; then
+    log "  ✅ Neon Branching OK — DATABASE_URL_DEV e DATABASE_URL su branch separati."
+  else
+    log "  ❌ DEPLOY BLOCCATO — Neon branching guard fallito (exit ${NEON_BRANCH_EXIT})."
+    log "     dev e prod potrebbero puntare allo stesso branch Neon."
+    log "     Rischio: drizzle-kit push nel workspace colpirebbe il DB di produzione."
+    log "     Azione: verifica DATABASE_URL_DEV e DATABASE_URL, poi rilancia il deploy."
+    log "     Dettagli: npx tsx scripts/verify-neon-branching.ts"
+    exit 1
+  fi
+else
+  log "  ⏭  REPLIT_DEPLOYMENT non impostato — guard Neon branching saltato (ambiente locale)."
+fi
+
+STEP_TS_14=$(date -u +%s)
+log "=== [14/16] Build server TypeScript — $(elapsed) elapsed ==="
 node scripts/server-build.js
 log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.js 2>/dev/null) il bundle)"
 
@@ -340,8 +364,8 @@ log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.j
 # potrebbe non essere garantita). NON-FATALE: se il download fallisce, i bridge
 # degradano con grazia (Redis → fallback in-memory; SSH → errore descrittivo, niente
 # crash) e il deploy non è bloccato.
-STEP_TS_14=$(date -u +%s)
-log "=== [14/15] Bake binario cloudflared (bridge Redis TCP + SSH) — $(elapsed) elapsed ==="
+STEP_TS_15=$(date -u +%s)
+log "=== [15/16] Bake binario cloudflared (bridge Redis TCP + SSH) — $(elapsed) elapsed ==="
 CF_BIN="bin/cloudflared"
 if [ -x "$CF_BIN" ]; then
   log "  $CF_BIN già presente ($(size $CF_BIN)) — skip download."
@@ -366,8 +390,8 @@ fi
 # GET /api/exports/matching-system.pdf non torni mai 500 in produzione.
 # NB: in caso di errore logghiamo un warning ma NON usciamo (set -e è attivo,
 # quindi usiamo || true per non bloccare l'intero deploy).
-STEP_TS_15=$(date -u +%s)
-log "=== [15/15] Verifica PDF matching-system — $(elapsed) elapsed ==="
+STEP_TS_16=$(date -u +%s)
+log "=== [16/16] Verifica PDF matching-system — $(elapsed) elapsed ==="
 MATCHING_PDF="server/public/matching-system.pdf"
 if [ -f "$MATCHING_PDF" ]; then
   log "  $MATCHING_PDF già presente ($(size $MATCHING_PDF)) — nessuna azione."
@@ -393,7 +417,7 @@ fi
 rm -f server_dist/.migrations-hash
 log "  Cache migration invalidata (al boot migrate.ts farà sempre il controllo DB)."
 
-STEP_TS_16=$(date -u +%s)
+STEP_TS_17=$(date -u +%s)
 
 # ── Slow-step detector (warning only — non blocca il deploy) ──────────────────
 # Calcola il delta di ogni step e avvisa se supera la soglia configurabile.
@@ -402,7 +426,7 @@ SLOW_STEP_THRESHOLD=${DEPLOY_SLOW_STEP_THRESHOLD:-120}
 declare -a _STEP_TS=( $STEP_TS_1 $STEP_TS_2 $STEP_TS_3 $STEP_TS_4 $STEP_TS_5
                       $STEP_TS_6 $STEP_TS_7 $STEP_TS_8 $STEP_TS_9 $STEP_TS_10
                       $STEP_TS_11 $STEP_TS_12 $STEP_TS_13 $STEP_TS_14 $STEP_TS_15
-                      $STEP_TS_16 )
+                      $STEP_TS_16 $STEP_TS_17 )
 declare -a _STEP_NAMES=(
   "Pulizia asset workspace"
   "Pulizia .local/state/"
@@ -416,26 +440,27 @@ declare -a _STEP_NAMES=(
   "Gate Quebracho Bridge Import"
   "Gate Quebracho Question Import"
   "Verifica versioni stabili"
+  "Gate Neon Branching"
   "Build server TypeScript"
   "Bake cloudflared"
   "Verifica PDF matching-system"
 )
 log "=== Slow-step report (soglia: ${SLOW_STEP_THRESHOLD}s) ==="
 _SLOW_FOUND=0
-for _i in $(seq 0 14); do
+for _i in $(seq 0 15); do
   _N=$(( _i + 1 ))
   _DELTA=$(( _STEP_TS[_i+1] - _STEP_TS[_i] ))
   if [ "$_DELTA" -gt "$SLOW_STEP_THRESHOLD" ]; then
-    log "  ⚠️  STEP LENTO [${_N}/15] '${_STEP_NAMES[$_i]}' — ${_DELTA}s (soglia: ${SLOW_STEP_THRESHOLD}s)"
+    log "  ⚠️  STEP LENTO [${_N}/16] '${_STEP_NAMES[$_i]}' — ${_DELTA}s (soglia: ${SLOW_STEP_THRESHOLD}s)"
     _SLOW_FOUND=$(( _SLOW_FOUND + 1 ))
   fi
 done
 if [ "$_SLOW_FOUND" -eq 0 ]; then
-  log "  ✅ Tutti i 15 step entro la soglia di ${SLOW_STEP_THRESHOLD}s."
+  log "  ✅ Tutti i 16 step entro la soglia di ${SLOW_STEP_THRESHOLD}s."
 fi
 
 # ── Deploy stamp + timing summary per l'analisi post-deploy (su richiesta) ────
-# Scritto in server_dist/ (sempre presente dopo il step [13/15] Build TS) così
+# Scritto in server_dist/ (sempre presente dopo il step [14/16] Build TS) così
 # l'operatore può eseguire manualmente l'analisi post-deploy tramite il workflow
 # "Post-Deploy Analysis" oppure con: FORCE_RERUN=1 bash scripts/post-deploy-analysis.sh
 #
@@ -449,7 +474,7 @@ _WS_FINAL=$(size .)
 
 # Raccoglie deltas step per il JSON
 _STEP_DELTAS_JSON="{"
-for _si in $(seq 0 14); do
+for _si in $(seq 0 15); do
   _sn=$(( _si + 1 ))
   _sd=$(( _STEP_TS[_si+1] - _STEP_TS[_si] ))
   _STEP_DELTAS_JSON="${_STEP_DELTAS_JSON}\"${_sn}\":${_sd},"
@@ -458,17 +483,17 @@ _STEP_DELTAS_JSON="${_STEP_DELTAS_JSON%,}}"
 
 # Raccoglie step lenti come array JSON
 _SLOW_ARRAY_JSON="["
-for _si in $(seq 0 14); do
+for _si in $(seq 0 15); do
   _sn=$(( _si + 1 ))
   _sd=$(( _STEP_TS[_si+1] - _STEP_TS[_si] ))
   if [ "$_sd" -gt "$SLOW_STEP_THRESHOLD" ]; then
-    _SLOW_ARRAY_JSON="${_SLOW_ARRAY_JSON}\"[${_sn}/15] ${_STEP_NAMES[$_si]} — ${_sd}s\","
+    _SLOW_ARRAY_JSON="${_SLOW_ARRAY_JSON}\"[${_sn}/16] ${_STEP_NAMES[$_si]} — ${_sd}s\","
   fi
 done
 _SLOW_ARRAY_JSON="${_SLOW_ARRAY_JSON%,}]"
 
 # Calcola durata totale
-_TOTAL_SECS=$(( _STEP_TS[15] - SCRIPT_START_EPOCH ))
+_TOTAL_SECS=$(( _STEP_TS[16] - SCRIPT_START_EPOCH ))
 
 echo "$_DEPLOY_EPOCH" > server_dist/.deploy-stamp
 cat > server_dist/.deploy-timing.json << EOF
