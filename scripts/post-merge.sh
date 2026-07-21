@@ -1302,8 +1302,10 @@ echo "════════════════════════�
 echo "  Cleanup utenti smoke residui"
 echo "════════════════════════════════════════"
 CLEANUP_EXIT=0
-npx tsx scripts/smoke/cleanup-orphans.ts 2>&1 || CLEANUP_EXIT=$?
-if [ "$CLEANUP_EXIT" -ne 0 ]; then
+timeout 45 npx tsx scripts/smoke/cleanup-orphans.ts 2>&1 || CLEANUP_EXIT=$?
+if [ "$CLEANUP_EXIT" -eq 124 ]; then
+  echo "⚠️  cleanup-orphans.ts: timeout 45s — DB lento in questo ambiente. Gate saltato (non bloccante)."
+elif [ "$CLEANUP_EXIT" -ne 0 ]; then
   echo "⚠️  cleanup-orphans.ts ha restituito exit ${CLEANUP_EXIT} — verificare manualmente."
 else
   echo "✅ Cleanup smoke completato."
