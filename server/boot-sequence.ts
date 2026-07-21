@@ -143,6 +143,23 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
   // ── DB readiness pre-flight (prima di Phase 2) ────────────────────────────
   await waitForDatabaseReady();
 
+  // ── DB endpoint log — visibile nei boot log per conferma region (Frankfurt) ─
+  // Estrae solo l'hostname dall'URL (niente credenziali) per permettere all'admin
+  // di verificare che DATABASE_URL punti al nodo corretto (eu-central-1 Frankfurt).
+  try {
+    const dbUrl = process.env.DATABASE_URL ?? "";
+    const dbHost = dbUrl ? new URL(dbUrl).hostname : "(URL assente)";
+    const isNeon = dbHost.endsWith("neon.tech");
+    const region = dbHost.includes("eu-central-1") ? "Frankfurt (eu-central-1)"
+      : dbHost.includes("us-west-2")               ? "US-West-2"
+      : dbHost.includes("us-east-1")               ? "US-East-1"
+      : isNeon                                      ? "Neon (region sconosciuta)"
+      : "non-Neon";
+    console.log(`[BOOT][DB] Endpoint: ${dbHost} — region: ${region}`);
+  } catch {
+    // non-fatale: se l'URL non è parsabile il boot continua normalmente
+  }
+
   // ── Phase 2: Migrations (FATAL — gira dopo il listen) ─────────────────────
   bootLog(2, TOTAL, "Migrations", "start");
   try {
