@@ -156,6 +156,7 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
       : isNeon                                      ? "Neon (region sconosciuta)"
       : "non-Neon";
     console.log(`[BOOT][DB] Endpoint: ${dbHost} — region: ${region}`);
+    addBootLog("[BOOT][DB] Endpoint:", `${dbHost} — region: ${region}`, true);
   } catch {
     // non-fatale: se l'URL non è parsabile il boot continua normalmente
   }
