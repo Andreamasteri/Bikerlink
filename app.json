@@ -2,7 +2,7 @@
   "expo": {
     "name": "BikerLink",
     "slug": "bikerlink",
-    "version": "82.10.235",
+    "version": "83.11.242",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
@@ -29,7 +29,7 @@
     "android": {
       "package": "com.bikerlink.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 82,
+      "versionCode": 83,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
@@ -133,7 +133,9 @@
           }
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-secure-store",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true
@@ -145,7 +147,7 @@
       "checkAutomatically": "NEVER",
       "disableAntiBrickingMeasures": false
     },
-    "runtimeVersion": "10.0.0",
+    "runtimeVersion": "11.0.0",
     "extra": {
       "eas": {
         "projectId": "a25192d7-72e5-46af-97d0-2d38ed9b78e3"

@@ -10,7 +10,7 @@ set -e
 
 # ── Parametri ──────────────────────────────────────────────
 OTA_BUNDLED="${1:-0}"
-CYCLE="10"   # ciclo runtimeVersion (cambia solo con breaking native change)
+CYCLE="11"   # ciclo runtimeVersion (cambia solo con breaking native change)
 
 # ── Legge versionCode attuale da app.json ──────────────────
 CURRENT_CODE=$(node -p "require('./app.json').expo.android.versionCode")

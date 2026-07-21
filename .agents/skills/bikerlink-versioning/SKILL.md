@@ -62,12 +62,12 @@ Il progetto usa il bare workflow (directory `android/` committata). I tre file d
 
 | File | Campo | Valore corrente |
 |---|---|---|
-| `app.json` | `expo.version` | `74.10.131` |
-| `app.json` | `expo.android.versionCode` | `74` |
-| `app.json` | `expo.runtimeVersion` | `10.0.0` |
-| `android/app/build.gradle` | `versionCode` | `74` |
-| `android/app/build.gradle` | `versionName` | `"74.10.131"` |
-| `android/app/src/main/res/values/strings.xml` | `expo_runtime_version` | `10.0.0` |
+| `app.json` | `expo.version` | `83.11.242` |
+| `app.json` | `expo.android.versionCode` | `83` |
+| `app.json` | `expo.runtimeVersion` | `11.0.0` |
+| `android/app/build.gradle` | `versionCode` | `83` |
+| `android/app/build.gradle` | `versionName` | `"83.11.242"` |
+| `android/app/src/main/res/values/strings.xml` | `expo_runtime_version` | `11.0.0` |
 
 ⚠️ **Aggiornare sempre tutti e tre i file contemporaneamente.** Un disallineamento causa errori di update check a runtime.
 
@@ -155,7 +155,9 @@ Rispetto allo schema standard, una build diagnostic **non** modifica:
 | v68–v71 | 68–71 | — | 10.0.0 | 10.x | — | Build intermedie ciclo 10 (diagnostic) |
 | v72 | 72 | 72D.10.125 | 10.0.0 | 10.x | OTA-125 inglobata | diagnostic build |
 | v73 | 73 | 73D.10.126 | 10.0.0 | 10.x | OTA-126 inglobata | diagnostic build |
-| v74 | 74 | 74.10.131 | 10.0.0 | 10.x | OTA-131 inglobata | **Corrente** — release-apk |
+| v74 | 74 | 74.10.131 | 10.0.0 | 10.x | OTA-131 inglobata | release-apk |
+| v75–v82 | 75–82 | — | 10.0.0 | 10.x | — | Build intermedie ciclo 10 (ultimo APK ciclo 10: v82 82.10.235; ciclo CHIUSO a OTA-242) |
+| v83 | 83 | 83.11.242 | 11.0.0 | 11.x | OTA-242 inglobata | **Corrente** — Primo APK ciclo 11, migrazione Expo SDK 57 (Task #841) |
 
 > **Cicli precedenti** (schema vecchio `major.minor.patch` senza significato semantico):
 > - Ciclo 2.x: rv 2.0.0
@@ -166,6 +168,7 @@ Rispetto allo schema standard, una build diagnostic **non** modifica:
 > - Ciclo 7.x: rv 7.0.0
 > - Ciclo 8.x: rv 8.0.0 — ultimo prima dell'adozione dello schema semantico (Task #1525)
 > - Ciclo 9.x: rv 9.0.0 — CHIUSO a OTA-13 (Task #1801 SDK 56 migration)
+> - Ciclo 10.x: rv 10.0.0 — CHIUSO a OTA-242 (Task #841 SDK 57 migration)
 
 ---
 
