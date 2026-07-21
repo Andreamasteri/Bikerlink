@@ -28,15 +28,15 @@ export const POOL_MIN = 1;
 
 /**
  * Timeout idle prima di evictare una connessione non in uso (ms).
- * 10s < timeout lato Replit managed DB (~20s): le connessioni vengono rilasciate
- * lato client prima che il server le droppi.
+ * 10s < timeout lato Neon (Frankfurt, eu-central-1): le connessioni vengono
+ * rilasciate lato client prima che il server le droppi.
  */
 export const POOL_IDLE_TIMEOUT_MS = 10_000;
 
 /**
  * Timeout massimo per stabilire una nuova connessione (ms).
- * 8s: aumentato da 3s per dare tempo al managed Postgres di accettare connessioni
- * durante picchi di concorrenza (tick watchdog con collector in parallelo).
+ * 8s: dato sufficiente per Neon Frankfurt ad accettare connessioni durante
+ * picchi di concorrenza (tick watchdog con collector in parallelo).
  */
 export const POOL_CONNECTION_TIMEOUT_MS = 8_000;
 

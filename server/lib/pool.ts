@@ -36,9 +36,9 @@ export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   application_name: APP_NAME,
   keepAlive: true,
-  // Neon richiede TLS esplicito; Replit managed Postgres non lo richiedeva.
-  // Il flag è condizionale per mantenere compatibilità con ambienti locali
-  // e il DB managed Replit (senza neon.tech nell'URL).
+  // Neon richiede TLS esplicito; usato da entrambe le region Neon (eu-central-1 Frankfurt,
+  // us-west-2 US-West — ora migrata a Frankfurt). Il flag è condizionale per mantenere
+  // compatibilità con ambienti locali (senza neon.tech nell'URL).
   ssl: process.env.DATABASE_URL?.includes("neon.tech")
     ? { rejectUnauthorized: true }
     : false,
@@ -53,11 +53,9 @@ export const pool = new Pool({
   // 10s < timeout lato Replit managed DB (~20s) → connessioni rilasciate prima
   // che il server le droppi, evitando "Connection terminated unexpectedly".
   idleTimeoutMillis: POOL_IDLE_TIMEOUT_MS,
-  // 8s: aumentato da 3s per dare tempo sufficiente a managed Postgres di
-  // accettare nuove connessioni durante picchi di concorrenza (tick watchdog
-  // con più collector in parallelo). Con managed Postgres lento, stabilire
-  // una nuova connessione può richiedere 3-6s → il vecchio timeout di 3s
-  // causava "Failed query" sistematici nei collector ad ogni tick.
+  // 8s: dato sufficiente per Neon (Frankfurt, eu-central-1) ad accettare
+  // nuove connessioni durante picchi di concorrenza (tick watchdog con
+  // più collector in parallelo).
   connectionTimeoutMillis: POOL_CONNECTION_TIMEOUT_MS,
   // Limite esplicito di connessioni — evita saturation burst.
   max: POOL_MAX,
