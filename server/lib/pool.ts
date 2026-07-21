@@ -36,6 +36,12 @@ export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   application_name: APP_NAME,
   keepAlive: true,
+  // Neon richiede TLS esplicito; Replit managed Postgres non lo richiedeva.
+  // Il flag è condizionale per mantenere compatibilità con ambienti locali
+  // e il DB managed Replit (senza neon.tech nell'URL).
+  ssl: process.env.DATABASE_URL?.includes("neon.tech")
+    ? { rejectUnauthorized: true }
+    : false,
   // Rete di sicurezza lato SERVER contro il leak "idle in transaction": qualsiasi
   // sessione che apre una transazione (BEGIN) e resta idle oltre 60s viene uccisa
   // da Postgres, liberando il socket. Le query autocommit di drizzle non aprono
@@ -158,6 +164,9 @@ const monitoringPool = new Pool({
   idleTimeoutMillis: MONITORING_POOL_IDLE_TIMEOUT_MS,
   connectionTimeoutMillis: MONITORING_POOL_CONNECTION_TIMEOUT_MS,
   statement_timeout: MONITORING_POOL_STATEMENT_TIMEOUT_MS,
+  ssl: process.env.DATABASE_URL?.includes("neon.tech")
+    ? { rejectUnauthorized: true }
+    : false,
 });
 monitoringPool.on("error", (err) => {
   console.error("[DB/monitor] pool error:", err.message);

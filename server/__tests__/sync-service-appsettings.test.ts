@@ -123,8 +123,9 @@ function makeFakeProcess(exitCode: number, stderrOutput = "") {
 
 /** Configura le env var minime affinché syncProdToDev() superi i guard iniziali. */
 function setupSyncEnv() {
-  process.env.PROD_DATABASE_URL = "postgres://prod:prod@prod-host:5432/prod"; // pragma: allowlist secret
-  process.env.DATABASE_URL = "postgres://dev:dev@localhost:5432/dev"; // pragma: allowlist secret
+  // Dopo il cutover Neon: DATABASE_URL = Neon main (prod), DATABASE_URL_DEV = branch dev.
+  process.env.DATABASE_URL = "postgres://prod:prod@prod-host.neon.tech:5432/neondb"; // pragma: allowlist secret
+  process.env.DATABASE_URL_DEV = "postgres://dev:dev@dev-host.neon.tech:5432/neondb"; // pragma: allowlist secret
   delete process.env.REPLIT_DEPLOYMENT;
   delete process.env.REPLIT_INTERNAL_APP_DOMAIN;
 }

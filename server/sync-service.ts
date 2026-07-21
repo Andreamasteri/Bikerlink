@@ -61,8 +61,11 @@ function isProductionEnvironment(): boolean {
 }
 
 function getSyncUrls(): { prodUrl: string; devUrl: string } | null {
-  const prodUrl = process.env.PROD_DATABASE_URL;
-  const devUrl = process.env.DATABASE_URL;
+  // Dopo il cutover Neon: DATABASE_URL = Neon main (produzione),
+  // DATABASE_URL_DEV = branch dev Neon (creato in task #991).
+  // PROD_DATABASE_URL era il vecchio DB Replit managed — non più usato.
+  const prodUrl = process.env.DATABASE_URL;
+  const devUrl = process.env.DATABASE_URL_DEV;
   if (!prodUrl || !devUrl) return null;
   if (prodUrl === devUrl) return null;
   return { prodUrl, devUrl };
@@ -120,9 +123,9 @@ export async function syncProdToDev(): Promise<{ ok: boolean; error?: string }> 
 
   const urls = getSyncUrls();
   if (!urls) {
-    const msg = process.env.PROD_DATABASE_URL
-      ? "PROD_DATABASE_URL e DATABASE_URL puntano allo stesso database — sync annullato"
-      : "PROD_DATABASE_URL non configurato";
+    const msg = process.env.DATABASE_URL_DEV
+      ? "DATABASE_URL e DATABASE_URL_DEV puntano allo stesso database — sync annullato"
+      : "DATABASE_URL_DEV non configurato (branch dev Neon non ancora creato)";
     console.warn("[sync-service]", msg);
     return { ok: false, error: msg };
   }
@@ -201,7 +204,7 @@ export function startSyncScheduler() {
     return;
   }
   if (!getSyncUrls()) {
-    console.log("[sync-service] PROD_DATABASE_URL non configurato o uguale a DATABASE_URL — scheduler sync non avviato");
+    console.log("[sync-service] DATABASE_URL_DEV non configurato o uguale a DATABASE_URL — scheduler sync non avviato");
     return;
   }
 
