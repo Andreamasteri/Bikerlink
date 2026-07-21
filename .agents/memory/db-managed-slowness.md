@@ -3,6 +3,29 @@ name: DB managed-Postgres slowness vs pool leak
 description: How to tell Replit managed-Postgres slowness apart from our pool saturation/leak, and why downstream-outage alarms are suppressed when ThinkCentre is off.
 ---
 
+# Causa precisa dei ping spike (verificata 2026-07-20)
+
+`pg_postmaster_start_time()` sul DB prod = uptime **83 secondi** al momento della query.
+`pg_stat_bgwriter`: `checkpoints_timed=0`, `buffers_alloc=421` (solo 3 MB su 128 MB shared_buffers usati).
+**Replit riavvia il managed Postgres periodicamente e senza preavviso.**
+
+Catena causale:
+1. Postgres riavvia → tutte le 10 connessioni del pool si rompono simultaneamente
+2. Il pool le riaprono in burst verso un processo Postgres freddo (cache vuota)
+3. 10 nuove connessioni in parallelo su istanza cold → 1–5s ciascuna
+4. Il ping (`SELECT 1`) include il tempo di `pool.connect()` → 5500ms
+5. Dura 10–15 tick (~2–3 min) finché pool si stabilizza e shared_buffers si riscalda
+
+**Non è risolvibile dal nostro codice.** Il restart lo decide Replit.
+
+**Piano concordato (in attesa):**
+- **A**: alzare `BG_DB_SLOW_THRESHOLD` da 2 a 8 in `pool-config.ts` + renderlo env var → meno sensibile a spike brevi
+- **B**: migrare a **Neon** (pgbouncer interno, nessun restart visibile all'app) → fix definitivo
+- Schema: 150 file `.sql` in `migrations/`, runner custom `server/migrate.ts` al boot
+- Estensioni: `pg_trgm`, `postgis`, `unaccent`, `vector` — tutte supportate da Neon
+- `pg_dump` disponibile a PostgreSQL 16.10
+- Dev Postgres: stabile (uptime 31 min+). Solo prod colpito dai restart.
+
 # DB ping lento ≠ pool saturo
 
 Un ping DB lento (>8s) con `waiting=0` NON è una saturazione del nostro pool né una
