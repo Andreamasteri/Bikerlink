@@ -118,3 +118,7 @@ bin/cloudflared
 # non deve gonfiare il Repl layer del deploy.
 .bikerblog-ref/
 logs/*.md
+
+# Neon migration artifacts — contengono dati prod, mai committare
+scripts/neon-migration/*.sql
+scripts/neon-migration/*.txt
