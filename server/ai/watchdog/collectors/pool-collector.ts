@@ -71,6 +71,10 @@ const DROP_BURST_FOR_WARN = 10;
 // Module-level state: consecutive ticks under pressure for each gauge.
 let consecutiveWaiting = 0;
 let consecutiveLimiterQueued = 0;
+// Task #973 — Kill-switch adattivo bg-db-limiter: tracking dello stato precedente per
+// rilevare le transizioni active→inactive (recovery signal).
+let prevKillSwitchActive = false;
+let prevDroppedSlowKillSwitchTotal = 0;
 
 /**
  * Invalida immediatamente la cache del kill-switch idle-leak (ora in actuator.ts)
@@ -377,7 +381,7 @@ export function collectPool(): Signal[] {
 
   // ── bg-db-limiter (cooperative background-job semaphore) ──────────────────
   try {
-    const { active, queued, max, droppedOverflowTotal, droppedTimeoutTotal } = getBgDbLimiterStats();
+    const { active, queued, max, droppedOverflowTotal, droppedTimeoutTotal, droppedSlowKillSwitchTotal, dbSlowPingsConsecutive } = getBgDbLimiterStats();
 
     // Active slots in use (always emit for the metrics dashboard).
     signals.push({
@@ -480,6 +484,52 @@ export function collectPool(): Signal[] {
         consecutiveDrops: consecutiveLimiterDrops,
       },
     });
+
+    // Task #973 — Kill-switch adattivo: espone lo stato del kill-switch e il
+    // contatore totale di job scartati da esso. Il kill-switch è attivo quando
+    // dbSlowPingsConsecutive >= 2 (BG_DB_SLOW_THRESHOLD in bg-db-limiter.ts).
+    //
+    // Emette tre segnali:
+    //   1. droppedSlowKillSwitchTotal (sempre, info — metrica del dashboard).
+    //   2. kill_switch_active (solo quando attivo, warn) — porta dbSlowPingsConsecutive
+    //      e droppedSlowKillSwitchTotal per il payload push admin.
+    //   3. kill_switch_recovered (solo alla transizione active→inactive, info) —
+    //      letto da alerts.ts per la push di rientro.
+    const deltaDroppedKillSwitch = Math.max(0, droppedSlowKillSwitchTotal - prevDroppedSlowKillSwitchTotal);
+    prevDroppedSlowKillSwitchTotal = droppedSlowKillSwitchTotal;
+
+    signals.push({
+      source: "db",
+      metric: "bg_limiter.dropped_kill_switch",
+      value: droppedSlowKillSwitchTotal,
+      unit: "jobs",
+      severity: "info",
+      details: { delta: deltaDroppedKillSwitch },
+    });
+
+    const killSwitchActive = dbSlowPingsConsecutive >= 2;
+    if (killSwitchActive) {
+      signals.push({
+        source: "db",
+        metric: "bg_limiter.kill_switch_active",
+        value: dbSlowPingsConsecutive,
+        unit: "pings",
+        severity: "warn",
+        details: { dbSlowPingsConsecutive, droppedSlowKillSwitchTotal },
+      });
+    }
+    // Transizione active→inactive: emette un segnale info per la push di rientro.
+    if (!killSwitchActive && prevKillSwitchActive) {
+      signals.push({
+        source: "db",
+        metric: "bg_limiter.kill_switch_recovered",
+        value: 0,
+        unit: "pings",
+        severity: "info",
+        details: { droppedSlowKillSwitchTotal },
+      });
+    }
+    prevKillSwitchActive = killSwitchActive;
   } catch (err) {
     signals.push({
       source: "db",

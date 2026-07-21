@@ -11,6 +11,7 @@ import { getAdminPushTokenCount } from "../../push-notifications-internal";
 const mapsLog = logger.child({ scope: "maps-watchdog", layer: "alerts" });
 
 const ALERT_TTL_MS = 10 * 60 * 1000;
+const KILL_SWITCH_ALERT_TTL_MS = 15 * 60 * 1000; // Task #973 — throttle separato per il kill-switch
 const sent = new Map<string, number>();
 
 // Guard anti-spam al ripristino dei token admin (0→N).
@@ -43,15 +44,19 @@ let matchingDragonflyBlockedAlertSent = false;
 // emesso (severity "high", non declassato a "warn" dalla soppressione downstream).
 let ghRoutingPlausibilityAlertSent = false;
 let valhallaRoutingPlausibilityAlertSent = false;
+// Task #973 — latch per il kill-switch adattivo bg-db-limiter. La push di rientro
+// ("✅ kill-switch disattivato") parte SOLO se la start push era stata realmente
+// inviata, così l'admin non riceve un "all-clear" per un evento mai notificato.
+let dbKillSwitchAlertSent = false;
 
 interface AdminWsBroadcast { (msg: { type: string; payload: unknown }): void }
 let wsBroadcast: AdminWsBroadcast | null = null;
 export function registerAdminWsBroadcast(fn: AdminWsBroadcast): void { wsBroadcast = fn; }
 
-function shouldSend(key: string): boolean {
+function shouldSend(key: string, ttlMs: number = ALERT_TTL_MS): boolean {
   const now = Date.now();
   const last = sent.get(key) ?? 0;
-  if (now - last < ALERT_TTL_MS) return false;
+  if (now - last < ttlMs) return false;
   sent.set(key, now);
   return true;
 }
@@ -304,6 +309,56 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
         details: { sent: n, consecutiveTicks: detail.consecutiveTicks, reasons: detail.reasons },
       });
     }
+  }
+
+  // Kill-switch adattivo bg-db-limiter attivo (Task #973) — il pool-collector emette
+  // un segnale "warn" db.bg_limiter.kill_switch_active quando dbSlowPingsConsecutive >= 2.
+  // Non è un Problem (severity "warn" non passa dal loop critical-only sotto), quindi
+  // serve un blocco dedicato. Throttle separato da db.overload_sustained (15 min).
+  // Latch: dbKillSwitchAlertSent armato finché il kill-switch è attivo (non solo alla
+  // prima push) così la push di rientro parte anche se il throttle ha bloccato la start.
+  const killSwitchActive = snap.metrics["db.bg_limiter.kill_switch_active"] != null;
+  if (killSwitchActive) {
+    dbKillSwitchAlertSent = true; // arma il latch prima di shouldSend
+    if (shouldSend("db.killswitch.active", KILL_SWITCH_ALERT_TTL_MS)) {
+      const pings = snap.metrics["db.bg_limiter.kill_switch_active"] ?? "?";
+      const dropped = snap.metrics["db.bg_limiter.dropped_kill_switch"] ?? "?";
+      const n = await sendSystemAlertPushToAdmins(
+        `⚡ Kill-switch DB attivo — ${pings} ping lenti consecutivi`,
+        `Il kill-switch adattivo bg-db-limiter è scattato (${pings} ping lenti ≥ soglia 2). Job background sospesi. Drop totali kill-switch: ${dropped}.`,
+        { type: "watchdog_db_killswitch_active", pings, droppedSlowKillSwitchTotal: dropped, score: snap.score },
+      );
+      sentCount += n;
+      await writeWatchdogLog({
+        kind: "alert", scope: "db.killswitch.active", status: "ok",
+        summary: `Alert kill-switch DB attivo: ${pings} ping lenti, ${dropped} job scartati`,
+        details: { sent: n, pings, droppedSlowKillSwitchTotal: dropped },
+      });
+    }
+  }
+
+  // Rientro dal kill-switch adattivo (Task #973) — il pool-collector emette
+  // "db.bg_limiter.kill_switch_recovered" info alla transizione active→inactive.
+  // Info → non è un Problem; lo leggiamo dai metrics. Gate latch: la push di rientro
+  // parte SOLO se la start push era stata armata (dbKillSwitchAlertSent).
+  if (
+    snap.metrics["db.bg_limiter.kill_switch_recovered"] != null &&
+    dbKillSwitchAlertSent &&
+    shouldSend("db.killswitch.recovered", KILL_SWITCH_ALERT_TTL_MS)
+  ) {
+    dbKillSwitchAlertSent = false; // consuma il latch
+    const dropped = snap.metrics["db.bg_limiter.dropped_kill_switch"] ?? "?";
+    const n = await sendSystemAlertPushToAdmins(
+      `✅ Kill-switch DB disattivato — DB tornato veloce`,
+      `Il kill-switch adattivo bg-db-limiter si è disattivato: il DB ha tornato veloce (ping lenti consecutivi = 0). Job background ripristinati. Drop totali kill-switch: ${dropped}.`,
+      { type: "watchdog_db_killswitch_recovered", droppedSlowKillSwitchTotal: dropped, score: snap.score },
+    );
+    sentCount += n;
+    await writeWatchdogLog({
+      kind: "alert", scope: "db.killswitch.recovered", status: "ok",
+      summary: `Alert rientro kill-switch DB inviato a ${n} admin`,
+      details: { sent: n, droppedSlowKillSwitchTotal: dropped },
+    });
   }
 
   // Rientro dal sovraccarico DB sostenuto (Task #84) — l'overload-collector emette
@@ -688,5 +743,6 @@ export function _resetThrottleForTests(): void {
   matchingDragonflyBlockedAlertSent = false;
   ghRoutingPlausibilityAlertSent = false;
   valhallaRoutingPlausibilityAlertSent = false;
+  dbKillSwitchAlertSent = false; // Task #973
   lastKnownAdminTokenCount = -1;
 }
