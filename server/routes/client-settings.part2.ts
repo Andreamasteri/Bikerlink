@@ -89,29 +89,19 @@ export function registerPart2Routes(app: Express) {
 
   app.get("/api/settings/all", async (_req, res) => {
     try {
-      const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled, mapsEnabled, mapsProvider, unitsPref] = await Promise.all([
-        storage.getAppSetting("syneco_branding_visible"),
-        storage.getAppSetting("email_verification_enabled"),
-        storage.getAppSetting("chatbot_enabled"),
-        storage.getAppSetting("auto_matching_enabled"),
-        storage.getAppSetting("custom_routes_enabled"),
-        storage.getAppSetting("paypal_email"),
-        storage.getAppSetting("sos_enabled"),
-        storage.getAppSetting("maps_enabled"),
-        storage.getAppSetting("maps_provider"),
-        storage.getAppSetting("units_preference_enabled"),
-      ]);
+      const settings = await storage.getAllAppSettings();
+      const values = new Map(settings.map((setting) => [setting.key, setting.value]));
       res.json({
-        synecoBranding: syneco?.value === "true",
-        emailVerification: emailVerification?.value === "true",
-        chatbotEnabled: chatbot?.value !== "false",
-        autoMatching: autoMatching?.value !== "false",
-        customRoutes: customRoutes?.value !== "false",
-        paypalEmail: paypal?.value || "",
-        sosEnabled: sosEnabled?.value !== "false",
-        mapsEnabled: mapsEnabled?.value !== "false",
-        mapsProvider: mapsProvider?.value || "carto_light",
-        unitsPrefEnabled: unitsPref?.value === "true",
+        synecoBranding: values.get("syneco_branding_visible") === "true",
+        emailVerification: values.get("email_verification_enabled") === "true",
+        chatbotEnabled: values.get("chatbot_enabled") !== "false",
+        autoMatching: values.get("auto_matching_enabled") !== "false",
+        customRoutes: values.get("custom_routes_enabled") !== "false",
+        paypalEmail: values.get("paypal_email") || "",
+        sosEnabled: values.get("sos_enabled") !== "false",
+        mapsEnabled: values.get("maps_enabled") !== "false",
+        mapsProvider: values.get("maps_provider") || "carto_light",
+        unitsPrefEnabled: values.get("units_preference_enabled") === "true",
       });
     } catch {
       res.json({
