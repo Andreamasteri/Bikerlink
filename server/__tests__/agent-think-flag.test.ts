@@ -109,6 +109,7 @@ vi.mock("../ai/assistant/tools", () => ({
   buildRememberNoteTool: vi.fn(() => ({})),
   buildReviewTaskPlanTool: vi.fn(() => ({})),
   buildSearchManualTool: vi.fn(() => ({})),
+  buildRunSecurityScanTool: vi.fn(() => ({})),
 }));
 
 vi.mock("../ai/assistant/tc-hub-tools", () => ({

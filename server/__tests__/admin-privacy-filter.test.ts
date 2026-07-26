@@ -67,6 +67,11 @@ vi.mock("../email", () => ({
 }));
 
 vi.mock("../objectStorage", () => ({
+  BUCKET_WISHLIST: "Wishlist/",
+  BUCKET_CAMPAIGN: "Campaign/ads/",
+  BUCKET_CONTEST: "PhotoContest/",
+  BUCKET_PROFILE_PIC: "ProfilePic/",
+  BUCKET_MOTO_PIC: "ProfilePic/motorcycles/",
   uploadBuffer: vi.fn().mockResolvedValue("https://example.com/file"),
   objectExists: vi.fn().mockResolvedValue(false),
   isValidOtaBundlePath: vi.fn().mockReturnValue(true),

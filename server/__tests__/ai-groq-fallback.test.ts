@@ -34,6 +34,7 @@ vi.mock("@ai-sdk/google", () => ({
 vi.mock("../lib/ollama-client", () => ({
   isOllamaConfigured: true,
   getOllamaModel: vi.fn(() => ({ __provider: "ollama" })),
+  getOllamaModelId: vi.fn(() => "test-ollama"),
   isOllamaReachable: vi.fn().mockResolvedValue(true),
 }));
 

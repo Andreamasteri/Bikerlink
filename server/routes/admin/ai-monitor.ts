@@ -50,11 +50,14 @@ async function probeBowieAgent(): Promise<AgentMonitorSnapshot> {
 async function probeHorusAgent(): Promise<AgentMonitorSnapshot> {
   const base = (process.env.HORUS_OLLAMA_URL?.trim() || process.env.BOWIE_OLLAMA_URL?.trim() || "").replace(/\/$/, "");
   const token = process.env.HORUS_OLLAMA_TOKEN?.trim() || process.env.BOWIE_OLLAMA_TOKEN?.trim() || "";
-  if (!base) return { persona: "horus", configured: false, online: false, latencyMs: null, activeJobs: null };
+  // I job del coordinator girano nel processo BikerLink e restano osservabili
+  // anche quando l'endpoint Ollama di Horus non è configurato.
+  const activeJobs = getHorusActiveJobCount();
+  if (!base) return { persona: "horus", configured: false, online: false, latencyMs: null, activeJobs };
   const headers: Record<string, string> = { ...cfAccessHeaders("horus") };
   if (token) headers["X-Ollama-Token"] = token;
   const r = await httpProbe(`${base}/api/tags`, headers);
-  return { persona: "horus", configured: true, online: r.ok, latencyMs: r.latencyMs, activeJobs: getHorusActiveJobCount(), error: r.error };
+  return { persona: "horus", configured: true, online: r.ok, latencyMs: r.latencyMs, activeJobs, error: r.error };
 }
 
 async function probeAresAgent(): Promise<AgentMonitorSnapshot> {
