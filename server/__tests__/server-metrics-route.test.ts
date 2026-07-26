@@ -5,7 +5,7 @@
  * os.cpus() restituiscono valori inattesi.
  * Il test gira senza SO reale mockando os e ../uptime.
  */
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import express, { type Request, type Response, type NextFunction } from "express";
 import request from "supertest";
 
@@ -39,11 +39,13 @@ vi.mock("../uptime", () => ({
 // ---------------------------------------------------------------------------
 // Mock dipendenze statiche di more-routes.ts
 // ---------------------------------------------------------------------------
+const storageMocks = vi.hoisted(() => ({
+  getUser: vi.fn(async () => ({ id: "1", role: "admin", status: "active" })),
+  cleanupOldCoordinateHistory: vi.fn(async () => 0),
+}));
+
 vi.mock("../storage", () => ({
-  storage: {
-    getUser: vi.fn(async () => ({ id: "1", role: "admin", status: "active" })),
-    cleanupOldCoordinateHistory: vi.fn(async () => 0),
-  },
+  storage: storageMocks,
 }));
 
 vi.mock("../db", () => ({
@@ -103,7 +105,11 @@ vi.mock("../lib/admin-auth-cache", () => ({
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
-import { registerMoreRoutes, __resetServerMetricsCacheForTests } from "../routes/more-routes";
+import {
+  registerMoreRoutes,
+  __resetServerMetricsCacheForTests,
+  __resetCoordinateHistoryCleanupForTests,
+} from "../routes/more-routes";
 
 function buildApp() {
   const app = express();
@@ -119,15 +125,65 @@ function buildApp() {
 
 beforeEach(() => {
   __resetServerMetricsCacheForTests();
+  __resetCoordinateHistoryCleanupForTests();
+  storageMocks.cleanupOldCoordinateHistory.mockReset();
+  storageMocks.cleanupOldCoordinateHistory.mockResolvedValue(0);
   osMocks.loadavg.mockReturnValue([0.5, 0.8, 1.2]);
   osMocks.cpus.mockReturnValue([{}, {}, {}, {}] as ReturnType<typeof import("os")["cpus"]>);
   osMocks.totalmem.mockReturnValue(8 * 1024 * 1024 * 1024);
   osMocks.freemem.mockReturnValue(2 * 1024 * 1024 * 1024);
 });
 
+afterEach(() => {
+  __resetCoordinateHistoryCleanupForTests();
+  vi.useRealTimers();
+});
+
 // ---------------------------------------------------------------------------
 // Test
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Cleanup scheduler e route univoca
+// ---------------------------------------------------------------------------
+describe("more-routes safety", () => {
+  it("non registra una seconda route /api/admin/client-error", async () => {
+    const res = await request(buildApp())
+      .post("/api/admin/client-error")
+      .send({ message: "test" });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("non sovrappone due cleanup se il primo è ancora pendente", async () => {
+    vi.useFakeTimers();
+
+    let resolveFirstCleanup: ((value: number) => void) | undefined;
+    storageMocks.cleanupOldCoordinateHistory
+      .mockImplementationOnce(
+        () =>
+          new Promise<number>((resolve) => {
+            resolveFirstCleanup = resolve;
+          }),
+      )
+      .mockResolvedValue(0);
+
+    buildApp();
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+    expect(storageMocks.cleanupOldCoordinateHistory).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(15 * 60 * 1000);
+    expect(storageMocks.cleanupOldCoordinateHistory).toHaveBeenCalledTimes(1);
+
+    resolveFirstCleanup?.(2);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+    expect(storageMocks.cleanupOldCoordinateHistory).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("GET /api/admin/server-metrics — forma payload CPU", () => {
   it("tutti i campi cpu sono numeri finiti con valori OS normali", async () => {
     const res = await request(buildApp()).get("/api/admin/server-metrics");
