@@ -22,7 +22,7 @@ const HASH_A = "abc123deadbeef0000000000000000ab"; // 32-char hex simulato
 
 // ── Mock node:fs — controlla readdir + readFile senza toccare il filesystem ──
 // Usiamo vi.hoisted per definire le factory prima dell'hoisting di vi.mock.
-const { readdirImpl, readFileImpl } = vi.hoisted(() => {
+const { spawnSyncImpl, readdirImpl, readFileImpl } = vi.hoisted(() => {
   /**
    * readdir stub: per semplicità restituisce ZERO entry per tutte le radici
    * ad eccezione di "app" (o "server"), che restituisce un file controllato.
@@ -32,9 +32,11 @@ const { readdirImpl, readFileImpl } = vi.hoisted(() => {
    */
   const readdirImpl = vi.fn();
   const readFileImpl = vi.fn();
-  return { readdirImpl, readFileImpl };
+  const spawnSyncImpl = vi.fn();
+  return { spawnSyncImpl, readdirImpl, readFileImpl };
 });
 
+vi.mock("node:child_process", () => ({ spawnSync: spawnSyncImpl }));
 vi.mock("node:fs", () => ({
   promises: {
     readdir: readdirImpl,
@@ -79,6 +81,13 @@ function makeDirent(name: string, isDir = false) {
 function setupFs(activeDir: string, fileName: string, content = "// code") {
   const ROOT = process.cwd();
   const absActive = path.join(ROOT, activeDir);
+  const rel = `${activeDir}/${fileName}`.replace(/\\/g, "/");
+
+  spawnSyncImpl.mockReturnValue({
+    status: 0,
+    stdout: `${rel}\n`,
+    stderr: "",
+  });
 
   readdirImpl.mockImplementation(async (absDir: string) => {
     if (absDir === absActive) {

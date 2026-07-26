@@ -92,6 +92,7 @@ vi.mock("../ai/assistant/roster", () => ({
 
 vi.mock("../ai/assistant/horus-scanner", () => ({
   detectHorusScanRequest: vi.fn(() => null),
+  detectHorusSecurityScanRequest: vi.fn(() => null),
   startHorusScan: vi.fn(),
 }));
 

@@ -51,6 +51,7 @@ vi.mock("../objectStorage", () => ({
   uploadBuffer: mockUploadBuffer,
   deleteObject: vi.fn(),
   listObjects: vi.fn(),
+  BUCKET_CAMPAIGN: "Campaign/",
 }));
 
 // ── Mock: fs (default export — usato come `import fs from "fs"`) ──────────────
@@ -156,7 +157,8 @@ describe("warmupAdImageCache — nessun ghost se immagine recuperata", () => {
   it("NON chiama ghostCampaign se il backup ha successo dopo il fallimento del primario", async () => {
     mockGetAllCampaigns.mockResolvedValue([makeCampaign("camp-004")]);
     mockDownloadBuffer
-      .mockRejectedValueOnce(new Error("primary fail"))
+      .mockRejectedValueOnce(new Error("new primary fail"))
+      .mockRejectedValueOnce(new Error("legacy primary fail"))
       .mockResolvedValueOnce(Buffer.from("backup data")); // backup ok
 
     await runWarmup();
@@ -182,7 +184,8 @@ describe("warmupAdImageCache — nessun ghost se immagine recuperata", () => {
     mockGetAllCampaigns.mockResolvedValue([makeCampaign("camp-backup-write")]);
     const backupData = Buffer.from("backup bytes");
     mockDownloadBuffer
-      .mockRejectedValueOnce(new Error("primary fail"))
+      .mockRejectedValueOnce(new Error("new primary fail"))
+      .mockRejectedValueOnce(new Error("legacy primary fail"))
       .mockResolvedValueOnce(backupData);
     mockUploadBuffer.mockResolvedValue(undefined);
 
@@ -278,7 +281,8 @@ describe("warmupAdImageCache — isolamento ghost tra campagne", () => {
 
     mockDownloadBuffer
       .mockResolvedValueOnce(Buffer.from("ok image")) // primario ok-camp → successo
-      .mockRejectedValueOnce(new Error("bad primary")) // primario bad-camp → fallisce
+      .mockRejectedValueOnce(new Error("bad new primary"))
+      .mockRejectedValueOnce(new Error("bad legacy primary"))
       .mockRejectedValueOnce(new Error("bad backup")); // backup bad-camp → fallisce
 
     await runWarmup();
@@ -298,10 +302,12 @@ describe("warmupAdImageCache — isolamento ghost tra campagne", () => {
 
     mockDownloadBuffer
       .mockResolvedValueOnce(Buffer.from("ok")) // good-1 primario ok
-      .mockRejectedValueOnce(new Error("fail"))  // bad-1 primario fallisce
-      .mockRejectedValueOnce(new Error("fail"))  // bad-1 backup fallisce
-      .mockRejectedValueOnce(new Error("fail"))  // bad-2 primario fallisce
-      .mockRejectedValueOnce(new Error("fail")); // bad-2 backup fallisce
+      .mockRejectedValueOnce(new Error("fail"))  // bad-1 nuovo primario
+      .mockRejectedValueOnce(new Error("fail"))  // bad-1 primario legacy
+      .mockRejectedValueOnce(new Error("fail"))  // bad-1 backup
+      .mockRejectedValueOnce(new Error("fail"))  // bad-2 nuovo primario
+      .mockRejectedValueOnce(new Error("fail"))  // bad-2 primario legacy
+      .mockRejectedValueOnce(new Error("fail")); // bad-2 backup
 
     await runWarmup();
 

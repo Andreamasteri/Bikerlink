@@ -34,6 +34,7 @@ vi.mock("@ai-sdk/google", () => ({
 vi.mock("../lib/ollama-client", () => ({
   isOllamaConfigured: true,
   getOllamaModel: vi.fn(() => ({ __provider: "ollama" })),
+  getOllamaModelId: vi.fn(() => "test-ollama"),
   isOllamaReachable: vi.fn().mockResolvedValue(true),
 }));
 
@@ -42,7 +43,19 @@ vi.mock("../lib/ollama-client", () => ({
 vi.mock("../lib/groq-client", () => ({
   isGroqConfigured: false,
   getGroqModel: vi.fn(() => ({ __provider: "groq" })),
+  getGroqParseModel: vi.fn(() => ({ __provider: "groq" })),
 }));
+
+vi.mock("../lib/openai-route-client", () => ({
+  isOpenAiRouteConfigured: false,
+  getOpenAiRouteModel: vi.fn(),
+}));
+
+vi.mock("../ai/route-provider-config", () => ({
+  getEffectiveRouteChain: vi.fn().mockResolvedValue(["ollama", "gemini"]),
+}));
+
+vi.mock("../ai/route-provider-stats", () => ({ incrementProviderStat: vi.fn() }));
 
 import plannedRoutesRouter from "../routes/planned-routes";
 import {

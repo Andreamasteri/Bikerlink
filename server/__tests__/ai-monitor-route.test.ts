@@ -11,7 +11,14 @@ vi.mock("../routes/admin/thinkcentre-health-gh-probes", () => ({ probeOllama: pr
 const { httpProbeMock } = vi.hoisted(() => ({ httpProbeMock: vi.fn(async () => ({ ok: true, latencyMs: 10, error: undefined })) }));
 vi.mock("../routes/admin/thinkcentre-health-utils", () => ({ httpProbe: httpProbeMock, sanitizeError: (e: unknown) => String(e) }));
 
-const { probeAresMock } = vi.hoisted(() => ({ probeAresMock: vi.fn(async () => ({ configured: true, online: true, latencyMs: 30, error: undefined })) }));
+const { probeAresMock } = vi.hoisted(() => ({
+  probeAresMock: vi.fn(async (): Promise<{
+    configured: boolean;
+    online: boolean;
+    latencyMs: number | null;
+    error?: string;
+  }> => ({ configured: true, online: true, latencyMs: 30 })),
+}));
 vi.mock("../routes/admin/thinkcentre-health-ares-probe", () => ({ probeAres: probeAresMock }));
 
 // isQuebrachoConfiguredMock/isQuebrachoReachableMock removed (Task #591 — Quebracho unified into Horus)
