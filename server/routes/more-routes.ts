@@ -69,9 +69,8 @@ function scheduleCoordinateHistoryCleanup(): void {
     void runCoordinateHistoryCleanup(generation);
   }, COORDINATE_HISTORY_CLEANUP_INTERVAL_MS);
   coordinateHistoryCleanupTimer = timer;
-  if (typeof timer === "object" && "unref" in timer) {
-    timer.unref();
-  }
+  const nodeTimer = timer as unknown as { unref?: () => void };
+  nodeTimer.unref?.();
 }
 
 async function runCoordinateHistoryCleanup(generation: number): Promise<void> {
