@@ -68,9 +68,15 @@ import { DbTimeoutError } from "../db";
 
 function makeSelectChain(terminal: () => Promise<unknown[]>) {
   // getAppSetting: .from().where().limit(1)
-  // getAllAppSettings: .from()  → deve essere direttamente awaitable
+  // getAppSettings: .from().where() → deve essere direttamente awaitable
+  // getAllAppSettings: .from()      → deve essere direttamente awaitable
+  const whereResult = {
+    limit: () => terminal(),
+    then: (onF: (v: unknown[]) => unknown, onR?: (e: unknown) => unknown) =>
+      terminal().then(onF, onR),
+  };
   const fromResult = {
-    where: () => ({ limit: () => terminal() }),
+    where: () => whereResult,
     then: (onF: (v: unknown[]) => unknown, onR?: (e: unknown) => unknown) =>
       terminal().then(onF, onR),
   };
@@ -192,6 +198,63 @@ describe("getAppSetting — cache in-memory", () => {
     mockDbSelect.mockImplementation(() => makeSelectChain(() => Promise.resolve([rowB])));
     const after = await storage.getAppSetting("k");
     expect(after).toEqual(rowB);
+    expect(mockDbSelect).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("getAppSettings — lettura batch e cache per-key", () => {
+  it("legge dieci chiavi a cache fredda con una sola query e conserva l'ordine", async () => {
+    const rows = [
+      { key: "chatbot_enabled", value: "false" },
+      { key: "syneco_branding_visible", value: "true" },
+    ];
+    mockDbSelect.mockImplementation(() => makeSelectChain(() => Promise.resolve(rows)));
+
+    const keys = [
+      "syneco_branding_visible",
+      "email_verification_enabled",
+      "chatbot_enabled",
+      "auto_matching_enabled",
+      "custom_routes_enabled",
+      "paypal_email",
+      "sos_enabled",
+      "maps_enabled",
+      "maps_provider",
+      "units_preference_enabled",
+    ];
+    const result = await storage.getAppSettings(keys);
+
+    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    expect(result).toHaveLength(10);
+    expect(result[0]).toEqual(rows[1]);
+    expect(result[1]).toBeUndefined();
+    expect(result[2]).toEqual(rows[0]);
+  });
+
+  it("serve chiavi presenti e mancanti dalla cache calda senza altre query", async () => {
+    const rows = [{ key: "maps_enabled", value: "true" }];
+    mockDbSelect.mockImplementation(() => makeSelectChain(() => Promise.resolve(rows)));
+    const keys = ["maps_enabled", "maps_provider"];
+
+    const cold = await storage.getAppSettings(keys);
+    const warm = await storage.getAppSettings(keys);
+
+    expect(cold).toEqual([rows[0], undefined]);
+    expect(warm).toEqual(cold);
+    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("interroga soltanto le chiavi non già presenti in cache", async () => {
+    const cached = { key: "maps_enabled", value: "true" };
+    const fetched = { key: "maps_provider", value: "carto_light" };
+    mockDbSelect
+      .mockImplementationOnce(() => makeSelectChain(() => Promise.resolve([cached])))
+      .mockImplementationOnce(() => makeSelectChain(() => Promise.resolve([fetched])));
+
+    await storage.getAppSetting("maps_enabled");
+    const result = await storage.getAppSettings(["maps_enabled", "maps_provider"]);
+
+    expect(result).toEqual([cached, fetched]);
     expect(mockDbSelect).toHaveBeenCalledTimes(2);
   });
 });

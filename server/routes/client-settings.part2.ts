@@ -89,17 +89,17 @@ export function registerPart2Routes(app: Express) {
 
   app.get("/api/settings/all", async (_req, res) => {
     try {
-      const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled, mapsEnabled, mapsProvider, unitsPref] = await Promise.all([
-        storage.getAppSetting("syneco_branding_visible"),
-        storage.getAppSetting("email_verification_enabled"),
-        storage.getAppSetting("chatbot_enabled"),
-        storage.getAppSetting("auto_matching_enabled"),
-        storage.getAppSetting("custom_routes_enabled"),
-        storage.getAppSetting("paypal_email"),
-        storage.getAppSetting("sos_enabled"),
-        storage.getAppSetting("maps_enabled"),
-        storage.getAppSetting("maps_provider"),
-        storage.getAppSetting("units_preference_enabled"),
+      const [syneco, emailVerification, chatbot, autoMatching, customRoutes, paypal, sosEnabled, mapsEnabled, mapsProvider, unitsPref] = await storage.getAppSettings([
+        "syneco_branding_visible",
+        "email_verification_enabled",
+        "chatbot_enabled",
+        "auto_matching_enabled",
+        "custom_routes_enabled",
+        "paypal_email",
+        "sos_enabled",
+        "maps_enabled",
+        "maps_provider",
+        "units_preference_enabled",
       ]);
       res.json({
         synecoBranding: syneco?.value === "true",
