@@ -53,6 +53,62 @@ let lastServerSample: {
   cpu: { user: number; system: number };
 } | null = null;
 
+
+const COORDINATE_HISTORY_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+let coordinateHistoryCleanupTimer: ReturnType<typeof setTimeout> | null = null;
+let coordinateHistoryCleanupRunning = false;
+let coordinateHistoryCleanupGeneration = 0;
+
+function scheduleCoordinateHistoryCleanup(): void {
+  if (coordinateHistoryCleanupTimer || coordinateHistoryCleanupRunning) {
+    return;
+  }
+
+  const generation = coordinateHistoryCleanupGeneration;
+  const timer = setTimeout(() => {
+    void runCoordinateHistoryCleanup(generation);
+  }, COORDINATE_HISTORY_CLEANUP_INTERVAL_MS);
+  coordinateHistoryCleanupTimer = timer;
+  if (typeof timer === "object" && "unref" in timer) {
+    timer.unref();
+  }
+}
+
+async function runCoordinateHistoryCleanup(generation: number): Promise<void> {
+  coordinateHistoryCleanupTimer = null;
+  if (
+    generation !== coordinateHistoryCleanupGeneration ||
+    coordinateHistoryCleanupRunning
+  ) {
+    return;
+  }
+
+  coordinateHistoryCleanupRunning = true;
+  try {
+    const deleted = await storage.cleanupOldCoordinateHistory();
+    if (deleted > 0) {
+      console.log(`[CoordinateHistory] Pulizia: rimossi ${deleted} record`);
+    }
+  } catch (err) {
+    console.error("[CoordinateHistory] Cleanup error:", err);
+  } finally {
+    coordinateHistoryCleanupRunning = false;
+    if (generation === coordinateHistoryCleanupGeneration) {
+      scheduleCoordinateHistoryCleanup();
+    }
+  }
+}
+
+/** Esposto solo per i test — arresta e azzera lo scheduler di cleanup. */
+export function __resetCoordinateHistoryCleanupForTests(): void {
+  coordinateHistoryCleanupGeneration += 1;
+  if (coordinateHistoryCleanupTimer) {
+    clearTimeout(coordinateHistoryCleanupTimer);
+  }
+  coordinateHistoryCleanupTimer = null;
+  coordinateHistoryCleanupRunning = false;
+}
+
 function readNetDev(): { rx: number; tx: number } {
   try {
     const fsInner = require("fs") as typeof import("fs");
@@ -352,48 +408,7 @@ export function registerMoreRoutes(app: Express) {
     });
   });
 
-  setInterval(async () => {
-    try {
-      const deleted = await storage.cleanupOldCoordinateHistory();
-      if (deleted > 0) {
-        console.log(`[CoordinateHistory] Pulizia: rimossi ${deleted} record`);
-      }
-    } catch (err) {
-      console.error("[CoordinateHistory] Cleanup error:", err);
-    }
-  }, 5 * 60 * 1000);
-
-  app.post("/api/admin/client-error", async (req, res) => {
-    try {
-      const { clientErrorReportSchema } = await import("@shared/validators");
-      const bodyParsed = clientErrorReportSchema.safeParse(req.body ?? {});
-      if (!bodyParsed.success) {
-        return sendError(res, 400, bodyParsed.error.issues[0]?.message ?? "Payload non valido");
-      }
-      const { message, stack, componentStack, platform, appVersion } = bodyParsed.data;
-
-      let resolvedStack = stack || "";
-      if (resolvedStack && appVersion) {
-        try {
-          const { symbolicateStack } = await import("../lib/symbolicate");
-          resolvedStack = await symbolicateStack(resolvedStack, appVersion);
-        } catch { /* fallback allo stack originale */ }
-      }
-
-      console.error("[CLIENT-ERROR]", JSON.stringify({
-        message: message || "unknown",
-        stack: resolvedStack.substring(0, 2000),
-        componentStack: (componentStack || "").substring(0, 1000),
-        platform: platform || "unknown",
-        appVersion: appVersion || "unknown",
-        timestamp: new Date().toISOString(),
-      }));
-      return res.json({ received: true });
-    } catch (err) {
-      console.error("[CLIENT-ERROR] Failed to process error report:", err);
-      res.status(200).json({ received: true });
-    }
-  });
+  scheduleCoordinateHistoryCleanup();
 
   app.get("/api/stats/public", async (_req, res) => {
     try {
