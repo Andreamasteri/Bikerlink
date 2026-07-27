@@ -383,28 +383,20 @@ else
   fi
 fi
 
-# Task #3501 — Garantisce che server/public/matching-system.pdf sia presente nel
-# Repl layer. Il file viene creato dal post-merge hook (scripts/generate-matching-pdf.mjs)
-# e copiato in server/public/. Se per qualsiasi motivo manca (primo deploy senza
-# post-merge, workspace pulito), lo rigeneriamo qui in modo che la route
-# GET /api/exports/matching-system.pdf non torni mai 500 in produzione.
-# NB: in caso di errore logghiamo un warning ma NON usciamo (set -e è attivo,
-# quindi usiamo || true per non bloccare l'intero deploy).
+# Task #3501 — Genera sempre server/public/matching-system.pdf dalla fonte
+# docs/matching-system.md. Il PDF è un artefatto di build: se generazione o
+# validazione falliscono, il build deve fermarsi invece di pubblicare un asset
+# assente/stale o affidarsi a fallback runtime.
 STEP_TS_16=$(date -u +%s)
-log "=== [16/16] Verifica PDF matching-system — $(elapsed) elapsed ==="
+log "=== [16/16] Genera e valida PDF matching-system — $(elapsed) elapsed ==="
 MATCHING_PDF="server/public/matching-system.pdf"
-if [ -f "$MATCHING_PDF" ]; then
-  log "  $MATCHING_PDF già presente ($(size $MATCHING_PDF)) — nessuna azione."
-else
-  log "  $MATCHING_PDF assente — rigenero con scripts/generate-matching-pdf.mjs..."
-  PDF_EXIT=0
-  node scripts/generate-matching-pdf.mjs 2>&1 || PDF_EXIT=$?
-  if [ "$PDF_EXIT" -eq 0 ] && [ -f "$MATCHING_PDF" ]; then
-    log "  PDF rigenerato con successo ($(size $MATCHING_PDF))."
-  else
-    log "  ⚠️  Rigenerazione PDF fallita (exit ${PDF_EXIT}) — il fallback dinamico della route gestirà la richiesta a runtime."
-  fi
+log "  Genero $MATCHING_PDF da docs/matching-system.md..."
+node scripts/generate-matching-pdf.mjs 2>&1
+if [ ! -s "$MATCHING_PDF" ] || [ "$(head -c 5 "$MATCHING_PDF")" != "%PDF-" ]; then
+  log "  ❌ PDF matching-system assente, vuoto o con firma non valida."
+  exit 1
 fi
+log "  PDF generato e validato ($(size "$MATCHING_PDF"))."
 
 # Task #2781-fix — invalida la cache hash delle migration.
 # server/migrate.ts ha un fast-skip basato su server_dist/.migrations-hash

@@ -1323,11 +1323,13 @@ echo "  Generazione PDF matching system"
 echo "════════════════════════════════════════"
 PDF_EXIT=0
 node scripts/generate-matching-pdf.mjs 2>&1 || PDF_EXIT=$?
-if [ "$PDF_EXIT" -ne 0 ]; then
-  echo "⚠️  generate-matching-pdf.mjs ha restituito exit ${PDF_EXIT} — PDF potrebbe essere stale."
-else
-  echo "✅ PDF matching system aggiornato."
+MATCHING_PDF="server/public/matching-system.pdf"
+if [ "$PDF_EXIT" -ne 0 ] || [ ! -s "$MATCHING_PDF" ] || [ "$(head -c 5 "$MATCHING_PDF" 2>/dev/null)" != "%PDF-" ]; then
+  echo "❌ generate-matching-pdf.mjs ha fallito o prodotto un PDF non valido."
+  [ "$PDF_EXIT" -ne 0 ] && exit "$PDF_EXIT"
+  exit 1
 fi
+echo "✅ PDF matching system aggiornato e validato."
 echo "════════════════════════════════════════"
 echo ""
 

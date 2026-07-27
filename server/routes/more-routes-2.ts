@@ -16,35 +16,6 @@ export function registerMoreRoutes2(app: Express) {
 
   const COMPETITOR_PDF_PATH = path.resolve(process.cwd(), "server/public/assets/competitor-analysis.pdf");
   const COMPETITOR_PNG_PATH = path.resolve(process.cwd(), "server/public/assets/competitor-analysis.png");
-  const MATCHING_PDF_PATH = path.resolve(process.cwd(), "server/public/matching-system.pdf");
-
-  app.get("/matching-system.pdf", async (_req, res) => {
-    res.setHeader("Content-Disposition", 'inline; filename="BikerLink-MatchingSystem.pdf"');
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Cache-Control", "public, max-age=3600");
-
-    if (fs.existsSync(MATCHING_PDF_PATH)) {
-      fs.createReadStream(MATCHING_PDF_PATH).pipe(res);
-      return;
-    }
-
-    try {
-      const { generateMatchingPdf } = await import("../exports/generate-matching-pdf");
-      const stream = generateMatchingPdf();
-      stream.on("error", (err: Error) => {
-        console.error("[matching-system.pdf] stream error:", err);
-        if (!res.headersSent) {
-          res.status(500).json({ message: "Errore generazione PDF" });
-        } else {
-          res.destroy();
-        }
-      });
-      stream.pipe(res);
-    } catch (err) {
-      console.error("[matching-system.pdf] generation failed:", err);
-      if (!res.headersSent) res.status(500).json({ message: "Errore generazione PDF" });
-    }
-  });
 
   app.get("/assets/competitor-analysis.pdf", (_req, res) => {
     if (!fs.existsSync(COMPETITOR_PDF_PATH)) {
