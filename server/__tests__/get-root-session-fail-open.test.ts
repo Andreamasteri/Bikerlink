@@ -250,7 +250,7 @@ function buildDelayedApp(storeDelayMs: number): express.Application {
 
   const sessionMiddleware = session({
     store: makeDelayedBrokenStore(storeDelayMs),
-    secret: "test-secret",
+    secret: "test-secret", // pragma: allowlist secret
     resave: false,
     saveUninitialized: false,
   });

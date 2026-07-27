@@ -193,7 +193,7 @@ describe('POST /api/ssh/terminal/auth — wrong credentials → "Credenziali TC 
     const app = buildApp();
     const res = await request(app)
       .post("/api/ssh/terminal/auth")
-      .send({ tcPassword: "somepassword" });
+      .send({ tcPassword: "somepassword" }); // pragma: allowlist secret
 
     expect(res.status).toBe(400);
   });
