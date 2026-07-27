@@ -40,6 +40,10 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "NODE_OPTIONS": "--max_old_space_size=8192",
+        "EXPO_PUBLIC_BUILD_PROFILE": "staging"
       }
     },
     "release-apk": {
