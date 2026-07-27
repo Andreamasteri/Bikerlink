@@ -21,18 +21,13 @@ import {
   MONITORING_POOL_STATEMENT_TIMEOUT_MS,
   POOL_SATURATION_GRACE_MS,
 } from "./pool-config";
+import { getDatabaseUrlForRuntime } from "./database-environment";
 
 const { Pool } = pg;
 
-// DATABASE_URL_DEV ha priorità in workspace dev (Neon dev branch).
-// In produzione DATABASE_URL_DEV non è impostata → fallback su DATABASE_URL (Neon prod).
-const dbUrl = process.env.DATABASE_URL_DEV ?? process.env.DATABASE_URL;
-
-if (!dbUrl) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
-}
+// Staging is fail-closed on DATABASE_URL_CANDIDATE; production requires
+// DATABASE_URL. Development retains the explicit dev URL preference.
+const dbUrl = getDatabaseUrlForRuntime();
 
 // ── Pool principale ──────────────────────────────────────────────────────────
 
