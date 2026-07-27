@@ -38,5 +38,11 @@
     "production_promotion_requires_explicit_andrea_approval": true
   },
   "created_at": "2026-07-27T21:19:00Z",
-  "notes": "Frozen application tree. Release metadata and the staging-only publisher may change without altering the frozen application tree. This candidate is not published to EAS and is not a production approval."
+  "notes": "Frozen application tree. Release metadata and staging/production control records may change without altering the frozen application tree. This candidate is not published to EAS, is not approved for production, and the production preflight record confers no deployment authority.",
+  "production_preflight": {
+    "record": "releases/production/BL-20260727-C01.preflight.json",
+    "status": "prepared_blocked_waiting_candidate_evidence",
+    "requires_exact_candidate_commit": "af4a02acb566039eaff241e796517d16ca2cd5e3",
+    "production_execution_authorization": "AUTORIZZO PROMOZIONE PROD BL-20260727-C01 COMMIT af4a02acb566039eaff241e796517d16ca2cd5e3"
+  }
 }
