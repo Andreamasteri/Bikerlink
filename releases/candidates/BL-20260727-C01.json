@@ -2,7 +2,6 @@
   "schema_version": 1,
   "release_id": "BL-20260727-C01",
   "status": "db_validated_waiting_staging_backend",
-  "candidate_commit_sha": "af4a02acb566039eaff241e796517d16ca2cd5e3",
   "candidate_commit_url": "https://github.com/Andreamasteri/Bikerlink/commit/af4a02acb566039eaff241e796517d16ca2cd5e3",
   "runtime_version": "11.0.0",
   "eas": {
@@ -42,7 +41,7 @@
   "production_preflight": {
     "record": "releases/production/BL-20260727-C01.preflight.json",
     "status": "prepared_blocked_waiting_candidate_evidence",
-    "requires_exact_candidate_commit": "af4a02acb566039eaff241e796517d16ca2cd5e3",
-    "production_execution_authorization": "AUTORIZZO PROMOZIONE PROD BL-20260727-C01 COMMIT af4a02acb566039eaff241e796517d16ca2cd5e3"
+    "requires_exact_candidate_commit": "candidate_commit_url (canonical Git commit URL)",
+    "production_execution_authorization": "AUTORIZZO PROMOZIONE PROD BL-20260727-C01 COMMIT <SHA_FROM_CANDIDATE_COMMIT_URL>"
   }
 }
