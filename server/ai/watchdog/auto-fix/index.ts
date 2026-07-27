@@ -36,7 +36,7 @@ export const PROPOSAL_DISPATCH_RULES: Record<string, AutoFixRule> = {
 // Task #891 — Motivi specifici per gli actionKind noti ma NON eseguibili in
 // automatico. L'UI li mostra al posto del vecchio messaggio generico "applica a mano".
 export const NON_DISPATCHABLE_REASONS: Record<string, string> = {
-  rotate_secret: "rotate_secret richiede accesso manuale al vault dei secret",
+  rotate_secret: "rotate_secret richiede accesso manuale al vault dei secret", // pragma: allowlist secret
   manual_only: "la proposta è dichiarata esplicitamente come azione manuale",
 };
 

@@ -402,7 +402,7 @@ _ai_self_test() {
   # 3. Horus smoke — skip actual LLM call (cold load would exceed 12s budget)
   echo ""
   echo "--- Horus LLM call (smoke only — no actual call to avoid cold load) ---"
-  if [ "$horus_secrets_ok" = "true" ] && [ "$tc_online" = "true" ]; then
+  if [ "$horus_secrets_ok" = "true" ] && [ "$tc_online" = "true" ]; then # pragma: allowlist secret
     echo "[SKIP] call_horus (smoke only — call ai_call_horus manually to test)"
   elif [ "$horus_secrets_ok" != "true" ]; then
     echo "[SKIP] call_horus (secrets missing)"

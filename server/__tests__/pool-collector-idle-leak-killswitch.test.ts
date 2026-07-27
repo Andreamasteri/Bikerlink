@@ -129,7 +129,7 @@ describe("pool-collector idle-leak kill-switch (end-to-end)", () => {
     poolStatsMock.mockReturnValue({ total: 10, idle: 0, waiting: 5, max: 10, activePct: 100 });
 
     // Provide a valid DATABASE_URL so probePgStatActivity doesn't exit early.
-    process.env.DATABASE_URL = "postgres://test:test@localhost/test";
+    process.env.DATABASE_URL = "postgres://test:test@localhost/test"; // pragma: allowlist secret
   });
 
   afterEach(() => {

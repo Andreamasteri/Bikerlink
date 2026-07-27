@@ -126,7 +126,7 @@ function buildApp(): express.Application {
   // Fail-open session wrapper — mirrors server/routes.ts lines 186-194.
   const sessionMiddleware = session({
     store: makeBrokenStore(),
-    secret: "test-secret",
+    secret: "test-secret", // pragma: allowlist secret
     resave: false,
     saveUninitialized: false,
   });

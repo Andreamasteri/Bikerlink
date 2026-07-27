@@ -359,7 +359,7 @@ router.post("/terminal/auth", async (req: Request, res: Response) => {
 
   const body = req.body as { tcUsername?: unknown; tcPassword?: unknown };
   const tcUsername = typeof body.tcUsername === "string" ? body.tcUsername.trim() : "";
-  const tcPassword = typeof body.tcPassword === "string" ? body.tcPassword : "";
+  const tcPassword = typeof body.tcPassword === "string" ? body.tcPassword : ""; // pragma: allowlist secret
 
   if (!tcUsername || !tcPassword) {
     return res.status(400).json({ error: "tcUsername e tcPassword sono obbligatori" });
