@@ -20,7 +20,7 @@ Fix crash login + nuova schermata impostazioni
 ```
 
 ### 2. Riavvia il workflow "OTA Publish"
-Dal pannello Replit, clicca il workflow **OTA Publish** → **Restart**.
+Dal pannello Replit, clicca il workflow **OTA Publish** → **Restart**. Il workflow di produzione usa `scripts/publish-ota-full.sh`; `scripts/publish-ota.sh` resta uno strumento separato per staging/diagnostic e non è il percorso di release utenti.
 
 ### 3. Attendi 5-8 minuti
 Metro deve ricompilare il bundle. Quando vedi:
@@ -44,9 +44,9 @@ L'aggiornamento è live. Gli utenti Android lo ricevono al prossimo avvio dell'a
 Formula: `<build>.<progressive_ota>.<ciclo_runtime>` — es. `53.2.10`
 
 ## Note
-- **MAI staging** — solo `production`. L'APK guarda solo il canale production.
+- Per gli utenti: solo `production`. `staging` e `diagnostic` sono isolati per build interne e non vanno usati come percorso di rilascio utenti.
 - OTA funziona solo su **Android** (iOS via TestFlight/App Store).
-- `runtimeVersion` (`10.0.0`) deve essere identica tra APK e OTA.
+- `runtimeVersion` (`11.0.0` al momento di questa configurazione) deve essere identica tra APK e OTA; ogni modifica richiede una nuova build nativa prima di pubblicare OTA compatibili.
 - Il pannello admin (`/admin/ota`) mostra la cronologia ma **non controlla la distribuzione** — è solo tracking.
 
 ## File coinvolti
