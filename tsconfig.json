@@ -21,6 +21,7 @@
     "node_modules",
     "bowie-terminal",
     "e2e",
-    "scripts"
+    "scripts",
+    "server/__tests__"
   ]
 }
