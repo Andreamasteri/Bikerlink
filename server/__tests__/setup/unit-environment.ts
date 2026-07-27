@@ -3,4 +3,4 @@
 // guaranteeing that an accidental unmocked query fails locally and cannot
 // reach an external database.
 delete process.env.DATABASE_URL_DEV;
-process.env.DATABASE_URL = "postgres://unit-test:unit-test@127.0.0.1:1/unit-test";
+process.env.DATABASE_URL = "postgres://unit-test:unit-test@127.0.0.1:1/unit-test"; // pragma: allowlist secret
