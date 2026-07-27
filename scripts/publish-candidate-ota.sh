@@ -31,7 +31,9 @@ const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
 if (r.release_id !== process.argv[2]) throw new Error("release_id mismatch");
 if (r.status !== "db_validated_waiting_staging_backend" && r.status !== "staging_ready") throw new Error("release status is not publishable to staging");
 if (r.eas?.channel !== "staging" || r.eas?.environment !== "preview") throw new Error("manifest is not a staging candidate");
-console.log(r.candidate_commit_sha);
+const match = String(r.candidate_commit_url ?? "").match(/\\/commit\\/([0-9a-f]{40})$/i);
+if (!match) throw new Error("candidate_commit_url must end with a full Git SHA");
+console.log(match[1]);
 ' "$MANIFEST" "$RELEASE_ID")"
 
 if ! git diff --quiet "$CANDIDATE_COMMIT" -- . \
