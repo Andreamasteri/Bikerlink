@@ -123,7 +123,7 @@ vi.mock("../ai/watchdog/auto-fix", () => ({
   },
   // Task #891 — motivi specifici per azioni note ma non automatizzabili.
   NON_DISPATCHABLE_REASONS: {
-    rotate_secret: "rotate_secret richiede accesso manuale al vault dei secret",
+    rotate_secret: "rotate_secret richiede accesso manuale al vault dei secret", // pragma: allowlist secret
     manual_only: "la proposta è dichiarata esplicitamente come azione manuale",
   },
 }));
