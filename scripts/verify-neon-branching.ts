@@ -49,7 +49,10 @@ function main(): void {
   console.log(LINE);
 
   const devUrl = process.env.DATABASE_URL_DEV;
-  const prodUrl = process.env.DATABASE_URL;
+  // The bridge keeps the production credential under PROD_DATABASE_URL; hosted
+  // production still uses DATABASE_URL. Prefer the explicit production names so
+  // a local dev DATABASE_URL can never be mistaken for production during checks.
+  const prodUrl = process.env.DATABASE_URL_PROD ?? process.env.PROD_DATABASE_URL ?? process.env.DATABASE_URL;
 
   // ── Check (a): DATABASE_URL_DEV deve essere impostato ────────────────────────
   if (!devUrl) {
@@ -65,7 +68,7 @@ function main(): void {
 
   if (!prodUrl) {
     console.error("\n  ✗ DATABASE_URL non impostato.");
-    console.error("    DATABASE_URL deve puntare al branch Neon di produzione.");
+    console.error("    DATABASE_URL_PROD / PROD_DATABASE_URL (oppure DATABASE_URL in hosting) deve puntare al branch Neon di produzione.");
     console.error(`\n${LINE}`);
     console.error("  ❌ GUARD FALLITO — DATABASE_URL mancante");
     console.error(`${LINE}\n`);
