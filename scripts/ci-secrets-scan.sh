@@ -98,23 +98,33 @@ if [[ ${#FILES[@]} -eq 0 ]]; then
 fi
 
 # --- Esecuzione del gate ---------------------------------------------------
-if "${RUNNER[@]}" --baseline "$BASELINE" "${FILES[@]}"; then
+# detect-secrets-hook can rewrite a baseline only to refresh line numbers after
+# unrelated insertions. CI must not fail for that metadata-only drift, but it
+# must still fail closed whenever the scanner reports a potential secret.
+HOOK_OUTPUT=""
+if HOOK_OUTPUT=$("${RUNNER[@]}" --baseline "$BASELINE" "${FILES[@]}" 2>&1); then
+  printf '%s\n' "$HOOK_OUTPUT"
   echo "✅ Nessun segreto non approvato rilevato — gate segreti OK."
   exit 0
-else
-  echo ""
-  echo "❌ GATE BLOCCATO — possibili segreti non approvati rilevati."
-  echo ""
-  echo "   Soluzioni:"
-  echo "   1. Rimuovi il segreto dal file (raccomandato)."
-  echo "   2. Credenziale fittizia in un test/fixture? Aggiungi sulla riga:"
-  echo "        # pragma: allowlist secret"
-  echo "      Funziona in qualsiasi linguaggio con commenti # o //."
-  echo "   3. Falso positivo in un file non-test? Approva nella baseline:"
-  echo "        detect-secrets scan --no-verify > .secrets.baseline"
-  echo "        detect-secrets audit .secrets.baseline"
-  echo "        git add .secrets.baseline"
-  echo "   Consulta CONTRIBUTING.md §'Test fixture e credenziali placeholder'"
-  echo "   per la procedura completa e le istruzioni sul pragma."
-  exit 1
 fi
+printf '%s\n' "$HOOK_OUTPUT"
+if grep -Fq "The baseline file was updated." <<<"$HOOK_OUTPUT" \
+  && ! grep -Fq "ERROR: Potential secrets" <<<"$HOOK_OUTPUT"; then
+  echo "ℹ️ Baseline aggiornata solo nei numeri di riga; nessun nuovo segreto rilevato."
+  exit 0
+fi
+echo ""
+echo "❌ GATE BLOCCATO — possibili segreti non approvati rilevati."
+echo ""
+echo "   Soluzioni:"
+echo "   1. Rimuovi il segreto dal file (raccomandato)."
+echo "   2. Credenziale fittizia in un test/fixture? Aggiungi sulla riga:"
+echo "        # pragma: allowlist secret"
+echo "      Funziona in qualsiasi linguaggio con commenti # o //."
+echo "   3. Falso positivo in un file non-test? Approva nella baseline:"
+echo "        detect-secrets scan --no-verify > .secrets.baseline"
+echo "        detect-secrets audit .secrets.baseline"
+echo "        git add .secrets.baseline"
+echo "   Consulta CONTRIBUTING.md §'Test fixture e credenziali placeholder'"
+echo "   per la procedura completa e le istruzioni sul pragma."
+exit 1
