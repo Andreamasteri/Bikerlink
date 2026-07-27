@@ -34,8 +34,11 @@ if (r.eas?.channel !== "staging" || r.eas?.environment !== "preview") throw new 
 console.log(r.candidate_commit_sha);
 ' "$MANIFEST" "$RELEASE_ID")"
 
-HEAD="$(git rev-parse HEAD)"
-[[ "$HEAD" == "$CANDIDATE_COMMIT" ]] || fail "HEAD ($HEAD) differs from frozen candidate ($CANDIDATE_COMMIT). Create a new candidate instead."
+if ! git diff --quiet "$CANDIDATE_COMMIT" -- . \
+  ':(exclude)releases/candidates/**' \
+  ':(exclude)scripts/publish-candidate-ota.sh'; then
+  fail "Application files differ from frozen candidate $CANDIDATE_COMMIT. Create a new candidate instead."
+fi
 
 info "Frozen release: $RELEASE_ID @ $CANDIDATE_COMMIT"
 info "Exporting Android bundle for staging..."
