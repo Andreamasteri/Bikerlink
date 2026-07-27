@@ -113,14 +113,21 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
 
     // BLOCCO ACCOUNT SMOKE — impedisce la creazione di account di test "smoke"
     // (es. smoke+<ts>@bikerlink.test / nickname smoke<ts>) che possono restare
-    // "in limbo" e sporcare il DB. Vale per qualsiasi chiamante.
+    // "in limbo" e sporcare il DB. L'unica eccezione è il server smoke dedicato:
+    // ascolta solo su 127.0.0.1 e abilita esplicitamente il flag app-local.
     const SMOKE_EMAIL_RE = /^smoke\+[^@]+@bikerlink\.test$/i;
     const SMOKE_NICKNAME_RE = /^smoke\d{6,}$/i;
-    if (
+    const isSmokeIdentity =
       SMOKE_EMAIL_RE.test(data.email) ||
       data.email.endsWith("@bikerlink.test") ||
-      SMOKE_NICKNAME_RE.test(data.nickname.trim())
-    ) {
+      SMOKE_NICKNAME_RE.test(data.nickname.trim());
+    const controlledSmoke =
+      req.app.locals.controlledSmokeRegistration === true &&
+      SMOKE_EMAIL_RE.test(data.email) &&
+      SMOKE_NICKNAME_RE.test(data.nickname.trim()) &&
+      !data.invitationCode;
+
+    if (isSmokeIdentity && !controlledSmoke) {
       console.warn(`[REGISTER] Bloccata creazione account smoke: email=${data.email} nickname=${data.nickname}`);
       return sendError(res, 403, "Registrazione non consentita");
     }
@@ -196,41 +203,48 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     // di matching vede il nuovo utente senza aspettare che salvi manualmente le
     // preferenze (altrimenti la riga veniva inserita solo al primo PUT, rendendo
     // l'utente invisibile al motore per tutta la fase iniziale di utilizzo).
-    db.insert(matchPreferences)
+    const matchPreferencesInsert = db.insert(matchPreferences)
       .values({ userId: user.id })
-      .onConflictDoNothing()
-      .catch((e) => console.warn("[REGISTER] match_preferences insert fallito (non bloccante):", e));
+      .onConflictDoNothing();
+    if (controlledSmoke) {
+      await withDbTimeout(matchPreferencesInsert);
+    } else {
+      matchPreferencesInsert
+        .catch((e) => console.warn("[REGISTER] match_preferences insert fallito (non bloccante):", e));
+    }
 
-    storage.getUserByNickname("admin").then(async (adminUser) => {
-      if (!adminUser) return;
-      const conv = await storage.createConversation({ conversationType: "private" });
-      await storage.addConversationParticipant({ conversationId: conv.id, userId: adminUser.id });
-      await storage.addConversationParticipant({ conversationId: conv.id, userId: user.id });
-      await storage.createMessage({
-        conversationId: conv.id,
-        senderId: adminUser.id,
-        messageType: "text",
-        content: "Ricordati di aggiungere le tue moto al garage, nel tab profilo",
-      });
-      await storage.updateConversationTimestamp(conv.id);
-    }).catch((e) => console.warn("[WELCOME] Messaggio admin non inviato:", e));
+    if (!controlledSmoke) {
+      storage.getUserByNickname("admin").then(async (adminUser) => {
+        if (!adminUser) return;
+        const conv = await storage.createConversation({ conversationType: "private" });
+        await storage.addConversationParticipant({ conversationId: conv.id, userId: adminUser.id });
+        await storage.addConversationParticipant({ conversationId: conv.id, userId: user.id });
+        await storage.createMessage({
+          conversationId: conv.id,
+          senderId: adminUser.id,
+          messageType: "text",
+          content: "Ricordati di aggiungere le tue moto al garage, nel tab profilo",
+        });
+        await storage.updateConversationTimestamp(conv.id);
+      }).catch((e) => console.warn("[WELCOME] Messaggio admin non inviato:", e));
 
-    sendNewUserNotificationEmail(
-      {
-        nickname: user.nickname,
-        email: user.email,
-        phone: user.phone,
-        userType: user.userType,
-        sex: user.sex,
-        birthYear: user.birthYear,
-        region: user.region,
-        country: user.country,
-      },
-      invitationCodeStr ?? null
-    ).catch((e) => console.warn("[EMAIL] Admin notification failed (non-blocking):", e));
+      sendNewUserNotificationEmail(
+        {
+          nickname: user.nickname,
+          email: user.email,
+          phone: user.phone,
+          userType: user.userType,
+          sex: user.sex,
+          birthYear: user.birthYear,
+          region: user.region,
+          country: user.country,
+        },
+        invitationCodeStr ?? null
+      ).catch((e) => console.warn("[EMAIL] Admin notification failed (non-blocking):", e));
 
-    if (data.region) {
-      createRegionalClubInvite(user.id, data.region).catch(() => {});
+      if (data.region) {
+        createRegionalClubInvite(user.id, data.region).catch(() => {});
+      }
     }
 
     if (invitationCodeStr) {
@@ -243,8 +257,10 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       }
     }
 
-    const emailVerifSetting = await withDbTimeout(storage.getAppSetting("email_verification_enabled"));
-    const emailVerificationEnabled = emailVerifSetting?.value === "true";
+    const emailVerifSetting = controlledSmoke
+      ? null
+      : await withDbTimeout(storage.getAppSetting("email_verification_enabled"));
+    const emailVerificationEnabled = !controlledSmoke && emailVerifSetting?.value === "true";
 
     if (emailVerificationEnabled && !isPrimal) {
       const token = crypto.randomBytes(4).toString("hex").toUpperCase();
