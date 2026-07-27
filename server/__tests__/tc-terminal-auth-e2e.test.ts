@@ -21,7 +21,7 @@ import path from "node:path";
 // ── Environment ───────────────────────────────────────────────────────────────
 vi.stubEnv("SESSION_SECRET", "test-secret-for-tc-terminal-auth");
 vi.stubEnv("TC_SSH_USER", "andrea");
-vi.stubEnv("TC_SSH_KEY", "-----BEGIN OPENSSH PRIVATE KEY-----\nfakekey\n-----END OPENSSH PRIVATE KEY-----\n");
+vi.stubEnv("TC_SSH_KEY", "-----BEGIN OPENSSH PRIVATE KEY-----\nfakekey\n-----END OPENSSH PRIVATE KEY-----\n"); // pragma: allowlist secret
 
 // ── Mock the CF bridge so no real cloudflared is required ─────────────────────
 vi.mock("../lib/tc-ssh-bridge", () => ({
@@ -164,7 +164,7 @@ describe('POST /api/ssh/terminal/auth — wrong credentials → "Credenziali TC 
     const app = buildApp();
     const res = await request(app)
       .post("/api/ssh/terminal/auth")
-      .send({ tcUsername: "andrea", tcPassword: "wrong_password" });
+      .send({ tcUsername: "andrea", tcPassword: "wrong_password" }); // pragma: allowlist secret
 
     expect(res.status).toBe(401);
     expect(res.body.error).toBe("Credenziali TC non valide");
@@ -174,7 +174,7 @@ describe('POST /api/ssh/terminal/auth — wrong credentials → "Credenziali TC 
     const app = buildApp();
     const res = await request(app)
       .post("/api/ssh/terminal/auth")
-      .send({ tcUsername: "user@example.com", tcPassword: "somepassword" });
+      .send({ tcUsername: "user@example.com", tcPassword: "somepassword" }); // pragma: allowlist secret
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/non valido/);
@@ -184,7 +184,7 @@ describe('POST /api/ssh/terminal/auth — wrong credentials → "Credenziali TC 
     const app = buildApp();
     const res = await request(app)
       .post("/api/ssh/terminal/auth")
-      .send({ tcUsername: "Andrea", tcPassword: "anypass" });
+      .send({ tcUsername: "Andrea", tcPassword: "anypass" }); // pragma: allowlist secret
 
     expect(res.status).toBe(400);
   });
