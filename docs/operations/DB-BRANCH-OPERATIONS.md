@@ -1,31 +1,55 @@
-# BikerLink — Operazioni DB Branching
+# BikerLink — Schema unico: DB, backend, build e OTA
 
-## Ruoli
+Questo documento è la fonte operativa per le release. I dati non vengono mai
+promossi da dev o candidate a produzione: si promuovono esclusivamente commit,
+migration SQL, configurazione e build approvati.
 
-| Ambiente | Branch Neon | Dati | Regole |
+## Ambienti e nomi
+
+| Nome | Ruolo | Dati | Regola |
 |---|---|---|---|
-| Produzione | branch principale protetto | reali | Nessun reset, clone o seed; modifiche solo tramite migration revisionate |
-| Dev | child branch sacrificabile | sintetici o mascherati | Può essere ricreato dal parent solo dopo approvazione operativa |
-| Feature/PR | child temporaneo di dev | sintetici o mascherati | Creato per test isolati; TTL e cancellazione al termine della PR |
+| DB-DEV | sviluppo quotidiano | sintetici/mascherati | sacrificabile |
+| DB-1 Candidate | collaudo della release | copia temporanea di DB-2 | si crea per una release e poi si elimina |
+| DB-2 Production | applicazione pubblica | reali | unica fonte autorevole; mai reset/copia da dev |
+| Backend staging | backend candidato | usa DB-1 Candidate | solo admin/tester |
+| Backend production | backend pubblico | usa DB-2 Production | utenti |
+| EAS staging/candidate | OTA candidata | admin/tester | non raggiunge utenti |
+| EAS production | OTA utenti | utenti | solo dopo approvazione |
 
-La topologia viene verificata senza aprire connessioni con `npm run check:neon-branch`. Il guard richiede `DATABASE_URL_DEV` e una URL di produzione esplicita (`DATABASE_URL_PROD` o `PROD_DATABASE_URL`; `DATABASE_URL` solo nel runtime hosted).
+```mermaid
+flowchart TD
+  Dev["DB-DEV + branch Git di sviluppo"] --> Candidate["Commit candidato + release_id"]
+  Production["DB-2 Production"] --> DB1["DB-1 Candidate"]
+  Candidate --> Staging["Backend staging"]
+  DB1 --> Staging
+  Staging --> OtaCandidate["EAS staging/candidate"]
+  OtaCandidate --> Admin["Test e approvazione admin"]
+  Admin --> ProdDeploy["Backend production"]
+  Admin --> OtaProd["EAS production"]
+  ProdDeploy --> Production
+```
 
-## Percorso di rilascio
+## Procedura release
 
-1. Le migration SQL numerate entrano nel branch candidato.
-2. Il candidato viene provato su un branch DB isolato con backend reale, login, SSE e cleanup.
-3. La stessa revisione viene approvata e pubblicata sul backend production; al boot il runner verifica `schema_migrations` del database effettivamente raggiunto.
-4. Un OTA è separato dal deploy backend: può uscire solo dopo che backend e schema sono compatibili con la runtimeVersion della build nativa.
-5. Le migration seguono expand → migrate/backfill → contract; non rimuovere colonne/tabelle nella stessa release che introduce il nuovo uso.
+1. Si lavora nel branch Git e su DB-DEV.
+2. Si fissa un commit candidato e un `release_id`; la pipeline viene bloccata su quella revisione.
+3. Si crea DB-1 Candidate da DB-2 Production. DB-1 è temporaneo e non è mai una fonte da cui copiare dati in produzione.
+4. Il backend staging usa il commit candidato con DB-1; applica e verifica le migration.
+5. Smoke live: login, SSE, cleanup, stato migration, pool/errori DB.
+6. Si pubblica una OTA candidate sul canale staging, riservata ad admin/tester.
+7. Dopo approvazione, lo stesso commit e le stesse migration sono promossi al backend production su DB-2.
+8. Verificato il backend production, si pubblica l'OTA production per gli utenti.
+9. DB-1 Candidate viene eliminato secondo il TTL previsto; il `release_id` conserva l'audit.
 
-## Controlli e osservabilità
+## Vincoli
 
-- `schema_migrations` è la fonte di verità; la cache locale dei file non può bypassare il controllo DB.
-- `session` è una migration versionata, non un bootstrap inserito nei test.
-- Il controllo index drift gira post-READY e degrada/avvisa senza crash-loop.
-- Gli smoke live verificano login, SSE e cleanup senza eseguire scheduler o seed.
-- Errori DB, SSE, pool e migration devono essere raccolti dai log di boot e dalla telemetria; una failure blocca il promotion, non prova a riparare produzione.
+- Le migration numerate sono l'unica via per cambiare lo schema di DB-2.
+- Il runner controlla `schema_migrations` nel database effettivamente raggiunto; una cache locale non può saltare tale controllo.
+- `session` è una migration versionata.
+- Le migration seguono expand → migrate/backfill → contract: nessuna rimozione distruttiva nella stessa release che introduce un nuovo uso.
+- Modifiche native, Expo SDK o dipendenze native richiedono una nuova build APK/AAB prima dell'OTA compatibile.
+- Staging/DB-1 non è ancora configurato e verificato: finché manca, non si dichiara completa una release end-to-end.
 
 ## Restore drill
 
-Il restore si prova su un nuovo branch temporaneo, mai su produzione. La prova è conclusa solo quando si documentano: punto nel tempo scelto, branch creato, migrazioni lette, login/smoke, e cancellazione del branch di test. Nessun restore/reset viene eseguito automaticamente.
+Il ripristino viene provato solo su un branch temporaneo creato da un punto nel tempo scelto. La prova registra: timestamp, branch creato, migration lette, smoke e cancellazione del branch. Non si ripristina né si resetta DB-2.
