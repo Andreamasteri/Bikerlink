@@ -221,6 +221,7 @@ export interface IStorage {
   createFeedbackTicket(ticket: InsertFeedbackTicket): Promise<FeedbackTicket>;
   updateFeedbackTicket(id: string, updates: { status?: string; internalNote?: string }): Promise<FeedbackTicket | undefined>;
   getAppSetting(key: string): Promise<AppSetting | undefined>;
+  getAppSettings(keys: readonly string[]): Promise<Array<AppSetting | undefined>>;
   invalidateAppSettingCache(key?: string): void;
   upsertAppSetting(key: string, value?: string, valueJson?: unknown, description?: string): Promise<AppSetting>;
   upsertAppSettingsAtomic(entries: { key: string; value?: string; valueJson?: unknown }[]): Promise<void>;
