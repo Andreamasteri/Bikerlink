@@ -18,3 +18,8 @@ Lo smoke deve poi essere eseguito con lo stesso `DATABASE_URL`. Il cleanup
 verifica l'identità smoke, rimuove sessioni e utente esatti e fallisce il run se
 l'utente rimane. La pulizia globale degli orfani è disattivata di default e può
 essere abilitata solo esplicitamente con `SMOKE_CLEANUP_ORPHANS=1`.
+
+Evidenza del 2026-07-27: sul branch `fix/audit-typecheck-2026-07-27`, commit
+`4cb67160387fef4e3705e3496fb81b9edb61d31b`, il run live ha riportato
+`login=PASS`, `sse=PASS`, `cleanup=PASS`, `migrations=false` e
+`schedulers=false`.
