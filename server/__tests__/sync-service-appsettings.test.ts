@@ -64,9 +64,12 @@ vi.mock("../db", async () => {
 // mockSpawn è controllabile per-test: restituisce un processo finto che emette
 // "close" con il codice desiderato in modo asincrono.
 
-const { mockSpawn } = vi.hoisted(() => ({ mockSpawn: vi.fn() }));
+const { mockSpawn, mockSpawnSync } = vi.hoisted(() => ({
+  mockSpawn: vi.fn(),
+  mockSpawnSync: vi.fn(() => ({ status: 0, stdout: "/usr/bin/mock\n" })),
+}));
 
-vi.mock("child_process", () => ({ spawn: mockSpawn }));
+vi.mock("child_process", () => ({ spawn: mockSpawn, spawnSync: mockSpawnSync }));
 
 // ── Mock: fs — evita operazioni reali sul filesystem (unlinkSync) ─────────────
 vi.mock("fs", () => ({ default: { unlinkSync: vi.fn() } }));

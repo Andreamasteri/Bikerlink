@@ -33,6 +33,7 @@ const ollamaMocks = vi.hoisted(() => ({
 vi.mock("../lib/ollama-client", () => ({
   isOllamaConfigured: true,
   getOllamaModel: ollamaMocks.getOllamaModel,
+  getOllamaModelId: vi.fn(() => "llama3"),
   // Probe di raggiungibilità aggiunta a waypoints.next: in test Ollama è "online".
   isOllamaReachable: vi.fn().mockResolvedValue(true),
 }));
@@ -51,6 +52,12 @@ vi.mock("../lib/openai-route-client", () => ({
   isOpenAiRouteConfigured: false,
   getOpenAiRouteModel: vi.fn(() => { throw new Error("OpenAI non configurato (mock)"); }),
 }));
+
+vi.mock("../ai/route-provider-config", () => ({
+  getEffectiveRouteChain: vi.fn().mockResolvedValue(["ollama", "gemini"]),
+}));
+
+vi.mock("../ai/route-provider-stats", () => ({ incrementProviderStat: vi.fn() }));
 
 // ---------------------------------------------------------------------------
 // Import under test — after mocks

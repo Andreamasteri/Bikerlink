@@ -91,6 +91,7 @@ vi.mock("../ai/assistant/tools", () => ({
   buildRememberNoteTool: buildRememberNoteToolSpy,
   buildReviewTaskPlanTool: buildReviewTaskPlanToolSpy,
   buildSearchManualTool: buildSearchManualToolSpy,
+  buildRunSecurityScanTool: vi.fn(() => ({})),
 }));
 
 vi.mock("../ai/assistant/knowledge", () => ({
@@ -196,6 +197,7 @@ vi.mock("../ai/assistant/web-search", () => ({
 
 vi.mock("../ai/assistant/horus-scanner", () => ({
   detectHorusScanRequest: vi.fn(() => null),
+  detectHorusSecurityScanRequest: vi.fn(() => null),
   startHorusScan: vi.fn(),
 }));
 

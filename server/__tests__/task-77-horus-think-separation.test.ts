@@ -51,6 +51,7 @@ const offlineMocks = vi.hoisted(() => ({
 vi.mock("ai", () => ({
   streamText: aiMocks.streamText,
   isStepCount: aiMocks.isStepCount,
+  tool: vi.fn((definition) => definition),
 }));
 
 vi.mock("../ai/moderation/provider", () => ({
@@ -76,6 +77,7 @@ vi.mock("../ai/assistant/tools", () => ({
   buildRememberNoteTool: vi.fn(() => ({})),
   buildReviewTaskPlanTool: vi.fn(() => ({})),
   buildSearchManualTool: vi.fn(() => ({})),
+  buildRunSecurityScanTool: vi.fn(() => ({})),
 }));
 
 vi.mock("../ai/assistant/knowledge", () => ({
@@ -207,7 +209,7 @@ describe("Task #77 — Horus streaming reasoning separation (think:true)", () =>
     expect(result.text).not.toContain("</think>");
   });
 
-  it("Bowie: la chiamata Ollama in streaming resta su think:false (comportamento invariato)", async () => {
+  it("Bowie: la chiamata Ollama usa think:true per separare il ragionamento", async () => {
     aiMocks.streamText.mockReturnValue(makeStream(["Ciao! Come posso aiutarti?"]));
 
     const result = await runAssistantAgent({
@@ -217,7 +219,7 @@ describe("Task #77 — Horus streaming reasoning separation (think:true)", () =>
     });
 
     expect(aiMocks.streamText).toHaveBeenCalled();
-    expect(lastOllamaCallThink()).toBe(false);
+    expect(lastOllamaCallThink()).toBe(true);
     expect(result.persona.id).toBe("bowie");
   });
 
