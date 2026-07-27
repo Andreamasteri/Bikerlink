@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "release_id": "BL-20260727-C01",
+  "record_type": "production_promotion_preparation",
+  "status": "prepared_blocked_waiting_candidate_evidence",
+  "prepared_at": "2026-07-28T00:00:00Z",
+  "promotion_identity": {
+    "candidate_commit_sha": "af4a02acb566039eaff241e796517d16ca2cd5e3",
+    "candidate_manifest": "releases/candidates/BL-20260727-C01.json",
+    "runtime_version": "11.0.0",
+    "source_database_role": "candidate",
+    "target_database_role": "production",
+    "target_database_variable": "PROD_DATABASE_URL",
+    "target_neon_branch_role": "production"
+  },
+  "invariants": {
+    "same_commit_required": true,
+    "same_migration_files_and_checksums_required": true,
+    "production_data_is_never_replaced_from_candidate": true,
+    "production_backend_deploy_requires_same_approved_artifact": true,
+    "production_ota_is_disabled_until_production_ready": true,
+    "automatic_promotion": false
+  },
+  "evidence_required_before_approval": {
+    "candidate_backend_staging": "pending",
+    "candidate_ci_node_22": "pending",
+    "candidate_smoke_against_candidate_db": "passed",
+    "candidate_ota_build_and_real_device_test": "pending",
+    "migration_inventory_and_checksums": "pending",
+    "previous_client_compatibility": "pending",
+    "production_pitr_or_backup_checkpoint": "passed_on_2026-07-27",
+    "production_health_and_capacity": "pending_at_execution_time"
+  },
+  "preflight_required_after_andrea_approval": [
+    "Acquire the exclusive production release lock.",
+    "Reload the candidate manifest and require the exact full SHA above.",
+    "Recompute the migration inventory and SHA-256 checksums; require an exact match with the approved candidate evidence.",
+    "Verify the target is the protected Neon production branch and uses only PROD_DATABASE_URL.",
+    "Verify a current recoverable point exists before any migration.",
+    "Reject unexpected applied or pending migrations, unhealthy database state, or concurrent release activity.",
+    "Verify the new schema/backend supports the previous supported client before deployment."
+  ],
+  "authorized_execution_order": [
+    "Apply only the approved additive migrations to production and record version, checksum, commit, start/end and result.",
+    "Verify schema and integrity.",
+    "Deploy the production backend from the same approved commit/artifact.",
+    "Run production login, SSE and cleanup smoke tests.",
+    "Mark PRODUCTION_READY only if every previous step passed.",
+    "Only then, and only under a separate explicit approval, publish/roll out the production OTA."
+  ],
+  "authorization": {
+    "candidate_approval_required": "APPROVO CANDIDATA BL-20260727-C01 COMMIT af4a02acb566039eaff241e796517d16ca2cd5e3",
+    "production_execution_required": "AUTORIZZO PROMOZIONE PROD BL-20260727-C01 COMMIT af4a02acb566039eaff241e796517d16ca2cd5e3",
+    "authorized_by": null,
+    "authorized_at": null
+  },
+  "notes": "Preparation only. This record authorizes no deployment, migration, database mutation, EAS production update or user-visible rollout. Any code or migration change requires a new candidate and a new preparation record."
+}
