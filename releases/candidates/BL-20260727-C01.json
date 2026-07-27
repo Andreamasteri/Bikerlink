@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "release_id": "BL-20260727-C01",
+  "status": "db_validated_waiting_staging_backend",
+  "candidate_commit_sha": "8f615afd04b21737a33b48196e666d474708e868",
+  "candidate_commit_url": "https://github.com/Andreamasteri/Bikerlink/commit/8f615afd04b21737a33b48196e666d474708e868",
+  "runtime_version": "11.0.0",
+  "eas": {
+    "channel": "staging",
+    "build_profile": "preview",
+    "environment": "preview",
+    "platforms": [
+      "android"
+    ],
+    "update_group_id": null,
+    "update_ids": []
+  },
+  "database": {
+    "role": "candidate",
+    "neon_branch_id": "br-fancy-cherry-a26jqrce",
+    "parent_role": "production",
+    "migrations_smoke": "passed"
+  },
+  "backend": {
+    "environment": "staging",
+    "database_variable": "DATABASE_URL_CANDIDATE",
+    "status": "not_deployed"
+  },
+  "external_effects": {
+    "email": "disabled_or_sink",
+    "push": "disabled_or_sink",
+    "payments": "disabled",
+    "jobs": "staging_or_disabled",
+    "media": "staging_only"
+  },
+  "freeze": {
+    "code_changes_require_new_candidate": true,
+    "production_promotion_requires_explicit_andrea_approval": true
+  },
+  "created_at": "2026-07-27T21:17:46Z",
+  "notes": "This candidate is not published to EAS and is not a production approval."
+}
