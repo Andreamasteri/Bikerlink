@@ -104,7 +104,11 @@ export function sameDay(d1: Date | null, d2: Date | null): boolean {
   if (!d1 || !d2) return true;
   const a = new Date(d1);
   const b = new Date(d2);
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  // I timestamp delle proposte sono istanti UTC. I getter locali rendevano il
+  // risultato dipendente dal timezone del processo (Europe/Rome vs CI in UTC).
+  return a.getUTCFullYear() === b.getUTCFullYear()
+    && a.getUTCMonth() === b.getUTCMonth()
+    && a.getUTCDate() === b.getUTCDate();
 }
 
 export const MATCH_RULES: MatchRule[] = [

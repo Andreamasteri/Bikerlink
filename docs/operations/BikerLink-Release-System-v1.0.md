@@ -6,6 +6,8 @@
 **Ambito:** codice, database Neon/PostgreSQL, backend, EAS Build, EAS Update, pannello amministrativo e futura console Quebracho  
 **Principio guida:** Andrea decide; Quebracho propone, prepara, verifica e documenta; nessuna promozione in produzione avviene implicitamente.
 
+**Runbook esecutivo:** [RELEASE-RUNBOOK.md](RELEASE-RUNBOOK.md) stabilisce formule di autorizzazione, ruoli, gate e cleanup; è vincolante per l'operatività quotidiana.
+
 ---
 
 ## 1. Verdetto esecutivo

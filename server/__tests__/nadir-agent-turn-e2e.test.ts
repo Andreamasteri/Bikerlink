@@ -46,6 +46,7 @@ const searchNadirMock = vi.hoisted(() => vi.fn());
 vi.mock("ai", () => ({
   streamText: aiMocks.streamText,
   isStepCount: aiMocks.isStepCount,
+  tool: vi.fn((definition) => definition),
 }));
 
 vi.mock("../ai/moderation/provider", () => ({
@@ -88,6 +89,7 @@ vi.mock("../ai/assistant/tools", () => ({
   HORUS_TOOLS: {
     getWeather: { description: "meteo", inputSchema: {}, execute: vi.fn() },
   },
+  buildRunSecurityScanTool: vi.fn(() => ({})),
   buildBowieInterAgentTools: vi.fn(() => ({})),
   buildRememberNoteTool: vi.fn(() => ({})),
   buildReviewTaskPlanTool: vi.fn(() => ({})),

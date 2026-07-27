@@ -1,4 +1,4 @@
-import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, desc, gte, inArray, lte, sql } from "drizzle-orm";
 import { db, withDbRetry } from "../db";
 import {
   notifications, invitationCodes, feedbackTickets, appSettings, phoneSharingTracker, workshopContacts,
@@ -101,6 +101,37 @@ export class SystemStorage extends AdsStorage {
     const [setting] = await withDbRetry(() => db.select().from(appSettings).where(eq(appSettings.key, key)).limit(1));
     _appSettingsCache.set(key, { value: setting, expiresAt: Date.now() + APP_SETTINGS_CACHE_TTL_MS });
     return setting;
+  }
+
+  async getAppSettings(keys: readonly string[]): Promise<Array<AppSetting | undefined>> {
+    if (keys.length === 0) return [];
+
+    const now = Date.now();
+    const missingKeys = new Set<string>();
+
+    for (const key of keys) {
+      if (!key || typeof key !== "string") continue;
+      const cached = _appSettingsCache.get(key);
+      if (!cached || cached.expiresAt <= now) missingKeys.add(key);
+    }
+
+    if (missingKeys.size > 0) {
+      const requestedKeys = [...missingKeys];
+      const rows = await withDbRetry(() =>
+        db.select().from(appSettings).where(inArray(appSettings.key, requestedKeys)),
+      );
+      const rowsByKey = new Map(rows.map((row) => [row.key, row]));
+      const expiresAt = Date.now() + APP_SETTINGS_CACHE_TTL_MS;
+
+      for (const key of requestedKeys) {
+        _appSettingsCache.set(key, { value: rowsByKey.get(key), expiresAt });
+      }
+    }
+
+    return keys.map((key) => {
+      if (!key || typeof key !== "string") return undefined;
+      return _appSettingsCache.get(key)?.value;
+    });
   }
 
   invalidateAppSettingCache(key?: string): void {

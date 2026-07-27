@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "release_id": "BL-20260727-C01",
+  "status": "db_validated_waiting_staging_backend",
+  "candidate_commit_url": "https://github.com/Andreamasteri/Bikerlink/commit/af4a02acb566039eaff241e796517d16ca2cd5e3",
+  "runtime_version": "11.0.0",
+  "eas": {
+    "channel": "staging",
+    "build_profile": "preview",
+    "environment": "preview",
+    "platforms": [
+      "android"
+    ],
+    "update_group_id": null,
+    "update_ids": []
+  },
+  "database": {
+    "role": "candidate",
+    "neon_branch_id": "br-fancy-cherry-a26jqrce",
+    "parent_role": "production",
+    "migrations_smoke": "passed"
+  },
+  "backend": {
+    "environment": "staging",
+    "database_variable": "DATABASE_URL_CANDIDATE",
+    "status": "not_deployed"
+  },
+  "external_effects": {
+    "email": "disabled_or_sink",
+    "push": "disabled_or_sink",
+    "payments": "disabled",
+    "jobs": "staging_or_disabled",
+    "media": "staging_only"
+  },
+  "freeze": {
+    "code_changes_require_new_candidate": true,
+    "production_promotion_requires_explicit_andrea_approval": true
+  },
+  "created_at": "2026-07-27T21:19:00Z",
+  "notes": "Frozen application tree. Release metadata and staging/production control records may change without altering the frozen application tree. This candidate is not published to EAS, is not approved for production, and the production preflight record confers no deployment authority.",
+  "production_preflight": {
+    "record": "releases/production/BL-20260727-C01.preflight.json",
+    "status": "prepared_blocked_waiting_candidate_evidence",
+    "requires_exact_candidate_commit": "candidate_commit_url (canonical Git commit URL)",
+    "production_execution_authorization": "AUTORIZZO PROMOZIONE PROD BL-20260727-C01 COMMIT <SHA_FROM_CANDIDATE_COMMIT_URL>"
+  }
+}

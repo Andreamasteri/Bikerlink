@@ -20,10 +20,19 @@ vi.mock("../storage", () => ({
   storage: { getAppSetting: vi.fn(async () => undefined), upsertAppSetting: vi.fn(async () => ({})) },
 }));
 
-const canRunJobMock = vi.hoisted(() => vi.fn(async () => ({ allowed: true })));
+const canRunJobMock = vi.hoisted(() => vi.fn(async (): Promise<{
+  allowed: boolean;
+  reason?: string;
+  source?: string;
+}> => ({ allowed: true })));
 vi.mock("../ai/coordinator/job-gate", () => ({ canRunJob: canRunJobMock }));
 
-vi.mock("../ai/coordinator/job-registry", () => ({ registerJob: vi.fn() }));
+vi.mock("../ai/coordinator/job-registry", () => ({
+  registerJob: vi.fn(),
+  markRunStart: vi.fn(),
+  markRunSuccess: vi.fn(),
+  markRunFailure: vi.fn(),
+}));
 vi.mock("../lib/dedup-logger", () => ({ dedupWarn: vi.fn() }));
 
 import {

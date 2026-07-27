@@ -41,7 +41,6 @@ BackSecr
 
 # typescript
 *.tsbuildinfo
-.vercel
 
 # Next.js build output
 .next/

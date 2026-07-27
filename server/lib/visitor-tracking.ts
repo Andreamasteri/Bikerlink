@@ -84,10 +84,9 @@ function pickLang(req: Request): string | null {
 }
 
 function pickCountry(req: Request, ip: string | undefined): string | null {
-  // Priority 1: proxy-injected geo headers (Cloudflare, Vercel, generic).
+  // Priority 1: proxy-injected geo headers (Cloudflare or generic).
   const candidates = [
     req.headers["cf-ipcountry"],
-    req.headers["x-vercel-ip-country"],
     req.headers["x-country-code"],
   ];
   for (const c of candidates) {

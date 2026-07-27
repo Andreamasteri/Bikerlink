@@ -20,7 +20,11 @@ const providerMocks = vi.hoisted(() => ({
 
 const tcOffline = vi.hoisted(() => vi.fn());
 
-vi.mock("ai", () => ({ streamText: aiMocks.streamText, isStepCount: aiMocks.isStepCount }));
+vi.mock("ai", () => ({
+  streamText: aiMocks.streamText,
+  isStepCount: aiMocks.isStepCount,
+  tool: vi.fn((definition) => definition),
+}));
 
 vi.mock("../ai/moderation/provider", () => ({
   runWithFallback: providerMocks.runWithFallback,
@@ -45,6 +49,12 @@ vi.mock("../ai/assistant/tools", () => ({
     getBikerStats: { description: "stats", inputSchema: {}, execute: vi.fn() },
     getUserPlannedRoutes: { description: "routes", inputSchema: {}, execute: vi.fn() },
   },
+  HORUS_TOOLS: {},
+  buildBowieInterAgentTools: vi.fn(() => ({})),
+  buildRememberNoteTool: vi.fn(() => ({})),
+  buildReviewTaskPlanTool: vi.fn(() => ({})),
+  buildSearchManualTool: vi.fn(() => ({})),
+  buildRunSecurityScanTool: vi.fn(() => ({})),
 }));
 
 vi.mock("../ai/assistant/knowledge", () => ({

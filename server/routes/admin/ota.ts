@@ -309,7 +309,7 @@ router.get("/:id/try", async (req: Request, res: Response) => {
     const [release] = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
     if (!release) return sendError(res, 404, "OTA release non trovata");
 
-    const manifestUrl = `https://u.expo.dev/${EAS_PROJECT_ID}?channel-name=production&runtime-version=${encodeURIComponent(release.runtimeVersion ?? "10.0.0")}`;
+    const manifestUrl = `https://u.expo.dev/${EAS_PROJECT_ID}?channel-name=${encodeURIComponent(release.channel)}&runtime-version=${encodeURIComponent(release.runtimeVersion ?? "10.0.0")}`;
 
     return res.json({
       easUpdateId: release.easUpdateId,

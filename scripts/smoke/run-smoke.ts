@@ -181,8 +181,14 @@ export async function cleanupSmokeUser(
       return { ok: false, note: `skip: userId=${userId} non corrisponde a un account smoke` };
     }
     try { await client.query("DELETE FROM email_verification_tokens WHERE user_id = $1", [userId]); } catch { /* tabella opzionale */ }
+    try { await client.query("DELETE FROM session WHERE sess ->> 'userId' = $1", [userId]); } catch { /* tabella opzionale */ }
     const del = await client.query("DELETE FROM users WHERE id = $1", [userId]);
-    return { ok: true, note: `userId=${userId} deleted=${del.rowCount}` };
+    const remaining = await client.query(
+      "SELECT 1 FROM users WHERE id = $1 OR LOWER(email) = LOWER($2) LIMIT 1",
+      [userId, email],
+    );
+    const ok = del.rowCount === 1 && remaining.rowCount === 0;
+    return { ok, note: `userId=${userId} deleted=${del.rowCount} remaining=${remaining.rowCount}` };
   } catch (e: unknown) {
     return { ok: false, note: `pg error: ${e instanceof Error ? e.message : String(e)}` };
   } finally {

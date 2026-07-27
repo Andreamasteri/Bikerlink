@@ -150,7 +150,10 @@ function splitStatements(sql: string): string[] {
 
 /**
  * Compute a hash of all migration filenames (sorted).
- * This lets us skip the DB round-trip when no new migration files were added.
+ *
+ * The hash is diagnostic only. It is deliberately never used to bypass the
+ * database check: a build directory can be reused against a different Neon
+ * branch, whose schema_migrations state may legitimately be different.
  */
 function computeMigrationsHash(files: string[]): string {
   return crypto.createHash("sha256").update(files.join("|")).digest("hex");
@@ -339,11 +342,8 @@ export async function runMigrations(): Promise<void> {
   const currentHash = computeMigrationsHash(all);
   const cachedHash = readCachedHash();
 
-  // Fast-skip: if migration file list hash matches cache, no new migrations exist.
-  // Avoids DB round-trip on every normal restart.
   if (cachedHash === currentHash) {
-    console.log("[migrate] All migrations already applied — cache hit (schema hash unchanged).");
-    return;
+    console.log("[migrate] Migration file cache matches; verifying the target database branch.");
   }
 
   const client = await pool.connect();

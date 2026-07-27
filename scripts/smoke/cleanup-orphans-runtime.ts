@@ -8,6 +8,7 @@
  */
 
 export async function cleanupOrphanSmokeUsers(): Promise<void> {
+  if (process.env.SMOKE_CLEANUP_ORPHANS !== "1") return;
   if (!process.env.DATABASE_URL) return;
   const { Client } = await import("pg");
   const client = new Client({ connectionString: process.env.DATABASE_URL });

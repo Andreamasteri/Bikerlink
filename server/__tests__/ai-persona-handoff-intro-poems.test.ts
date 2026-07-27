@@ -50,6 +50,7 @@ const dbInsertValues = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock("ai", () => ({
   streamText: aiMocks.streamText,
   isStepCount: aiMocks.isStepCount,
+  tool: vi.fn((definition) => definition),
 }));
 
 vi.mock("../ai/moderation/provider", () => ({
@@ -75,6 +76,7 @@ vi.mock("../ai/assistant/tools", () => ({
   buildRememberNoteTool: vi.fn(() => ({})),
   buildReviewTaskPlanTool: vi.fn(() => ({})),
   buildSearchManualTool: vi.fn(() => ({})),
+  buildRunSecurityScanTool: vi.fn(() => ({})),
 }));
 
 vi.mock("../ai/assistant/knowledge", () => ({

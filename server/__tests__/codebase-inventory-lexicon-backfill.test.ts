@@ -10,15 +10,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createHash } from "node:crypto";
 
 // ── Hoisted mock factories (eseguiti prima di qualsiasi import) ────────────
-const { readdirMock, readFileMock } = vi.hoisted(() => ({
-  readdirMock: vi.fn(),
+const { spawnSyncMock, readFileMock } = vi.hoisted(() => ({
+  spawnSyncMock: vi.fn(),
   readFileMock: vi.fn(),
 }));
 
-// Mock node:fs/promises — intercetta enumerateSourceFiles e readAndHashFile.
+// L'inventario usa git ls-files; il mock rende la lista deterministica e
+// readFile intercetta il successivo hashing del contenuto.
+vi.mock("node:child_process", () => ({ spawnSync: spawnSyncMock }));
 vi.mock("node:fs", () => ({
   promises: {
-    readdir: readdirMock,
     readFile: readFileMock,
   },
 }));
@@ -49,14 +50,13 @@ function makeFile(name: string) {
 }
 
 /**
- * Configura readdir per restituire `fileName` nella sola cartella `subDir`
- * e array vuoti per tutte le altre cartelle (evita di camminare l'intero repo).
+ * Configura git ls-files per restituire un solo file sorgente.
  */
 function setupReaddirSingleFile(subDir: string, fileName: string) {
-  readdirMock.mockImplementation(async (absDir: string) => {
-    const normalized = absDir.replace(/\\/g, "/");
-    if (normalized.endsWith(`/${subDir}`)) return [makeFile(fileName)];
-    return [];
+  spawnSyncMock.mockReturnValue({
+    status: 0,
+    stdout: `${subDir}/${fileName}\n`,
+    stderr: "",
   });
 }
 
