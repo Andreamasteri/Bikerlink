@@ -336,8 +336,8 @@ _ai_self_test() {
   echo "--- Secret presence ---"
 
   local horus_config_ok=true
-  local ares_secrets_ok=true
-  local tc_secrets_ok=true
+  local ares_config_ok=true
+  local tc_config_ok=true
 
   for var in HORUS_OLLAMA_URL CF_ACCESS_CLIENT_ID CF_ACCESS_CLIENT_SECRET; do
     local val
@@ -365,7 +365,7 @@ _ai_self_test() {
     val=$(printenv "$var" 2>/dev/null || true)
     if [ -z "$val" ]; then
       echo "[INFO] $var not set — Ares will be skipped"
-      ares_secrets_ok=false
+      ares_config_ok=false
     else
       echo "[OK]   $var present"
     fi
@@ -376,7 +376,7 @@ _ai_self_test() {
     val=$(printenv "$var" 2>/dev/null || true)
     if [ "${#val}" -lt 5 ]; then
       echo "[WARN] $var is empty or too short"
-      tc_secrets_ok=false
+      tc_config_ok=false
     else
       echo "[OK]   $var present (${#val} chars)"
     fi
@@ -413,7 +413,7 @@ _ai_self_test() {
   # 4. Ares smoke — skip if secrets not set
   echo ""
   echo "--- Ares LLM call ---"
-  if [ "$ares_secrets_ok" != "true" ]; then
+  if [ "$ares_config_ok" != "true" ]; then
     echo "[SKIP] call_ares (secret not set)"
   else
     echo "[SKIP] call_ares (smoke only — call ai_call_ares manually to test)"
@@ -422,7 +422,7 @@ _ai_self_test() {
   # 5. TC agent sys-metrics (≤30s, but usually <2s)
   echo ""
   echo "--- TC agent /sys-metrics ---"
-  if [ "$tc_secrets_ok" != "true" ]; then
+  if [ "$tc_config_ok" != "true" ]; then
     echo "[SKIP] tc_agent /sys-metrics (secrets missing)"
   elif [ "$tc_online" != "true" ]; then
     echo "[SKIP] tc_agent /sys-metrics (TC offline)"
