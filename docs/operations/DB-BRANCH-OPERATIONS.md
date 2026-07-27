@@ -4,6 +4,10 @@ Questo documento è la fonte operativa per le release. I dati non vengono mai
 promossi da dev o candidate a produzione: si promuovono esclusivamente commit,
 migration SQL, configurazione e build approvati.
 
+Ruoli, formule di autorizzazione e condizioni di cleanup sono definiti in
+[RELEASE-RUNBOOK.md](RELEASE-RUNBOOK.md). In caso di conflitto, il runbook
+impedisce qualsiasi promozione PROD non autorizzata esplicitamente da Andrea.
+
 ## Ambienti e nomi
 
 | Nome | Ruolo | Dati | Regola |
