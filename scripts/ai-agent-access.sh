@@ -335,7 +335,7 @@ _ai_self_test() {
   echo ""
   echo "--- Secret presence ---"
 
-  local horus_secrets_ok=true
+  local horus_config_ok=true
   local ares_secrets_ok=true
   local tc_secrets_ok=true
 
@@ -344,7 +344,7 @@ _ai_self_test() {
     val=$(printenv "$var" 2>/dev/null || true)
     if [ "${#val}" -lt 5 ]; then
       echo "[WARN] $var is empty or too short"
-      horus_secrets_ok=false
+      horus_config_ok=false
     else
       echo "[OK]   $var present (${#val} chars)"
     fi
@@ -402,10 +402,9 @@ _ai_self_test() {
   # 3. Horus smoke — skip actual LLM call (cold load would exceed 12s budget)
   echo ""
   echo "--- Horus LLM call (smoke only — no actual call to avoid cold load) ---"
-  # pragma: allowlist nextline secret
-  if [ "$horus_secrets_ok" = "true" ] && [ "$tc_online" = "true" ]; then
+  if [ "$horus_config_ok" = "true" ] && [ "$tc_online" = "true" ]; then
     echo "[SKIP] call_horus (smoke only — call ai_call_horus manually to test)"
-  elif [ "$horus_secrets_ok" != "true" ]; then
+  elif [ "$horus_config_ok" != "true" ]; then
     echo "[SKIP] call_horus (secrets missing)"
   else
     echo "[SKIP] call_horus (TC offline)"
