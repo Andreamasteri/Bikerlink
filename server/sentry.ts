@@ -1,13 +1,19 @@
 /**
- * Task #2527 — Inizializzazione Sentry per il backend.
+ * Backend Sentry initialization.
  *
- * Attivo solo se `SENTRY_DSN` è presente nell'ambiente. Import dinamico per
- * non bloccare il boot se la dipendenza manca. `setupExpressErrorHandler`
- * va chiamato DOPO le route, prima del nostro error handler custom.
+ * Sentry is optional and must never block application boot. Configuration is
+ * deliberately conservative: no default PII, bounded tracing, explicit release
+ * metadata and filtering for transient errors already handled by the runtime.
  */
 import type { Express } from "express";
 
 let sentryReady = false;
+
+function readTraceSampleRate(): number {
+  const raw = Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? "0.05");
+  if (!Number.isFinite(raw)) return 0.05;
+  return Math.min(1, Math.max(0, raw));
+}
 
 export async function initSentry(): Promise<void> {
   const dsn = process.env.SENTRY_DSN;
@@ -15,31 +21,44 @@ export async function initSentry(): Promise<void> {
     console.log("[sentry] SENTRY_DSN non impostato — Sentry disabilitato");
     return;
   }
+
   try {
     const Sentry = await import("@sentry/node");
     Sentry.init({
       dsn,
-      tracesSampleRate: 0.1,
-      environment: process.env.NODE_ENV ?? "development",
+      environment: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV ?? "development",
+      release: process.env.SENTRY_RELEASE ?? process.env.REPL_SLUG ?? undefined,
+      tracesSampleRate: readTraceSampleRate(),
+      sendDefaultPii: false,
+      maxBreadcrumbs: 50,
       ignoreErrors: [
         "BgDbSlowKillSwitchError",
         "BgDbQueueTimeoutError",
         "BgDbQueueOverflowError",
-        // Task #935 — Errori DB transitori già gestiti con fallback conservativo
-        // nel Matching Coordinator (→ paused_by_killswitch). L'auto-strumentazione
-        // pg di @sentry/node li cattura a livello driver anche quando il codice
-        // applicativo li gestisce tramite try/catch: aggiungere qui previene il
-        // rumore in Sentry senza rimuovere la gestione applicativa.
         "DbTimeoutError",
         /DB query timeout/,
         /connection timeout/i,
         /connection terminated/i,
         /connection reset/i,
+        /socket hang up/i,
       ],
+      beforeSend(event) {
+        if (event.request) {
+          delete event.request.cookies;
+          delete event.request.data;
+          if (event.request.headers) {
+            delete event.request.headers.authorization;
+            delete event.request.headers.cookie;
+          }
+        }
+        return event;
+      },
     });
+
     sentryReady = true;
-    console.log("[sentry] inizializzato");
+    console.log(`[sentry] inizializzato (traces=${readTraceSampleRate()})`);
   } catch (err) {
+    sentryReady = false;
     console.warn("[sentry] init fallito:", (err as Error).message);
   }
 }
@@ -57,15 +76,20 @@ export async function attachSentryErrorHandler(app: Express): Promise<void> {
 }
 
 /**
- * Captures an exception via Sentry and returns the Sentry event ID so it can
- * be stored alongside the ring-buffer log entry for deep-link access.
- * Returns null if Sentry is disabled or the capture fails.
+ * Captures an exception via Sentry and returns the event ID so it can be stored
+ * alongside the local diagnostic entry. Returns null when Sentry is disabled.
  */
-export async function captureMatchingError(err: unknown, context: Record<string, unknown> = {}): Promise<string | null> {
+export async function captureMatchingError(
+  err: unknown,
+  context: Record<string, unknown> = {},
+): Promise<string | null> {
   if (!sentryReady) return null;
   try {
     const Sentry = await import("@sentry/node");
-    const eventId = Sentry.captureException(err, { extra: { component: "matching", ...context } });
+    const eventId = Sentry.captureException(err, {
+      tags: { component: "matching" },
+      extra: context,
+    });
     return eventId ?? null;
   } catch {
     return null;
