@@ -67,9 +67,12 @@ function main(): void {
     fail(`Dev e prod usano database name differenti (${dev.dbname} / ${prod.dbname}); verificare che siano branch dello stesso progetto.`);
   }
 
-  // In locale DATABASE_URL è spesso consumata implicitamente da drizzle e dagli
-  // script. Deve quindi puntare al branch dev, non a produzione.
-  if (process.env.NODE_ENV !== "production" && ambientUrl) {
+  // In locale DATABASE_URL è consumata implicitamente da drizzle e da diversi
+  // script. Deve essere presente e puntare allo stesso branch di DATABASE_URL_DEV.
+  if (process.env.NODE_ENV !== "production") {
+    if (!ambientUrl) {
+      fail("DATABASE_URL locale mancante. Impostarla uguale a DATABASE_URL_DEV.");
+    }
     const ambient = parseConnectionString(ambientUrl);
     if (!ambient) fail(`DATABASE_URL locale non valido: ${redactUrl(ambientUrl)}`);
     if (ambient.host === prod.host) {
