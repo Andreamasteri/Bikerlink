@@ -43,6 +43,7 @@
       },
       "env": {
         "NODE_OPTIONS": "--max_old_space_size=8192",
+        "EXPO_PUBLIC_DOMAIN": "bikerlink.replit.app",
         "EXPO_PUBLIC_BUILD_PROFILE": "staging"
       }
     },
@@ -52,7 +53,8 @@
       "credentialsSource": "remote",
       "env": {
         "NODE_OPTIONS": "--max_old_space_size=8192",
-        "EXPO_PUBLIC_DOMAIN": "bikerlink.replit.app"
+        "EXPO_PUBLIC_DOMAIN": "bikerlink.replit.app",
+        "EXPO_PUBLIC_BUILD_PROFILE": "production"
       },
       "android": {
         "buildType": "apk",
@@ -66,7 +68,8 @@
       "credentialsSource": "remote",
       "env": {
         "NODE_OPTIONS": "--max_old_space_size=8192",
-        "EXPO_PUBLIC_DOMAIN": "bikerlink.replit.app"
+        "EXPO_PUBLIC_DOMAIN": "bikerlink.replit.app",
+        "EXPO_PUBLIC_BUILD_PROFILE": "emergency"
       },
       "android": {
         "buildType": "apk",
@@ -78,9 +81,11 @@
       "distribution": "store",
       "channel": "production",
       "credentialsSource": "remote",
+      "autoIncrement": true,
       "env": {
         "NODE_OPTIONS": "--max_old_space_size=8192",
-        "EXPO_PUBLIC_DOMAIN": "bikerlink.replit.app"
+        "EXPO_PUBLIC_DOMAIN": "bikerlink.replit.app",
+        "EXPO_PUBLIC_BUILD_PROFILE": "production"
       },
       "android": {
         "buildType": "app-bundle",
@@ -88,7 +93,7 @@
         "image": "latest"
       },
       "ios": {
-        "autoIncrement": false
+        "autoIncrement": true
       }
     }
   },
