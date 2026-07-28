@@ -47,3 +47,6 @@ jobs:
 
       - name: Expo public config
         run: npx --no-install expo config --type public
+
+      - name: Validation marker
+        run: echo PR23 targeted validation completed
