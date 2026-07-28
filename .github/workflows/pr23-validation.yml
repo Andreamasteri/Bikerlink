@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/stabilize-campaigns-db-runtime-ota
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -31,6 +34,14 @@ jobs:
 
       - name: Tests
         run: npm test
+
+      - name: Neon branch guard
+        env:
+          DATABASE_URL_DEV: postgresql://dev:dev@ep-dev-pooler.eu-central-1.aws.neon.tech/neondb
+          DATABASE_URL_PROD: postgresql://prod:prod@ep-prod-pooler.eu-central-1.aws.neon.tech/neondb
+          DATABASE_URL: postgresql://dev:dev@ep-dev-pooler.eu-central-1.aws.neon.tech/neondb
+          NODE_ENV: development
+        run: npm run check:neon-branch
 
       - name: Server build
         run: npm run server:build
