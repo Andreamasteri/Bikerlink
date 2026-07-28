@@ -31,7 +31,7 @@ jobs:
         run: bash scripts/ci-secrets-scan.sh
 
   ci:
-    name: Typecheck & Lint
+    name: Typecheck, Lint & Campaign Watchdog Test
     runs-on: ubuntu-latest
 
     steps:
@@ -55,6 +55,9 @@ jobs:
 
       - name: ESLint
         run: npm run lint
+
+      - name: Campaign watchdog read-only regression test
+        run: npx vitest run server/__tests__/campaigns-self-check-readonly.test.ts
 
       - name: AI schema drift check
         run: bash scripts/check-ai-direct-generateobject.sh
