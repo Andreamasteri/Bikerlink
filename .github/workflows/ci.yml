@@ -31,8 +31,12 @@ jobs:
         run: bash scripts/ci-secrets-scan.sh
 
   ci:
-    name: Typecheck & Lint
+    name: Typecheck, Lint & PR23 Validation
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL_DEV: postgresql://neondb_owner:test@ep-pr23-dev-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require
+      DATABASE_URL_PROD: postgresql://neondb_owner:test@ep-pr23-prod-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require
+      DATABASE_URL: postgresql://neondb_owner:test@ep-pr23-dev-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require
 
     steps:
       - name: Checkout
@@ -55,6 +59,18 @@ jobs:
 
       - name: ESLint
         run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Neon branch guard
+        run: npm run check:neon-branch
+
+      - name: Server build
+        run: npm run server:build
+
+      - name: Expo public config
+        run: npx --no-install expo config --type public
 
       - name: AI schema drift check
         run: bash scripts/check-ai-direct-generateobject.sh
