@@ -43,7 +43,7 @@ class MainApplication : Application(), ReactApplication {
         val body = """{"step":"native_crash","platform":"android","data":{"newArch":"${BuildConfig.IS_NEW_ARCHITECTURE_ENABLED}","thread":"${thread.name.je()}","error":"$err","stack":"$stack"}}"""
         val t = Thread {
           runCatching {
-            val conn = java.net.URL("https://bikerlink.replit.app/api/admin/startup-beacon")
+            val conn = java.net.URL("https://biker-link.net/api/admin/startup-beacon")
               .openConnection() as java.net.HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
