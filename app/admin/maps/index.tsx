@@ -199,7 +199,7 @@ export default function AdminMapsPage() {
         <Text style={styles.reminderLine}>2. Crea <Text style={styles.reminderCode}>/opt/graphhopper/scripts/.env</Text> con:</Text>
         <Text style={styles.reminderCode2}>{"   OSM_UPDATE_SECRET=<segreto>"}</Text>
         <Text style={styles.reminderCode2}>{"   SLACK_WEBHOOK_URL=https://hooks.slack.com/..."}</Text>
-        <Text style={styles.reminderCode2}>{"   BACKEND_URL=https://bikerlink.replit.app"}</Text>
+        <Text style={styles.reminderCode2}>{"   BACKEND_URL=https://biker-link.net"}</Text>
         <Text style={styles.reminderLine}>3. Aggiungi <Text style={styles.reminderCode}>OSM_UPDATE_SECRET</Text> nei Secrets Replit</Text>
         <Text style={styles.reminderLine}>4. Cron (root) — <Text style={styles.reminderCode}>sudo crontab -e</Text>:</Text>
         <Text style={styles.reminderCode2}>{"   CRON_TZ=Europe/Rome"}</Text>
