@@ -17,7 +17,7 @@ import { router } from "expo-router";
 import { clearSession, getToken } from "../lib/session";
 import { THEME } from "../constants/theme";
 
-const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
+const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.net";
 // Label visivo mostrato in UI: indica l'host del ThinkCentre, non il bridge BikerLink.
 const TC_DISPLAY_HOST = process.env.EXPO_PUBLIC_TC_DISPLAY_HOST || "tc.biker-link.net";
 
