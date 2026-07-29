@@ -173,7 +173,7 @@ function renderCover(doc) {
   doc.fill(WHITE).font('Helvetica').fontSize(11)
      .text('Versione 1.0  ·  Maggio 2026  ·  Italiano', 0, doc.page.height - 82, { align: 'center' });
   doc.fill(WHITE).font('Helvetica').fontSize(10)
-     .text('bikerlink.replit.app', 0, doc.page.height - 58, { align: 'center' });
+     .text('biker-link.net', 0, doc.page.height - 58, { align: 'center' });
 }
 
 function renderHeader(doc, sectionLabel) {
