@@ -14,7 +14,7 @@ import { router } from "expo-router";
 import { getSavedCredentials, saveCredentials, saveSession } from "../lib/session";
 import { THEME } from "../constants/theme";
 
-const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
+const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.net";
 
 async function loginTc(
   tcUsername: string,
