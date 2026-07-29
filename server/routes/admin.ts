@@ -390,6 +390,7 @@ import metroCrashRouter from './admin/metro-crash';
 import coordinateHistoryAdminRouter from './admin/coordinate-history';
 // Task #997 — Sync prod→dev (trigger manuale + status).
 import dbSyncRouter from './sync';
+import secretVaultRouter from './admin/secret-vault';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -550,5 +551,7 @@ router.use('/', _requireAdmin, metroCrashRouter);
 router.use('/coordinate-history', _requireAdmin, coordinateHistoryAdminRouter);
 // Task #997 — Sync prod→dev: trigger manuale e status.
 router.use('/', _requireAdmin, dbSyncRouter);
+// Secret Vault: metadata-only reads; encrypted relay on writes.
+router.use('/', _requireAdmin, secretVaultRouter);
 
 export default router;
