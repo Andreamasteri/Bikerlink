@@ -1,32 +1,22 @@
 /**
- * verify-neon-branching.ts — Task #1032
- *
- * Verifica che dev e prod puntino a branch Neon SEPARATI.
- * Parsing-only: non apre connessioni TCP.
- *
- * Condizioni verificate:
- *   (a) DATABASE_URL_DEV è impostato
- *   (b) entrambi i connection string contengono "neon.tech"
- *   (c) gli host dei due branch sono DIVERSI (branch separati)
- *   (d) il dbname coincide (stesso progetto Neon)
- *
- * Esecuzione:
- *   npx tsx scripts/verify-neon-branching.ts
- *   npm run check:neon-branch
- *
- * Exit code:
- *   0 → OK — branch separati confermati
- *   1 → FAIL — guard non superato (messaggio specifico stampato su stderr)
+ * Verifies that development and production use distinct Neon branches.
+ * Parsing-only: this script never opens a database connection.
  */
 
-function parseConnectionString(raw: string): { host: string; dbname: string } | null {
+type ParsedConnection = {
+  host: string;
+  dbname: string;
+  branchHint: string;
+};
+
+function parseConnectionString(raw: string): ParsedConnection | null {
   try {
-    const u = new URL(raw);
-    const host = u.hostname;
-    // dbname is the pathname minus leading slash
-    const dbname = u.pathname.replace(/^\//, "").split("?")[0] ?? "";
+    const url = new URL(raw);
+    const host = url.hostname.toLowerCase();
+    const dbname = url.pathname.replace(/^\//, "").split("?")[0] ?? "";
     if (!host) return null;
-    return { host, dbname };
+    const branchHint = host.split(".")[0] ?? host;
+    return { host, dbname, branchHint };
   } catch {
     return null;
   }
@@ -34,125 +24,76 @@ function parseConnectionString(raw: string): { host: string; dbname: string } | 
 
 function redactUrl(raw: string): string {
   try {
-    const u = new URL(raw);
-    // Keep host visible; redact user/password/path details
-    return `${u.protocol}//<redacted>@${u.host}${u.pathname}`;
+    const url = new URL(raw);
+    return `${url.protocol}//<redacted>@${url.host}${url.pathname}`;
   } catch {
     return "<non-parseable URL>";
   }
 }
 
+function fail(message: string): never {
+  console.error(`\n❌ ${message}\n`);
+  process.exit(1);
+}
+
 function main(): void {
-  const LINE = "═".repeat(62);
-  console.log(`\n${LINE}`);
-  console.log("  verify-neon-branching — Neon DB branching guard");
-  console.log(LINE);
-
   const devUrl = process.env.DATABASE_URL_DEV;
-  // The bridge keeps the production credential under PROD_DATABASE_URL; hosted
-  // production still uses DATABASE_URL. Prefer the explicit production names so
-  // a local dev DATABASE_URL can never be mistaken for production during checks.
-  const prodUrl = process.env.DATABASE_URL_PROD ?? process.env.PROD_DATABASE_URL ?? process.env.DATABASE_URL;
+  const explicitProdUrl = process.env.DATABASE_URL_PROD ?? process.env.PROD_DATABASE_URL;
+  const ambientUrl = process.env.DATABASE_URL;
+  const prodUrl = explicitProdUrl ?? ambientUrl;
 
-  // ── Check (a): DATABASE_URL_DEV deve essere impostato ────────────────────────
   if (!devUrl) {
-    console.error("\n  ✗ DATABASE_URL_DEV non impostato.");
-    console.error("    Questo variable deve puntare al branch Neon di sviluppo.");
-    console.error("    Senza di esso, drizzle-kit e gli script di workspace");
-    console.error("    potrebbero colpire accidentalmente il branch di produzione.");
-    console.error(`\n${LINE}`);
-    console.error("  ❌ GUARD FALLITO — DATABASE_URL_DEV mancante");
-    console.error(`${LINE}\n`);
-    process.exit(1);
+    fail("DATABASE_URL_DEV mancante: gli script locali non hanno un branch Neon isolato.");
   }
-
   if (!prodUrl) {
-    console.error("\n  ✗ DATABASE_URL non impostato.");
-    console.error("    DATABASE_URL_PROD / PROD_DATABASE_URL (oppure DATABASE_URL in hosting) deve puntare al branch Neon di produzione.");
-    console.error(`\n${LINE}`);
-    console.error("  ❌ GUARD FALLITO — DATABASE_URL mancante");
-    console.error(`${LINE}\n`);
-    process.exit(1);
+    fail("DATABASE_URL_PROD / PROD_DATABASE_URL mancante: impossibile confrontare dev e produzione.");
   }
 
-  // ── Parse entrambi i connection string ───────────────────────────────────────
   const dev = parseConnectionString(devUrl);
   const prod = parseConnectionString(prodUrl);
+  if (!dev) fail(`DATABASE_URL_DEV non valido: ${redactUrl(devUrl)}`);
+  if (!prod) fail(`URL produzione non valido: ${redactUrl(prodUrl)}`);
 
-  if (!dev) {
-    console.error(`\n  ✗ DATABASE_URL_DEV non è un URL valido: ${redactUrl(devUrl)}`);
-    process.exit(1);
+  if (!dev.host.endsWith("neon.tech")) {
+    fail(`DATABASE_URL_DEV non punta a Neon: ${dev.host}`);
   }
-  if (!prod) {
-    console.error(`\n  ✗ DATABASE_URL non è un URL valido: ${redactUrl(prodUrl)}`);
-    process.exit(1);
+  if (!prod.host.endsWith("neon.tech")) {
+    fail(`Il database di produzione non punta a Neon: ${prod.host}`);
   }
-
-  // ── Tabella riassuntiva ───────────────────────────────────────────────────────
-  console.log("");
-  console.log("  Branch        Host                                  DB");
-  console.log("  ──────────── ─────────────────────────────────────────────────────────────");
-  console.log(`  dev           ${dev.host.padEnd(44)} ${dev.dbname}`);
-  console.log(`  prod          ${prod.host.padEnd(44)} ${prod.dbname}`);
-  console.log("");
-
-  let allPassed = true;
-
-  // ── Check (b): entrambi devono contenere neon.tech ───────────────────────────
-  if (!dev.host.includes("neon.tech")) {
-    console.error(`  ✗ DATABASE_URL_DEV non punta a neon.tech: "${dev.host}"`);
-    console.error("    Verifica che DATABASE_URL_DEV sia la connection string Neon corretta.");
-    allPassed = false;
-  } else {
-    console.log(`  ✓ dev  → neon.tech confermato (${dev.host})`);
-  }
-
-  if (!prod.host.includes("neon.tech")) {
-    console.error(`  ✗ DATABASE_URL non punta a neon.tech: "${prod.host}"`);
-    console.error("    Verifica che DATABASE_URL sia la connection string Neon corretta.");
-    allPassed = false;
-  } else {
-    console.log(`  ✓ prod → neon.tech confermato (${prod.host})`);
-  }
-
-  // ── Check (c): gli host devono essere DIVERSI ─────────────────────────────────
   if (dev.host === prod.host) {
-    console.error(`\n  ✗ CRITICO — dev e prod puntano allo STESSO host Neon:`);
-    console.error(`    host: "${dev.host}"`);
-    console.error("    Questo significa che dev e prod condividono lo stesso branch.");
-    console.error("    Rischio: drizzle-kit push, script diretti o migration applicate");
-    console.error("    nel workspace colpiscono il database di PRODUZIONE.");
-    console.error("    Azione: crea un branch Neon separato per dev e aggiorna DATABASE_URL_DEV.");
-    allPassed = false;
-  } else {
-    console.log("  ✓ Host diversi — branch Neon separati confermati");
+    fail(`CRITICO: sviluppo e produzione condividono lo stesso host Neon (${dev.host}).`);
   }
-
-  // ── Check (d): il dbname deve coincidere (stesso progetto Neon) ──────────────
   if (dev.dbname && prod.dbname && dev.dbname !== prod.dbname) {
-    console.error(`\n  ✗ Il dbname differisce tra dev e prod:`);
-    console.error(`    dev:  "${dev.dbname}"`);
-    console.error(`    prod: "${prod.dbname}"`);
-    console.error("    Dev e prod dovrebbero essere branch dello stesso progetto Neon");
-    console.error("    (stesso dbname). Verifica la configurazione del branching.");
-    allPassed = false;
-  } else if (dev.dbname && prod.dbname) {
-    console.log(`  ✓ DB name coincide su entrambi i branch: "${dev.dbname}"`);
-  } else {
-    console.log("  ℹ DB name non determinabile dai connection string — skip check (d)");
+    fail(`Dev e prod usano database name differenti (${dev.dbname} / ${prod.dbname}); verificare che siano branch dello stesso progetto.`);
   }
 
-  // ── Report finale ─────────────────────────────────────────────────────────────
-  console.log(`\n${LINE}`);
-  if (allPassed) {
-    console.log("  ✅ NEON BRANCHING OK — dev e prod su branch separati");
-  } else {
-    console.error("  ❌ GUARD FALLITO — dev e prod NON sono su branch Neon separati");
-    console.error("     Correggi la configurazione prima di fare deploy.");
+  // In locale DATABASE_URL è consumata implicitamente da drizzle e da diversi
+  // script. Deve essere presente e puntare allo stesso branch di DATABASE_URL_DEV.
+  if (process.env.NODE_ENV !== "production") {
+    if (!ambientUrl) {
+      fail("DATABASE_URL locale mancante. Impostarla uguale a DATABASE_URL_DEV.");
+    }
+    const ambient = parseConnectionString(ambientUrl);
+    if (!ambient) fail(`DATABASE_URL locale non valido: ${redactUrl(ambientUrl)}`);
+    if (ambient.host === prod.host) {
+      fail("DATABASE_URL locale punta al branch di produzione. Impostarla uguale a DATABASE_URL_DEV.");
+    }
+    if (ambient.host !== dev.host) {
+      fail(`DATABASE_URL locale (${ambient.host}) non coincide con DATABASE_URL_DEV (${dev.host}).`);
+    }
   }
-  console.log(`${LINE}\n`);
 
-  process.exit(allPassed ? 0 : 1);
+  // Destructive scripts must opt in explicitly even on a dev branch.
+  const destructiveIntent = process.env.BIKERLINK_DESTRUCTIVE_DB_OPERATION === "1";
+  const productionOverride = process.env.BIKERLINK_ALLOW_PRODUCTION_DB === "I_UNDERSTAND_DATA_LOSS";
+  if (destructiveIntent && productionOverride) {
+    fail("Configurazione contraddittoria: un'operazione distruttiva non può essere autorizzata verso produzione.");
+  }
+
+  console.log("✅ NEON BRANCHING OK");
+  console.log(`   dev : ${dev.host} (${dev.branchHint})`);
+  console.log(`   prod: ${prod.host} (${prod.branchHint})`);
+  console.log("   DATABASE_URL locale isolata dalla produzione");
 }
 
 main();
