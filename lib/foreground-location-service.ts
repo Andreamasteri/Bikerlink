@@ -66,7 +66,7 @@ TaskManager.defineTask(
       const { locations } = data;
       if (!locations || locations.length === 0) return;
       const location = locations[locations.length - 1];
-      const domain = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
+      const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.net";
       await fetch(`https://${domain}/api/users/location`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
