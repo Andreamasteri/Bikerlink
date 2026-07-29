@@ -94,7 +94,7 @@ async function run() {
   if (zipResult.ok) {
     console.log("  ✓ ZIP on object storage: public/guide/bikerlink-guida.zip");
     console.log(
-      "  ✓ HTTP download URL: https://bikerlink.replit.app/uploads/bikerlink-guida.zip"
+      "  ✓ HTTP download URL: https://biker-link.net/uploads/bikerlink-guida.zip"
     );
   } else {
     console.error("  ✗ ZIP upload:", zipResult.error?.message);
