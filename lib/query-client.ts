@@ -6,7 +6,7 @@ export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
 
   if (!host) {
-    host = "bikerlink.replit.app";
+    host = "biker-link.net";
   }
 
   const url = new URL(`https://${host}`);
