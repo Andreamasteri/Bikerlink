@@ -537,9 +537,12 @@ export default function GiriDetailScreen() {
   const handleShare = async () => {
     if (!route) return;
     try {
+      const shareDomain = (
+        process.env.EXPO_PUBLIC_DOMAIN || "biker-link.net"
+      ).replace(/^https?:\/\//, "");
       await Share.share({
         message: `Guarda questo giro su BikerLink: ${route.title}\n${route.distanceKm}km, Score: ${Math.round(route.bikerScore * 100)}%`,
-        url: `${process.env.EXPO_PUBLIC_DOMAIN}/giri/${route.id}`,
+        url: `https://${shareDomain}/giri/${route.id}`,
       });
     } catch {
       // no-op: ignore share failures

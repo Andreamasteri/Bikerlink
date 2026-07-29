@@ -328,7 +328,7 @@ timeoutMs = 660000
 
   [userenv.production]
   NODE_ENV = "production"
-  EXPO_WEB_URL = "https://biker-link--8081.replit.app"
+  EXPO_WEB_URL = "https://biker-link.net"
 
   [userenv.shared]
 EXPO_PUBLIC_DOMAIN = "biker-link.net"
