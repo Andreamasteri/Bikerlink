@@ -314,7 +314,7 @@ export function AppStateHandler() {
         const supported = await isBackgroundLocationSupported();
         if (!supported) return;
 
-        const domain = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
+        const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.net";
         const settings = await fetchAndCacheSettings(domain);
         if (settings.enabled === false) return;
         const intervalSeconds = settings.intervalSeconds || 30;
@@ -323,7 +323,7 @@ export function AppStateHandler() {
         let gpsPrecision = await AsyncStorage.getItem(GPS_PRECISION_STORAGE_KEY).catch(() => null);
         if (!gpsPrecision) {
           try {
-            const domain = process.env.EXPO_PUBLIC_DOMAIN || "bikerlink.replit.app";
+            const domain = process.env.EXPO_PUBLIC_DOMAIN || "biker-link.net";
             const meRes = await fetch(`https://${domain}/api/users/me`, { credentials: "include" });
             if (meRes.ok) {
               const meData = await meRes.json();
