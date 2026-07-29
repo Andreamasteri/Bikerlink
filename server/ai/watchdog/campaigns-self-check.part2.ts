@@ -44,23 +44,3 @@ export function httpProbe(
     req.end();
   });
 }
-
-export async function deleteProbeWithRetry(id: string, label: string, maxAttempts = 2): Promise<void> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const r = await httpProbe("DELETE", `/api/admin/advertisements/${id}`);
-      if (r.status === 200 || r.status === 404) return;
-      if (attempt < maxAttempts) {
-        await new Promise((res) => setTimeout(res, 500 * attempt));
-      } else {
-        console.warn(`[campaigns-self-check] WARN: campagna test non eliminata, id=${id} label=${label} status=${r.status}`);
-      }
-    } catch (e) {
-      if (attempt < maxAttempts) {
-        await new Promise((res) => setTimeout(res, 500 * attempt));
-      } else {
-        console.warn(`[campaigns-self-check] WARN: campagna test non eliminata, id=${id} label=${label} err=${(e as Error)?.message}`);
-      }
-    }
-  }
-}
