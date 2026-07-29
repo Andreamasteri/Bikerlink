@@ -80,8 +80,10 @@ router.post("/test", async (req: Request, res: Response) => {
  * {
  *   efSearch: number,          // current hnsw.ef_search value in use
  *   activeUsers: number,       // total users with status = 'active'
+ *   bioEligibleUsers: number,   // active users with a non-empty bio
  *   byField: Array<{
  *     field: string,
+ *     eligibleUsers: number,
  *     withEmbedding: number,
  *     missingEmbedding: number,
  *     coveragePct: number,     // 0–100
@@ -94,31 +96,59 @@ router.get("/coverage", async (_req: Request, res: Response) => {
   try {
     const client = await pool.connect();
     try {
-      const [activeUsersResult, embeddingStatsResult, efSearchSetting, thresholdSetting, capSetting] =
-        await Promise.all([
-          client.query<{ total: string }>(
-            `SELECT COUNT(*) AS total FROM users WHERE status = 'active'`,
-          ),
-          client.query<{
-            field: string;
-            with_embedding: string;
-            last_updated: Date | null;
-          }>(
-            `SELECT e.field,
-                    COUNT(DISTINCT e.entity_id) AS with_embedding,
-                    MAX(e.updated_at)            AS last_updated
-             FROM embeddings e
-             JOIN users u ON u.id = e.entity_id
-               AND u.status = 'active'
-             WHERE e.entity_type = 'user'
-             GROUP BY e.field`,
-          ),
-          storage.getAppSetting("embedding_ef_search"),
-          storage.getAppSetting("embedding_coverage_threshold"),
-          storage.getAppSetting("embedding_daily_cap"),
-        ]);
+      const [
+        activeUsersResult,
+        bioEligibleResult,
+        embeddingStatsResult,
+        bioCoverageResult,
+        efSearchSetting,
+        thresholdSetting,
+        capSetting,
+      ] = await Promise.all([
+        client.query<{ total: string }>(
+          `SELECT COUNT(*) AS total FROM users WHERE status = 'active'`,
+        ),
+        client.query<{ total: string }>(
+          `SELECT COUNT(*) AS total
+           FROM users u
+           JOIN user_profiles up ON up.user_id = u.id
+           WHERE u.status = 'active'
+             AND up.bio IS NOT NULL
+             AND trim(up.bio) != ''`,
+        ),
+        client.query<{
+          field: string;
+          with_embedding: string;
+          last_updated: Date | null;
+        }>(
+          `SELECT e.field,
+                  COUNT(DISTINCT e.entity_id) AS with_embedding,
+                  MAX(e.updated_at)            AS last_updated
+           FROM embeddings e
+           JOIN users u ON u.id = e.entity_id
+             AND u.status = 'active'
+           WHERE e.entity_type = 'user'
+           GROUP BY e.field`,
+        ),
+        client.query<{ with_embedding: string; last_updated: Date | null }>(
+          `SELECT COUNT(DISTINCT e.entity_id) AS with_embedding,
+                  MAX(e.updated_at) AS last_updated
+           FROM embeddings e
+           JOIN users u ON u.id = e.entity_id AND u.status = 'active'
+           JOIN user_profiles up ON up.user_id = u.id
+           WHERE e.entity_type = 'user'
+             AND e.field = 'bio'
+             AND up.bio IS NOT NULL
+             AND trim(up.bio) != ''
+             AND e.source_hash = encode(sha256(trim(up.bio)::bytea), 'hex')`,
+        ),
+        storage.getAppSetting("embedding_ef_search"),
+        storage.getAppSetting("embedding_coverage_threshold"),
+        storage.getAppSetting("embedding_daily_cap"),
+      ]);
 
       const activeUsers = parseInt(activeUsersResult.rows[0]?.total ?? "0", 10);
+      const bioEligibleUsers = parseInt(bioEligibleResult.rows[0]?.total ?? "0", 10);
 
       const efSearch = (() => {
         const raw = efSearchSetting?.value;
@@ -151,6 +181,11 @@ router.get("/coverage", async (_req: Request, res: Response) => {
           lastUpdated: row.last_updated,
         });
       }
+      const currentBio = bioCoverageResult.rows[0];
+      fieldMap.set("bio", {
+        withEmbedding: parseInt(currentBio?.with_embedding ?? "0", 10),
+        lastUpdated: currentBio?.last_updated ?? null,
+      });
 
       const trackedFields = new Set([
         "bio",
@@ -159,14 +194,16 @@ router.get("/coverage", async (_req: Request, res: Response) => {
 
       const byField = Array.from(trackedFields).map((field) => {
         const data = fieldMap.get(field);
-        const withEmbedding = data?.withEmbedding ?? 0;
-        const missingEmbedding = Math.max(0, activeUsers - withEmbedding);
+        const eligibleUsers = field === "bio" ? bioEligibleUsers : activeUsers;
+        const withEmbedding = Math.min(data?.withEmbedding ?? 0, eligibleUsers);
+        const missingEmbedding = Math.max(0, eligibleUsers - withEmbedding);
         const coveragePct =
-          activeUsers > 0
-            ? Math.round((withEmbedding / activeUsers) * 100 * 10) / 10
+          eligibleUsers > 0
+            ? Math.round((withEmbedding / eligibleUsers) * 100 * 10) / 10
             : 100;
         return {
           field,
+          eligibleUsers,
           withEmbedding,
           missingEmbedding,
           coveragePct,
@@ -181,6 +218,7 @@ router.get("/coverage", async (_req: Request, res: Response) => {
       return sendSuccess(res, {
         efSearch,
         activeUsers,
+        bioEligibleUsers,
         byField,
         coverageWarning,
         coverageThresholdPct: coverageThreshold,
