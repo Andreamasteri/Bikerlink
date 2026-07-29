@@ -617,32 +617,42 @@ async function runEmbeddingCoveragePostReady(): Promise<void> {
     })();
     const client = await pgPool.connect();
     try {
-      const [activeRes, covRes] = await Promise.all([
+      const [eligibleRes, covRes] = await Promise.all([
         client.query<{ total: string }>(
-          `SELECT COUNT(*) AS total FROM users WHERE status = 'active'`,
+          `SELECT COUNT(*) AS total
+           FROM users u
+           JOIN user_profiles up ON up.user_id = u.id
+           WHERE u.status = 'active'
+             AND up.bio IS NOT NULL
+             AND trim(up.bio) != ''`,
         ),
         client.query<{ with_embedding: string }>(
           `SELECT COUNT(DISTINCT e.entity_id) AS with_embedding
            FROM embeddings e
            JOIN users u ON u.id = e.entity_id AND u.status = 'active'
-           WHERE e.entity_type = 'user' AND e.field = 'bio'`,
+           JOIN user_profiles up ON up.user_id = u.id
+           WHERE e.entity_type = 'user'
+             AND e.field = 'bio'
+             AND up.bio IS NOT NULL
+             AND trim(up.bio) != ''
+             AND e.source_hash = encode(sha256(trim(up.bio)::bytea), 'hex')`,
         ),
       ]);
-      const activeUsers = parseInt(activeRes.rows[0]?.total ?? "0", 10);
+      const eligibleUsers = parseInt(eligibleRes.rows[0]?.total ?? "0", 10);
       const withEmbedding = parseInt(covRes.rows[0]?.with_embedding ?? "0", 10);
-      const pct = activeUsers > 0
-        ? Math.round((withEmbedding / activeUsers) * 100 * 10) / 10
+      const pct = eligibleUsers > 0
+        ? Math.round((withEmbedding / eligibleUsers) * 100 * 10) / 10
         : 100;
       if (pct < threshold) {
         console.warn(
-          `[INIT][EMBED] Coverage WARNING: only ${pct}% of active users have a 'bio' embedding` +
-          ` (${withEmbedding}/${activeUsers}, threshold=${threshold}%).` +
-          ` Match quality may be degraded for users without embeddings.`,
+          `[INIT][EMBED] Coverage WARNING: only ${pct}% of active users with a non-empty bio` +
+          ` have a current 'bio' embedding (${withEmbedding}/${eligibleUsers}, threshold=${threshold}%).` +
+          ` Match quality may be degraded for eligible users without embeddings.`,
         );
       } else {
         console.log(
-          `[INIT][EMBED] Coverage OK: ${pct}% of active users have a 'bio' embedding` +
-          ` (${withEmbedding}/${activeUsers}).`,
+          `[INIT][EMBED] Coverage OK: ${pct}% of active users with a non-empty bio` +
+          ` have a current 'bio' embedding (${withEmbedding}/${eligibleUsers}).`,
         );
       }
     } finally {

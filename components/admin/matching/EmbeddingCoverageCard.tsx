@@ -14,6 +14,7 @@ import { apiRequest } from "@/lib/query-client";
 
 interface CoverageFieldRow {
   field: string;
+  eligibleUsers: number;
   withEmbedding: number;
   missingEmbedding: number;
   coveragePct: number;
@@ -23,6 +24,7 @@ interface CoverageFieldRow {
 interface CoverageResponse {
   efSearch: number;
   activeUsers: number;
+  bioEligibleUsers: number;
   byField: CoverageFieldRow[];
   coverageWarning: boolean;
   coverageThresholdPct: number;
@@ -192,8 +194,8 @@ export function EmbeddingCoverageCard() {
         <>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{data.activeUsers.toLocaleString("it-IT")}</Text>
-              <Text style={styles.statLabel}>Utenti attivi</Text>
+              <Text style={styles.statValue}>{data.bioEligibleUsers.toLocaleString("it-IT")}</Text>
+              <Text style={styles.statLabel}>Bio valorizzate</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
