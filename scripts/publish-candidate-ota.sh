@@ -20,7 +20,7 @@ done
 [[ -n "$MESSAGE" ]] || fail "--message is required"
 [[ -n "${EAS_TOKEN:-}" ]] || fail "EAS_TOKEN is required"
 [[ -n "${EXPO_PUBLIC_DOMAIN:-}" ]] || fail "EXPO_PUBLIC_DOMAIN must be the HTTPS staging backend domain"
-[[ "$EXPO_PUBLIC_DOMAIN" != "bikerlink.replit.app" ]] || fail "The production domain is forbidden for a candidate OTA"
+[[ "$EXPO_PUBLIC_DOMAIN" != "biker-link.net" ]] || fail "The production domain is forbidden for a candidate OTA"
 
 MANIFEST="releases/candidates/${RELEASE_ID}.json"
 [[ -f "$MANIFEST" ]] || fail "Missing frozen manifest: $MANIFEST"
