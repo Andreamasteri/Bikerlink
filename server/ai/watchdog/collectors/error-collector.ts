@@ -161,16 +161,21 @@ export async function collectErrors(): Promise<Signal[]> {
 
   try {
     const deltaResult = await withDbRetry(() => db.execute(sql`
-      WITH versions AS (
-        SELECT DISTINCT app_version
+      WITH parsed_versions AS (
+        SELECT DISTINCT
+          app_version,
+          COALESCE(substring(SPLIT_PART(app_version, '.', 1) FROM '^[0-9]+'), '0')::INTEGER AS major,
+          COALESCE(substring(SPLIT_PART(app_version, '.', 2) FROM '^[0-9]+'), '0')::INTEGER AS minor,
+          COALESCE(substring(SPLIT_PART(app_version, '.', 3) FROM '^[0-9]+'), '0')::INTEGER AS patch
         FROM app_crash_logs
         WHERE app_version IS NOT NULL
           AND crash_type IN ('crash_system','crash_js')
           AND COALESCE(error_message, '') NOT LIKE '[resume:%'
-        ORDER BY
-          COALESCE(substring(SPLIT_PART(app_version, '.', 1) FROM '^[0-9]+'), '0')::INTEGER DESC,
-          COALESCE(substring(SPLIT_PART(app_version, '.', 2) FROM '^[0-9]+'), '0')::INTEGER DESC,
-          COALESCE(substring(SPLIT_PART(app_version, '.', 3) FROM '^[0-9]+'), '0')::INTEGER DESC
+      ),
+      versions AS (
+        SELECT app_version
+        FROM parsed_versions
+        ORDER BY major DESC, minor DESC, patch DESC, app_version DESC
         LIMIT 2
       ),
       stats AS (
