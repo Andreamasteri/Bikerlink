@@ -3,7 +3,7 @@
 # Metro/frontend non più in uso (EAS build + OTA).
 
 BACKEND_PORT=5000
-PROD_HOST="https://bikerlink.replit.app"
+PROD_HOST="https://biker-link.net"
 LOG_FILE="logs/error-monitor.log"
 CHECK_INTERVAL=30
 LOG_MAX_LINES=2000
