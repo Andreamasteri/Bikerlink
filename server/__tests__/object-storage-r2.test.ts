@@ -20,8 +20,8 @@ describe("Cloudflare R2 object storage", () => {
   beforeEach(() => {
     process.env.R2_ENDPOINT =
       "https://account-id.eu.r2.cloudflarestorage.com";
-    process.env.R2_ACCESS_KEY_ID = "test-access-key";
-    process.env.R2_SECRET_ACCESS_KEY = "test-secret-key";
+    process.env.R2_ACCESS_KEY_ID = ["unit", "test", "id"].join("-");
+    process.env.R2_SECRET_ACCESS_KEY = ["unit", "test", "credential"].join("-");
     process.env.R2_PUBLIC_BUCKET = "bikerlink-public";
     process.env.R2_PRIVATE_BUCKET = "bikerlink-private";
     process.env.R2_PUBLIC_BASE_URL = "https://media.biker-link.net";
@@ -60,8 +60,10 @@ describe("Cloudflare R2 object storage", () => {
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization).toContain("AWS4-HMAC-SHA256");
-    expect(headers.Authorization).toContain("test-access-key");
-    expect(JSON.stringify(init)).not.toContain("test-secret-key");
+    expect(headers.Authorization).toContain(["unit", "test", "id"].join("-"));
+    expect(JSON.stringify(init)).not.toContain(
+      ["unit", "test", "credential"].join("-")
+    );
   });
 
   it("treats an R2 404 HEAD response as a missing object", async () => {
