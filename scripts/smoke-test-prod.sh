@@ -8,12 +8,12 @@
 #   bash scripts/smoke-test-prod.sh
 #
 # Variabili opzionali:
-#   PROD_URL   — URL base di produzione (default: https://bikerlink.replit.app)
+#   PROD_URL   — URL base di produzione (default: https://biker-link.net)
 #   MAX_TIME   — timeout curl in secondi (default: 15)
 
 set -euo pipefail
 
-PROD_URL="${PROD_URL:-https://bikerlink.replit.app}"
+PROD_URL="${PROD_URL:-https://biker-link.net}"
 MAX_TIME="${MAX_TIME:-15}"
 ENDPOINT="$PROD_URL/api/health"
 
