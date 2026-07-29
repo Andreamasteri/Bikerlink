@@ -95,7 +95,7 @@ if [ "$SMOKE_FAILED" -eq 1 ]; then
   {
     echo "### ❌ SMOKE TEST FALLITO"
     echo ""
-    echo "Il check di \`https://bikerlink.replit.app/api/health\` ha rilevato un problema:"
+    echo "Il check di \`https://biker-link.net/api/health\` ha rilevato un problema:"
     echo ""
     echo "\`\`\`"
     echo "$SMOKE_OUTPUT"
