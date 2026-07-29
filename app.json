@@ -144,7 +144,7 @@
       "enabled": true,
       "url": "https://u.expo.dev/a25192d7-72e5-46af-97d0-2d38ed9b78e3",
       "fallbackToCacheTimeout": 0,
-      "checkAutomatically": "NEVER",
+      "checkAutomatically": "ON_LOAD",
       "disableAntiBrickingMeasures": false
     },
     "runtimeVersion": "11.0.0",
