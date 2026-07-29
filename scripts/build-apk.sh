@@ -64,7 +64,7 @@ if [ -z "${EXPO_PUBLIC_DOMAIN:-}" ]; then
   echo "  Questa variabile è richiesta per il build. Impostarla nei segreti Replit"
   echo "  o esportarla prima di avviare lo script:"
   echo ""
-  echo "    export EXPO_PUBLIC_DOMAIN=your-project.replit.app"
+  echo "    export EXPO_PUBLIC_DOMAIN=biker-link.net"
   echo ""
   exit 1
 fi
