@@ -24,6 +24,19 @@ export const LOCAL_EMBEDDING_MODEL_TAG = `local:${LOCAL_EMBEDDING_MODEL_ID}`;
 
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 3;
+const LOCAL_FALLBACK_DISABLED_ENV = "EMBEDDINGS_LOCAL_FALLBACK_DISABLED";
+
+function isLocalFallbackDisabled(): boolean {
+  return process.env[LOCAL_FALLBACK_DISABLED_ENV]?.trim().toLowerCase() === "true";
+}
+
+function assertLocalFallbackEnabled(): void {
+  if (isLocalFallbackDisabled()) {
+    throw new Error(
+      `Fallback embedding locale disabilitato da ${LOCAL_FALLBACK_DISABLED_ENV}; OPENAI_API_KEY non disponibile.`,
+    );
+  }
+}
 
 function hasOpenAI(): boolean {
   return Boolean(process.env.OPENAI_API_KEY);
@@ -161,6 +174,10 @@ type FeatureExtractionPipeline = (
 let _localPipelinePromise: Promise<FeatureExtractionPipeline> | null = null;
 
 async function getLocalPipeline(): Promise<FeatureExtractionPipeline> {
+  // I modelli Transformers possono superare la RAM dei container Railway.
+  // Il controllo avviene prima dell'import dinamico, quindi il processo resta vivo
+  // e il job chiamante può degradare in modo non fatale.
+  assertLocalFallbackEnabled();
   if (!_localPipelinePromise) {
     _localPipelinePromise = (async () => {
       const mod = await import("@huggingface/transformers");
