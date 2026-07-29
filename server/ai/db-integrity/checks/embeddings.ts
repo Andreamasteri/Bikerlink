@@ -51,17 +51,50 @@ const checks: IntegrityCheck[] = [
   },
   {
     id: "embeddings/missing-for-active-users",
-    name: "Utenti attivi senza embedding bio",
+    name: "Utenti attivi con bio senza embedding corrente",
     category: "embeddings", severity: "medium", cost: "expensive",
     expensive: true,
-    description: "Utenti attivi che non hanno mai generato un embedding del campo bio.",
+    description: "Utenti attivi con bio non vuota che non hanno un embedding bio aggiornato.",
     async query() {
-      if (!(await tableExists("embeddings")) || !(await tableExists("users"))) return { ok: true, count: 0, sample: [] };
+      if (!(await tableExists("embeddings")) || !(await tableExists("users")) || !(await tableExists("user_profiles"))) return { ok: true, count: 0, sample: [] };
       try {
-        const cnt = await db.execute(sql`SELECT COUNT(*)::int AS c FROM users u WHERE u.status = 'active' AND u.is_fake = false AND NOT EXISTS (SELECT 1 FROM embeddings e WHERE e.entity_type = 'user' AND e.entity_id = u.id AND e.field = 'bio')`);
+        const cnt = await db.execute(sql`
+          SELECT COUNT(*)::int AS c
+          FROM users u
+          JOIN user_profiles up ON up.user_id = u.id
+          WHERE u.status = 'active'
+            AND u.is_fake = false
+            AND up.bio IS NOT NULL
+            AND trim(up.bio) != ''
+            AND NOT EXISTS (
+              SELECT 1
+              FROM embeddings e
+              WHERE e.entity_type = 'user'
+                AND e.entity_id = u.id
+                AND e.field = 'bio'
+                AND e.source_hash = encode(sha256(trim(up.bio)::bytea), 'hex')
+            )
+        `);
         const count = Number((cnt.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
         if (!count) return { ok: true, count: 0, sample: [] };
-        const smp = await db.execute(sql`SELECT id, nickname FROM users u WHERE u.status = 'active' AND u.is_fake = false AND NOT EXISTS (SELECT 1 FROM embeddings e WHERE e.entity_type = 'user' AND e.entity_id = u.id AND e.field = 'bio') LIMIT 10`);
+        const smp = await db.execute(sql`
+          SELECT u.id, u.nickname
+          FROM users u
+          JOIN user_profiles up ON up.user_id = u.id
+          WHERE u.status = 'active'
+            AND u.is_fake = false
+            AND up.bio IS NOT NULL
+            AND trim(up.bio) != ''
+            AND NOT EXISTS (
+              SELECT 1
+              FROM embeddings e
+              WHERE e.entity_type = 'user'
+                AND e.entity_id = u.id
+                AND e.field = 'bio'
+                AND e.source_hash = encode(sha256(trim(up.bio)::bytea), 'hex')
+            )
+          LIMIT 10
+        `);
         const rows = (smp.rows ?? []) as Array<Record<string, unknown>>;
         return { ok: false, count, sample: rows.map((r) => ({ pk: String(r.id), data: r })) };
       } catch (err) {
