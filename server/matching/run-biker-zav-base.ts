@@ -17,8 +17,8 @@
  */
 import { db } from "../db";
 import { storage } from "../storage";
-import { users, userProfiles } from "@shared/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { bikerBikerMatches, bikerZavorrinaMatches, users, userProfiles } from "@shared/db";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { loadMatchPreferencesMap, prefEnabled } from "./filters";
 import { classifyMatch } from "./notifications/classify";
 import { dispatchMatchNotification } from "./notifications/dispatcher";
@@ -77,35 +77,49 @@ export async function runBikerZavorrinaBase(): Promise<number> {
 
     // Deduplication: coppie già in biker_biker_matches (pair_type='bz')
     // Scoped to bikerIds × zavIds to avoid full-table load in memory.
-    const existingBbRes = await db.execute<{ a: string; b: string }>(sql`
-      SELECT LEAST(biker1_id, biker2_id)::text AS a,
-             GREATEST(biker1_id, biker2_id)::text AS b
-      FROM biker_biker_matches
-      WHERE pair_type = 'bz'
-        AND archived_at IS NULL
-        AND (
-          (biker1_id = ANY(${bikerIds}::text[]) AND biker2_id = ANY(${zavIds}::text[]))
-          OR
-          (biker1_id = ANY(${zavIds}::text[]) AND biker2_id = ANY(${bikerIds}::text[]))
-        )
-    `);
+    const existingBbRows = await db
+      .select({
+        biker1Id: bikerBikerMatches.biker1Id,
+        biker2Id: bikerBikerMatches.biker2Id,
+      })
+      .from(bikerBikerMatches)
+      .where(and(
+        eq(bikerBikerMatches.pairType, "bz"),
+        isNull(bikerBikerMatches.archivedAt),
+        or(
+          and(
+            inArray(bikerBikerMatches.biker1Id, bikerIds),
+            inArray(bikerBikerMatches.biker2Id, zavIds),
+          ),
+          and(
+            inArray(bikerBikerMatches.biker1Id, zavIds),
+            inArray(bikerBikerMatches.biker2Id, bikerIds),
+          ),
+        ),
+      ));
     const existingPairSet = new Set<string>();
-    for (const row of (existingBbRes.rows ?? []) as Array<{ a: string; b: string }>) {
-      existingPairSet.add(`${row.a}:${row.b}`);
+    for (const row of existingBbRows) {
+      const idA = row.biker1Id < row.biker2Id ? row.biker1Id : row.biker2Id;
+      const idB = row.biker1Id < row.biker2Id ? row.biker2Id : row.biker1Id;
+      existingPairSet.add(`${idA}:${idB}`);
     }
 
     // Deduplication: coppie già in biker_zavorrina_matches (wishlist-based)
     // Scoped to bikerIds × zavIds to avoid full-table load in memory.
-    const existingBzRes = await db.execute<{ bid: string; zid: string }>(sql`
-      SELECT biker_id::text AS bid, zavorrina_id::text AS zid
-      FROM biker_zavorrina_matches
-      WHERE archived_at IS NULL
-        AND biker_id = ANY(${bikerIds}::text[])
-        AND zavorrina_id = ANY(${zavIds}::text[])
-    `);
+    const existingBzRows = await db
+      .select({
+        bikerId: bikerZavorrinaMatches.bikerId,
+        zavorrinaId: bikerZavorrinaMatches.zavorrinaId,
+      })
+      .from(bikerZavorrinaMatches)
+      .where(and(
+        isNull(bikerZavorrinaMatches.archivedAt),
+        inArray(bikerZavorrinaMatches.bikerId, bikerIds),
+        inArray(bikerZavorrinaMatches.zavorrinaId, zavIds),
+      ));
     const existingWishlistSet = new Set<string>();
-    for (const row of (existingBzRes.rows ?? []) as Array<{ bid: string; zid: string }>) {
-      existingWishlistSet.add(`${row.bid}:${row.zid}`);
+    for (const row of existingBzRows) {
+      existingWishlistSet.add(`${row.bikerId}:${row.zavorrinaId}`);
     }
 
     // Negative preference filters: carica prefs + profili candidati
