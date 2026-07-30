@@ -168,6 +168,22 @@ monitoringPool.on("error", (err) => {
   console.error("[DB/monitor] pool error:", err.message);
 });
 
+/**
+ * Executes a diagnostic callback on the single reserved monitoring connection.
+ * This prevents watchdog probes from opening ad-hoc PostgreSQL sessions while
+ * the application pool is under pressure. The client is always released.
+ */
+export async function withMonitoringClient<T>(
+  fn: (client: import("pg").PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await monitoringPool.connect();
+  try {
+    return await fn(client);
+  } finally {
+    client.release();
+  }
+}
+
 export interface BlockedQueryRow {
   pid: number;
   state: string;
