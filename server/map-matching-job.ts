@@ -467,6 +467,40 @@ function formatRomeTime(date: Date): string {
   });
 }
 
+/**
+ * Optional bounded catch-up for an existing pending/retry backlog. Unlike the
+ * nightly job it never requeues terminal records: it only processes the normal
+ * eligible batch and preserves retry/backoff semantics.
+ */
+function scheduleMapMatchingCatchup(): void {
+  const minutes = Number.parseInt(process.env.MAP_MATCHING_CATCHUP_INTERVAL_MINUTES ?? "0", 10);
+  if (!Number.isFinite(minutes) || minutes <= 0) return;
+
+  // A lower interval would turn a failed routing dependency into a retry storm.
+  const intervalMs = Math.max(5, Math.min(minutes, 24 * 60)) * 60_000;
+  const gatedCatchup = withJobGate("map-matching-catchup", runMapMatchingJob);
+  const runAndReschedule = async () => {
+    try {
+      const result = await gatedCatchup();
+      if (result) {
+        console.log(
+          `[MAP-MATCH] Catch-up — processed ${result.processed}, retry ${result.retry}, ` +
+          `unmatchable ${result.unmatchable}, errors ${result.errors.length}`,
+        );
+      }
+    } catch (err) {
+      console.error("[MAP-MATCH] Errore catch-up:", err);
+    }
+    setTimeout(runAndReschedule, intervalMs);
+  };
+
+  console.log(
+    `[MAP-MATCH] Catch-up controllato attivo — un batch ogni ${Math.round(intervalMs / 60_000)} min.`,
+  );
+  // Let startup checks finish first; this avoids competing with migrations/boot.
+  setTimeout(runAndReschedule, 30_000);
+}
+
 export function scheduleNightlyMapMatching(): void {
   if (process.env.DISABLE_MAP_MATCHING === "1") {
     console.log("[MAP-MATCH] Scheduler notturno disabilitato (DISABLE_MAP_MATCHING=1).");
@@ -474,6 +508,8 @@ export function scheduleNightlyMapMatching(): void {
   }
 
   const TARGET_HOUR = 2; // 02:00 Europe/Rome
+
+  scheduleMapMatchingCatchup();
 
   // Task #9 — SOLO il lavoro vero e proprio è gated, non il ri-arm del timer:
   // se withJobGate nega l'esecuzione (pausa/kill-switch) restituisce
