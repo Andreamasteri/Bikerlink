@@ -113,9 +113,14 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
 }
 
 async function runAggregatorCycleInner(): Promise<HealthSnapshot> {
+  // Capture the synchronous pool counters before starting the parallel collector
+  // fan-out. Otherwise waitingCount includes queries queued by this watchdog
+  // cycle itself, producing a false sustained-pressure signal.
+  const poolSignals = collectPool();
+
   const collectors = await Promise.allSettled([
     collectBullMq(), collectDb(), collectDragonfly(), collectLatency(),
-    Promise.resolve(collectPool()), collectMaps(),
+    Promise.resolve(poolSignals), collectMaps(),
     // ai-hub TC (Task #153): probe HTTP di rete lenta come collectMaps → FUORI
     // da withBgDbSlot (nessuna query DB). Aggiorna isHubAvailable() usato dai tool.
     collectAiHub(),
