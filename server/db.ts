@@ -24,6 +24,7 @@ export {
   getCheckedOutConnections,
   BlockedQueryRow,
   snapshotBlockedQueries,
+  withMonitoringClient,
   isPoolHealthy,
   isPoolSaturatedSustained,
   PoolStats,
