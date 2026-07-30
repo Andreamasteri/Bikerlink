@@ -16,8 +16,7 @@
 // global watchdog status on an isolated sample generates false alarms, so we
 // require the pressure to be PERSISTENT (N consecutive samples) before pushing
 // severity to "high".
-import pg from "pg";
-import { getPoolStats, getCheckedOutConnections, APP_NAME } from "../../../db";
+import { getPoolStats, getCheckedOutConnections, APP_NAME, withMonitoringClient } from "../../../db";
 import { getBgDbLimiterStats } from "../../../lib/bg-db-limiter";
 import type { Signal } from "../types";
 // Fase 5 (Task #545) — il kill-switch pg_terminate_backend vive nell'actuator:
@@ -33,7 +32,7 @@ const CONSECUTIVE_FOR_WARN = 2;
 const CONSECUTIVE_FOR_HIGH = 3;
 
 // After this many consecutive ticks with waiting > 0, run a pg_stat_activity
-// probe via a direct Client (not from the pool) to identify blocking queries.
+// probe through the one reserved monitoring pool connection.
 const CONSECUTIVE_FOR_ACTIVITY_PROBE = 5;
 
 // ── Idle-connection leak detector (Task #5229, step 10) ───────────────────────
@@ -137,59 +136,47 @@ let consecutiveLimiterDrops = 0;
 // Uses a short-lived pg.Client with a 4s connect+query timeout so it never
 // hangs, and always disconnects in finally to avoid leaking a connection.
 async function probePgStatActivity(): Promise<void> {
-  const url = process.env.DATABASE_URL;
-  if (!url) return;
-  const client = new pg.Client({
-    connectionString: url,
-    connectionTimeoutMillis: 4000,
-    statement_timeout: 4000,
-  });
   try {
-    await client.connect();
-    const result = await client.query<{
-      pid: number;
-      state: string | null;
-      wait_event_type: string | null;
-      wait_event: string | null;
-      duration_s: number | null;
-      query_short: string;
-      application_name: string;
-    }>(`
-      SELECT
-        pid,
-        state,
-        wait_event_type,
-        wait_event,
-        ROUND(EXTRACT(EPOCH FROM (now() - query_start))::numeric, 1) AS duration_s,
-        LEFT(query, 120)  AS query_short,
-        application_name
-      FROM pg_stat_activity
-      WHERE datname = current_database()
-        AND pid <> pg_backend_pid()
-        AND state <> 'idle'
-      ORDER BY duration_s DESC NULLS LAST
-      LIMIT 10
-    `);
-    if (result.rows.length === 0) {
-      console.warn("[pool-collector/activity] pool saturo ma 0 query attive (connessioni idle tenute aperte senza query)");
-    } else {
-      console.warn(
-        "[pool-collector/activity] query attive durante saturazione pool:\n" +
-        result.rows.map((r) =>
-          `  pid=${r.pid} state=${r.state ?? "-"} duration=${r.duration_s ?? "-"}s ` +
-          `wait=${r.wait_event_type ?? "-"}/${r.wait_event ?? "-"} q="${r.query_short?.trim()}"`
-        ).join("\n"),
-      );
-    }
-
-    // Step 10 — detector di connessioni idle anomale (riusa la connessione
-    // out-of-band già aperta). Gira SEMPRE durante la probe, anche quando ci
-    // sono query attive: il leak "0 query attive" è solo il caso estremo.
-    await detectIdleLeak(client);
+    await withMonitoringClient(async (client) => {
+      const result = await client.query<{
+        pid: number;
+        state: string | null;
+        wait_event_type: string | null;
+        wait_event: string | null;
+        duration_s: number | null;
+        query_short: string;
+        application_name: string;
+      }>(`
+        SELECT
+          pid,
+          state,
+          wait_event_type,
+          wait_event,
+          ROUND(EXTRACT(EPOCH FROM (now() - query_start))::numeric, 1) AS duration_s,
+          LEFT(query, 120)  AS query_short,
+          application_name
+        FROM pg_stat_activity
+        WHERE datname = current_database()
+          AND pid <> pg_backend_pid()
+          AND state <> 'idle'
+        ORDER BY duration_s DESC NULLS LAST
+        LIMIT 10
+      `);
+      if (result.rows.length === 0) {
+        console.warn("[pool-collector/activity] pool saturo ma 0 query attive (connessioni idle tenute aperte senza query)");
+      } else {
+        console.warn(
+          "[pool-collector/activity] query attive durante saturazione pool:\n" +
+          result.rows.map((r) =>
+            `  pid=${r.pid} state=${r.state ?? "-"} duration=${r.duration_s ?? "-"}s ` +
+            `wait=${r.wait_event_type ?? "-"}/${r.wait_event ?? "-"} q="${r.query_short?.trim()}"`
+          ).join("\n"),
+        );
+      }
+      await detectIdleLeak(client);
+    });
   } catch (err) {
     console.warn("[pool-collector/activity] probe fallita:", (err as Error).message?.slice(0, 200));
-  } finally {
-    try { await client.end(); } catch { /* best-effort */ }
   }
 }
 
@@ -211,7 +198,7 @@ async function probePgStatActivity(): Promise<void> {
  * Usa la connessione out-of-band passata (NON il pool, che è saturo) anche per
  * leggere l'AppSetting, evitando di accodare una query su un pool già pieno.
  */
-async function detectIdleLeak(client: pg.Client): Promise<void> {
+async function detectIdleLeak(client: import("pg").PoolClient): Promise<void> {
   const idleRes = await client.query<{
     pid: number;
     state: string | null;
