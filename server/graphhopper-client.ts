@@ -49,7 +49,7 @@ export const canFallbackToCloud = isSelfHosted && Boolean(CLOUD_API_KEY);
  */
 export { isRoutingEnabled } from "./routing/routing-kill-switch";
 import { isRoutingEnabled as _isRoutingEnabled } from "./routing/routing-kill-switch";
-import { ROUTING_AREAS } from "@shared/routing-areas";
+import { findRoutingAreasForPoint, ROUTING_AREAS, routingAreaUrl } from "@shared/routing-areas";
 import { cfAccessHeaders } from "./lib/cf-access";
 
 /**
@@ -428,12 +428,29 @@ export async function mapMatch(
     points_encoded: false,
   };
 
+  // The self-hosted deployment is split into regional GraphHopper instances.
+  // /match is not served at the proxy root: use the first GPS point to select
+  // the same /areas/<code> base that regular route planning already uses.
+  const selfHostedAreaBase = (() => {
+    if (!isSelfHosted) return undefined;
+    const firstPoint = points[0];
+    const area = firstPoint
+      ? findRoutingAreasForPoint(firstPoint.lat, firstPoint.lon)[0]
+      : undefined;
+    if (!area) {
+      throw new Error(
+        "Map-matching non disponibile: la traccia è fuori dalle aree GraphHopper coperte.",
+      );
+    }
+    return routingAreaUrl(area, GH_BASE_URL);
+  })();
+
   const start = Date.now();
   try {
     const res = await ghFetch("/match", {
       method: "POST",
       body: JSON.stringify(body),
-    });
+    }, false, selfHostedAreaBase);
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(`HTTP ${res.status}: GraphHopper /match — ${text.slice(0, 300)}`);
