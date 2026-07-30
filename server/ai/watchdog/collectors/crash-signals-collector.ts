@@ -82,21 +82,27 @@ export async function collectCrashSignals(): Promise<Signal[]> {
   try {
     const [result, config] = await Promise.all([
       withDbRetry(() => db.execute<SignalRow>(sql`
+        WITH recent_resume_signals AS (
+          SELECT
+            CASE
+              WHEN error_message LIKE '[resume:js_thread_freeze]%'      THEN 'js_thread_freeze'
+              WHEN error_message LIKE '[resume:gps_flood]%'             THEN 'gps_flood'
+              WHEN error_message LIKE '[resume:memory_pressure]%'       THEN 'memory_pressure'
+              WHEN error_message LIKE '[resume:native_module_missing]%' THEN 'native_module_missing'
+              WHEN error_message LIKE '[resume:appstate_transition]%'   THEN 'appstate_transition'
+            END AS signal_type,
+            user_id
+          FROM app_crash_logs
+          WHERE error_message LIKE '[resume:%]%'
+            AND reported_at >= NOW() - INTERVAL '2 hours'
+        )
         SELECT
-          CASE
-            WHEN error_message LIKE '[resume:js_thread_freeze]%'      THEN 'js_thread_freeze'
-            WHEN error_message LIKE '[resume:gps_flood]%'             THEN 'gps_flood'
-            WHEN error_message LIKE '[resume:memory_pressure]%'       THEN 'memory_pressure'
-            WHEN error_message LIKE '[resume:native_module_missing]%' THEN 'native_module_missing'
-            WHEN error_message LIKE '[resume:appstate_transition]%'   THEN 'appstate_transition'
-          END AS signal_type,
+          signal_type,
           COUNT(*)::int                AS total,
           COUNT(DISTINCT user_id)::int AS distinct_users
-        FROM app_crash_logs
-        WHERE error_message LIKE '[resume:%]%'
-          AND reported_at >= NOW() - INTERVAL '2 hours'
+        FROM recent_resume_signals
+        WHERE signal_type IS NOT NULL
         GROUP BY signal_type
-        HAVING signal_type IS NOT NULL
       `)),
       resolveSignalConfig(),
     ]);
