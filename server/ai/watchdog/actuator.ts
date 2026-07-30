@@ -68,7 +68,7 @@ export interface KillResult {
  *   parziale che deve essere surfaceto nel segnale watchdog.
  */
 export async function runIdleLeakKill(
-  client: pg.Client,
+  client: Pick<pg.Client, "query">,
   anomalous: AnomalousConnection[],
 ): Promise<KillResult> {
   let killEnabled = false;
