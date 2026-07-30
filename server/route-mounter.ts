@@ -331,6 +331,26 @@ export function registerAllRoutes(app: express.Application) {
     res.sendFile(sshTerminalPath);
   });
 
+  // Secret Vault (admin only). Cloudflare Access is applied at the edge.
+  const secretVaultPath = path.resolve(process.cwd(), "server", "templates", "admin-secret-vault.html");
+  app.get("/admin/secrets", async (req, res) => {
+    const userId = (req.session as { userId?: string })?.userId;
+    if (!userId) return res.redirect(302, "/accedi?next=/admin/secrets");
+    try {
+      const { storage: appStorage } = await import("./storage");
+      const user = await appStorage.getUser(userId);
+      if (!user || user.role !== "admin" || user.status !== "active") {
+        return res.status(403).send("Accesso riservato agli amministratori.");
+      }
+    } catch {
+      return res.status(500).send("Errore interno.");
+    }
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store, max-age=0");
+    res.setHeader("Pragma", "no-cache");
+    return res.sendFile(secretVaultPath);
+  });
+
   // Live diagnostics dashboard (admin only — requires active admin session)
   const diagnosticsLivePath = path.resolve(process.cwd(), "server", "templates", "diagnostics-live.html");
   app.get("/admin/diagnostics/live", async (req, res) => {
