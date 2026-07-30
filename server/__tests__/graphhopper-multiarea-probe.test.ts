@@ -56,6 +56,24 @@ describe("getServerInfo — sonda multi-area (Task #159)", () => {
     expect(rootProbes).toHaveLength(0);
   });
 
+
+  it("seleziona l'istanza regionale per il map matching", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      paths: [{ details: { osm_way_id: [[0, 1, 123]] } }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { mapMatch } = await import("../graphhopper-client");
+    await mapMatch([
+      { lat: 45.44, lon: 12.33 },
+      { lat: 45.45, lon: 12.34 },
+    ]);
+
+    expect(String(fetchMock.mock.calls[0][0])).toBe(
+      "https://gh.test.local/areas/arco-alpino/match",
+    );
+  });
+
   it("ritorna status error e areasOnline:0 quando nessuna area risponde", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 404 })));
 
