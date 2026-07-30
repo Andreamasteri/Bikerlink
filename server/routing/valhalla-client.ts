@@ -6,8 +6,9 @@
  * degli equivalenti in graphhopper-adapter.ts.
  *
  * Variabili d'ambiente:
- *   VALHALLA_URL     — URL base del server Valhalla (es: https://valhalla.bikerlink.app)
- *   VALHALLA_API_KEY — Chiave opzionale inviata come X-Valhalla-Key
+ *   VALHALLA_URL     — URL base pubblico del server Valhalla (es: https://valhalla.biker-link.net)
+ *   VALHALLA_API_KEY — Chiave opzionale inviata come X-Valhalla-Key.
+ *   VALHALLA_TOKEN   — Alias legacy compatibile di VALHALLA_API_KEY.
  */
 
 import type { RouteRequest, RouteResult, MapMatchResult, GHPoint, GHServerInfo } from "./graphhopper-adapter";
@@ -27,7 +28,7 @@ import {
 import { cfAccessHeaders } from "../lib/cf-access";
 
 const VALHALLA_BASE_URL = process.env.VALHALLA_URL?.replace(/\/$/, "") ?? "";
-const VALHALLA_API_KEY = process.env.VALHALLA_API_KEY ?? "";
+const VALHALLA_API_KEY = process.env.VALHALLA_API_KEY ?? process.env.VALHALLA_TOKEN ?? "";
 const TIMEOUT_MS = 10_000;
 const MAX_RETRIES = 1;
 
