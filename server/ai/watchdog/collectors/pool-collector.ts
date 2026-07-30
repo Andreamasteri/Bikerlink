@@ -222,21 +222,24 @@ async function detectIdleLeak(client: import("pg").PoolClient): Promise<void> {
   );
 
   const anomalous = idleRes.rows;
-  if (anomalous.length === 0) {
-    // Nessuna anomalia: azzera lo stato così non riemettiamo un alert stantio.
+  // A pg.Pool with POOL_MIN=1 intentionally keeps one idle connection warm.
+  // A server-side idle row alone therefore is not evidence of a leak: require
+  // a matching long-lived explicit checkout observed by the in-process tracer
+  // before alerting or terminating anything.
+  const leakedInProc = getCheckedOutConnections(IDLE_LEAK_MIN_AGE_S * 1000);
+  if (anomalous.length === 0 || leakedInProc.length === 0) {
     lastIdleLeak = null;
     return;
   }
 
   console.error(
-    `[pool-collector/idle-leak] ${anomalous.length} connessioni idle anomale (app=${APP_NAME}, >${IDLE_LEAK_MIN_AGE_S}s):\n` +
+    `[pool-collector/idle-leak] ${anomalous.length} connessioni idle con ${leakedInProc.length} checkout espliciti trattenuti (app=${APP_NAME}, >${IDLE_LEAK_MIN_AGE_S}s):\n` +
     anomalous.map((r) =>
       `  pid=${r.pid} state=${r.state ?? "-"} idle=${r.idle_s ?? "-"}s lastq="${r.last_query?.trim()}"`
     ).join("\n"),
   );
 
   // Incrocio con il tracer in-process: stampa lo stack di chi non ha rilasciato.
-  const leakedInProc = getCheckedOutConnections(IDLE_LEAK_MIN_AGE_S * 1000);
   if (leakedInProc.length > 0) {
     console.error(
       `[pool-collector/idle-leak] checkout in-process tenuti >${IDLE_LEAK_MIN_AGE_S}s (stack del chiamante):\n` +
