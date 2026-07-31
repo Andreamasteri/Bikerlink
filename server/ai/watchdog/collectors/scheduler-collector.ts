@@ -140,7 +140,12 @@ export async function collectScheduler(): Promise<Signal[]> {
       // Entrambi i check condividono una singola chiamata a DragonflyDB.
       const RUN_GAP_NO_LOCK_THRESHOLD_MS = 60 * 60 * 1000; // 1 ora — soglia notifica
       const RUN_GAP_ZOMBIE_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4 ore — zombie-lock
-      if (schedulerAlive && ageMs > RUN_GAP_NO_LOCK_THRESHOLD_MS) {
+      // Il primo tick automatico è programmato un'ora dopo l'avvio. Durante
+      // questa sola finestra lastRunAt può appartenere alla replica precedente:
+      // non è un gap operativo, ma una transizione di deploy/restart.
+      const RUN_GAP_STARTUP_GRACE_MS = RUN_GAP_NO_LOCK_THRESHOLD_MS + 5 * 60 * 1000;
+      const startupGraceActive = process.uptime() * 1000 < RUN_GAP_STARTUP_GRACE_MS;
+      if (schedulerAlive && ageMs > RUN_GAP_NO_LOCK_THRESHOLD_MS && !startupGraceActive) {
         try {
           const ls = await getMatchingLockStatus();
           const remoteHolder = ls.redis.remoteHolder as { pid?: number } | null;
