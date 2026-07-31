@@ -87,6 +87,17 @@ describe("scheduler-collector — heartbeat fresco declassa last_run_min_ago", (
     expect(signals.find((x) => x.metric === "scheduler_heartbeat_dead")).toBeUndefined();
   });
 
+  it("durante il primo tick dopo il boot non alza run_gap_no_lock per lastRunAt ereditato", async () => {
+    vi.spyOn(process, "uptime").mockReturnValue(60);
+    getAppSettingMock.mockResolvedValue({
+      valueJson: { lastRunAt: minutesAgo(120), lastTickAt: minutesAgo(1) },
+    });
+    const collectScheduler = await loadCollector();
+    const signals = await collectScheduler();
+
+    expect(signals.find((x) => x.metric === "scheduler.run_gap_no_lock")).toBeUndefined();
+  });
+
   it("zombie recovery recente → segnale info scheduler.zombie_recovered", async () => {
     getAppSettingMock.mockResolvedValue({
       valueJson: { lastRunAt: minutesAgo(10), lastTickAt: minutesAgo(1), lastZombieRecoveredAt: minutesAgo(30) },
