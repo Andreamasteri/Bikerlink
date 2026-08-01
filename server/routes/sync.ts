@@ -37,7 +37,7 @@ router.post("/db/sync/run", async (_req: Request, res: Response) => {
     return sendError(
       res,
       409,
-      process.env.REPLIT_DEPLOYMENT === "1" || process.env.REPLIT_INTERNAL_APP_DOMAIN
+      process.env.BIKERLINK_DEPLOY_ENV === "production" || process.env.NODE_ENV === "production"
         ? "Sync non disponibile in ambiente di produzione"
         : "DATABASE_URL_DEV non configurato — branch dev Neon non ancora presente",
     );
