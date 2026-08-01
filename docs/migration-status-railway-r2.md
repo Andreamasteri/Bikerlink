@@ -1,13 +1,13 @@
 # BikerLink migration status — Railway + Cloudflare R2
 
-This document records the safe boundary between the repository migration work and the final operations that require production credentials.
+This document records the safe boundary between the repository migration work and the final operations that require production credentials. Replit is no longer an operational target; Railway and Cloudflare R2 are the only supported production path.
 
 ## Repository state
 
 - Cloudflare R2 adapter and resumable migration command are on `main` through PR #36.
 - PR #26 was an older draft of the same migration and was closed as superseded.
 - The migration command is manual only. It does not run at deploy time and never deletes the Replit source.
-- Replit references that remain in the repository are intentional when they are needed by the source-side migration command, historical runbooks, or legacy deployment compatibility. They must not be removed until the real object copy and rollback window are complete.
+- Replit is retired from the supported architecture. Historical references and the one-way source migration utility remain only for audit/recovery; no new runtime path depends on Replit.
 
 ## Safe offline preparation
 
@@ -29,6 +29,6 @@ The following must be executed only after the R2 and source credentials are avai
 4. Verify object counts, sizes and SHA-256 hashes.
 5. Run authenticated production upload/download smoke tests.
 6. Keep the Replit source intact during the observation window.
-7. Disable Replit storage only after all checks pass.
+7. Replit storage is not part of the new runtime; retain or discard the old source according to the final data-retention decision.
 
 No production secret belongs in this repository or in `.env.example`.
