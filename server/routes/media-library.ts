@@ -147,7 +147,7 @@ adminMediaRouter.post("/upload", upload.single("file"), async (req: Request, res
     const filename = `public/media/${Date.now()}-${Math.random().toString(36).slice(2)}.${safeExt}`;
     await uploadBuffer(filename, req.file.buffer, req.file.mimetype);
 
-    const domain = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS?.split(",")[0]?.trim() || "";
+    const domain = process.env.EXPO_PUBLIC_DOMAIN?.trim() || "";
     const publicUrl = domain
       ? `https://${domain}/api/media/file/${encodeURIComponent(filename)}`
       : `/api/media/file/${encodeURIComponent(filename)}`;
