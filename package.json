@@ -28,7 +28,8 @@
     "lint": "npx oxlint -c .oxlintrc.json .",
     "lint:fix": "npx oxlint -c .oxlintrc.json --fix-suggestions .",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "r2:preflight": "tsx scripts/r2-migration-preflight.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.14",
