@@ -22,6 +22,7 @@ const mockClientQuery = vi.hoisted(() => vi.fn());
 const mockClientConnect = vi.hoisted(() => vi.fn());
 const mockClientEnd = vi.hoisted(() => vi.fn());
 const MockPgClient = vi.hoisted(() => vi.fn());
+const withMonitoringClientMock = vi.hoisted(() => vi.fn());
 
 vi.mock("pg", () => ({
   default: { Client: MockPgClient },
@@ -35,6 +36,7 @@ vi.mock("../db", () => ({
   getPoolStats: poolStatsMock,
   getCheckedOutConnections: checkedOutMock,
   APP_NAME: "bikerlink-test",
+  withMonitoringClient: withMonitoringClientMock,
 }));
 
 vi.mock("../lib/bg-db-limiter", () => ({
@@ -121,7 +123,18 @@ describe("pool-collector idle-leak kill-switch (end-to-end)", () => {
     mockClientConnect.mockReset().mockResolvedValue(undefined);
     mockClientEnd.mockReset().mockResolvedValue(undefined);
     mockClientQuery.mockReset();
-    checkedOutMock.mockReset().mockReturnValue([]);
+    withMonitoringClientMock.mockReset().mockImplementation(async (fn: (client: unknown) => unknown) =>
+      fn({ query: mockClientQuery, connect: mockClientConnect, end: mockClientEnd, release: vi.fn() }),
+    );
+    // The production detector requires an in-process long-lived checkout in
+    // addition to pg_stat_activity evidence before it can terminate anything.
+    // Keep three synthetic checkouts alive so the fixture exercises the full
+    // detector/actuator path instead of being filtered as a healthy idle pool.
+    checkedOutMock.mockReset().mockReturnValue([
+      { id: "checkout-1", ageMs: 90_000, stack: "test fixture" },
+      { id: "checkout-2", ageMs: 90_000, stack: "test fixture" },
+      { id: "checkout-3", ageMs: 90_000, stack: "test fixture" },
+    ]);
 
     // Saturated pool — waiting > 0 on every tick drives consecutiveWaiting up,
     // which fires probePgStatActivity at tick 5 (CONSECUTIVE_FOR_ACTIVITY_PROBE).
