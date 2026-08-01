@@ -25,14 +25,8 @@ declare module "http" {
 
 function getAllowedOrigins(): Set<string> {
   const origins = new Set<string>();
-  if (process.env.REPLIT_DEV_DOMAIN) {
-    origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
-  }
-  if (process.env.REPLIT_DOMAINS) {
-    process.env.REPLIT_DOMAINS.split(",").forEach((d) => {
-      origins.add(`https://${d.trim()}`);
-    });
-  }
+  const configured = process.env.EXPO_PUBLIC_DOMAIN?.trim();
+  if (configured) origins.add(`https://${configured.replace(/^https?:\\/\\//, "")}`);
   return origins;
 }
 
@@ -66,9 +60,8 @@ export function enforceOrigin(req: Request, res: Response, next: NextFunction): 
 }
 
 export function setupMiddleware(app: express.Application) {
-  // Trust all proxies in Replit's deployment (multiple reverse-proxy hops).
-  // Using `true` instead of `1` ensures req.ip always resolves to the real
-  // client IP regardless of how many hops Replit's infra uses.
+  // Railway/Cloudflare may add multiple reverse-proxy hops.
+  // Trust the forwarded chain so req.ip resolves to the client address.
   app.set("trust proxy", true);
   console.log(`[VISITOR-TRACKING] trust proxy set to: true (all proxies trusted)`);
 
@@ -90,15 +83,8 @@ export function setupMiddleware(app: express.Application) {
   app.use((req, res, next) => {
     const origins = new Set<string>();
 
-    if (process.env.REPLIT_DEV_DOMAIN) {
-      origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
-    }
-
-    if (process.env.REPLIT_DOMAINS) {
-      process.env.REPLIT_DOMAINS.split(",").forEach((d) => {
-        origins.add(`https://${d.trim()}`);
-      });
-    }
+    const configured = process.env.EXPO_PUBLIC_DOMAIN?.trim();
+    if (configured) origins.add(`https://${configured.replace(/^https?:\\/\\//, "")}`);
 
     const origin = req.header("origin");
 
