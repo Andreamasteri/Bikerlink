@@ -129,14 +129,6 @@ async function downloadBundlesAndManifests(timestamp, exitWithError, Readable, p
   }
 }
 
-function safePath(baseDir, ...segments, path) {
-  const resolved = path.resolve(baseDir, ...segments);
-  if (!resolved.startsWith(baseDir + path.sep) && resolved !== baseDir) {
-    throw new Error(`Path traversal detected: ${resolved} is outside ${baseDir}`);
-  }
-  return resolved;
-}
-
 function extractAssets(timestamp, fs, path) {
   const bundles = {
     ios: fs.readFileSync(path.join("static-build", timestamp, "_expo", "static", "js", "ios", "bundle.js"), "utf-8"),

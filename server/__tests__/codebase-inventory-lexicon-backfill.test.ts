@@ -44,11 +44,6 @@ const FAKE_HASH = createHash("sha256").update(FAKE_CONTENT).digest("hex").slice(
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Simula una Dirent che rappresenta un file (non una directory). */
-function makeFile(name: string) {
-  return { name, isDirectory: () => false, isFile: () => true };
-}
-
 /**
  * Configura git ls-files per restituire un solo file sorgente.
  */

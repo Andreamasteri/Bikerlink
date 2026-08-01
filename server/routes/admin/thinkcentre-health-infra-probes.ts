@@ -98,6 +98,7 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
   if (dragonflyUrl) {
     const t0 = Date.now();
     let client: { ping: () => Promise<string>; quit: () => Promise<unknown> } | null = null;
+    let pingTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       // Uses the statically-imported Redis so vi.mock("ioredis") intercepts it in tests.
       client = new Redis(dragonflyUrl, {
@@ -113,9 +114,9 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
       // del monitor se DragonflyDB accetta il TCP ma non risponde al comando.
       await Promise.race([
         client.ping(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("PING timeout (3s)")), 3_000),
-        ),
+        new Promise<never>((_, reject) => {
+          pingTimer = setTimeout(() => reject(new Error("PING timeout (3s)")), 3_000);
+        }),
       ]);
 
       const latencyMs = Date.now() - t0;
@@ -130,6 +131,7 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
       recordProbeLog("dragonfly", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
       return { configured: true, ok: false, latencyMs, url: maskUrl(dragonflyUrl), error, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
     } finally {
+      if (pingTimer) clearTimeout(pingTimer);
       if (client) {
         client.quit().catch(() => { /* ignore — client usa-e-getta */ });
       }
