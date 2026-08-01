@@ -1,7 +1,9 @@
 # Deploy Status — BikerLink
 
-Stato di prontezza al deploy in produzione (Replit Cloud Run autoscale).
-Ultimo aggiornamento: 28/05/2026 — Task #2682.
+Stato di prontezza al deploy in produzione su Railway.
+
+> Le sezioni che citano Replit Cloud Run descrivono verifiche storiche e non sono il criterio corrente di cutover.
+Ultimo aggiornamento storico: 28/05/2026 — Task #2682. Stato Railway/R2: vedere `docs/migration-status-railway-r2.md`.
 
 ## Sintesi
 
