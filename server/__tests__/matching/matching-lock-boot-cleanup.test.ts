@@ -239,10 +239,11 @@ describe("collectScheduler() scheduler.run_gap_no_lock signal (Task #939)", () =
     mockGetAppSetting.mockReset();
   });
 
-  it("emits scheduler.run_gap_no_lock HIGH at 65-min gap (below 4h zombie gate)", async () => {
-    // The critical fix: before Task #939, this signal was only emitted inside
-    // the >4h gate. Now it fires at >=60 min. DragonflyDB is unavailable
-    // (mocked getRawRedis → null) so getMatchingLockStatus() returns active=false.
+  it("emits scheduler.run_gap_no_lock HIGH at 65-min gap after startup grace", async () => {
+    // The signal is suppressed only during the 65-minute deploy/restart grace
+    // window; after that window it fires at >=60 min. DragonflyDB is
+    // unavailable (mocked getRawRedis → null), so the lock is inactive.
+    const uptimeSpy = vi.spyOn(process, "uptime").mockReturnValue(70 * 60);
     const now = Date.now();
     const lastTickAt = new Date(now - 30_000).toISOString(); // 30s ago → alive
     const lastRunAt = new Date(now - 65 * 60_000).toISOString(); // 65min ago
@@ -268,6 +269,7 @@ describe("collectScheduler() scheduler.run_gap_no_lock signal (Task #939)", () =
     expect(noLockSignal).toBeDefined();
     expect(noLockSignal?.severity).toBe("high");
     expect(noLockSignal?.value).toBe(65);
+    uptimeSpy.mockRestore();
   });
 
   it("does NOT emit scheduler.run_gap_no_lock at 59-min gap (below 60-min threshold)", async () => {
