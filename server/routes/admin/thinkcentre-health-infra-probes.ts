@@ -98,6 +98,7 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
   if (dragonflyUrl) {
     const t0 = Date.now();
     let client: { ping: () => Promise<string>; quit: () => Promise<unknown> } | null = null;
+    let pingTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       // Uses the statically-imported Redis so vi.mock("ioredis") intercepts it in tests.
       client = new Redis(dragonflyUrl, {
@@ -113,9 +114,9 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
       // del monitor se DragonflyDB accetta il TCP ma non risponde al comando.
       await Promise.race([
         client.ping(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("PING timeout (3s)")), 3_000),
-        ),
+        new Promise<never>((_, reject) => {
+          pingTimer = setTimeout(() => reject(new Error("PING timeout (3s)")), 3_000);
+        }),
       ]);
 
       const latencyMs = Date.now() - t0;
@@ -130,6 +131,7 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
       recordProbeLog("dragonfly", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
       return { configured: true, ok: false, latencyMs, url: maskUrl(dragonflyUrl), error, history: getHistory("dragonfly"), probeLog: getProbeLog("dragonfly") };
     } finally {
+      if (pingTimer) clearTimeout(pingTimer);
       if (client) {
         client.quit().catch(() => { /* ignore — client usa-e-getta */ });
       }
@@ -256,56 +258,3 @@ export async function probeNginxInfra(): Promise<InfraServiceHealth> {
     console.error("[thinkcentre-probe] nginx KO", { error });
     recordError("nginx", error);
     recordProbeLog("nginx", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
-    return { configured: true, ok: false, latencyMs: r.latencyMs, url: maskUrl(base), error, history: getHistory("nginx"), probeLog: getProbeLog("nginx") };
-  }
-  recordProbeLog("nginx", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "HTTP OK" });
-  return { configured: true, ok: true, latencyMs: r.latencyMs, url: maskUrl(base), history: getHistory("nginx"), probeLog: getProbeLog("nginx") };
-}
-
-// ── Uptime Kuma ───────────────────────────────────────────────────────────────
-export async function probeUptimeKuma(): Promise<InfraServiceHealth> {
-  const base = process.env.UPTIME_KUMA_URL?.trim().replace(/\/$/, "");
-  if (!base) {
-    return { configured: false, ok: false, latencyMs: null, url: null, history: getHistory("uptimekuma"), probeLog: getProbeLog("uptimekuma") };
-  }
-  const r = await httpProbe(`${base}/`, {}, (s) => s < 500);
-  if (!r.ok) {
-    const error = r.error ?? "HTTP error";
-    console.error("[thinkcentre-probe] uptimekuma KO", { error });
-    recordError("uptimekuma", error);
-    recordProbeLog("uptimekuma", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
-    return { configured: true, ok: false, latencyMs: r.latencyMs, url: maskUrl(base), error, history: getHistory("uptimekuma"), probeLog: getProbeLog("uptimekuma") };
-  }
-  recordProbeLog("uptimekuma", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "HTTP OK" });
-  return { configured: true, ok: true, latencyMs: r.latencyMs, url: maskUrl(base), history: getHistory("uptimekuma"), probeLog: getProbeLog("uptimekuma") };
-}
-
-// ── AI Hub ────────────────────────────────────────────────────────────────────
-// Probe verso {AI_HUB_URL}/health usando hubGet() che include automaticamente
-// X-Hub-Gate-Token + CF Access headers — consistente con ai-hub-collector.ts.
-// Also fetches /vram to read agentMapSource (Task #549).
-export async function probeAiHub(): Promise<InfraServiceHealth> {
-  if (!isHubConfigured()) {
-    return { configured: false, ok: false, latencyMs: null, url: null, history: getHistory("aihub"), probeLog: getProbeLog("aihub") };
-  }
-  const displayUrl = maskUrl(getHubBaseUrl());
-  const t0 = Date.now();
-  const [healthResult, vramResult] = await Promise.all([
-    hubGet("/health", undefined, HUB_HEALTH_TIMEOUT_MS),
-    hubGet<{ agentMapSource?: string }>("/vram", undefined, HUB_VRAM_TIMEOUT_MS),
-  ]);
-  const latencyMs = Date.now() - t0;
-  const healthy = healthResult.ok && (healthResult.data as { ok?: boolean } | undefined)?.ok !== false;
-  if (!healthy) {
-    const error = healthResult.error ?? (healthResult.status ? `HTTP ${healthResult.status}` : "unreachable");
-    console.error("[thinkcentre-probe] ai-hub KO", { error });
-    recordError("aihub", error);
-    recordProbeLog("aihub", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
-    return { configured: true, ok: false, latencyMs, url: displayUrl, error, history: getHistory("aihub"), probeLog: getProbeLog("aihub") };
-  }
-  const rawSource = vramResult.ok ? (vramResult.data?.agentMapSource ?? null) : null;
-  const vramAgentMapSource: "default" | "pushed" | null =
-    rawSource === "pushed" ? "pushed" : rawSource === "default" ? "default" : null;
-  recordProbeLog("aihub", { timestamp: Date.now(), ok: true, latencyMs, detail: `health OK · agentMapSource=${vramAgentMapSource ?? "unknown"}` });
-  return { configured: true, ok: true, latencyMs, url: displayUrl, history: getHistory("aihub"), probeLog: getProbeLog("aihub"), vramAgentMapSource };
-}
