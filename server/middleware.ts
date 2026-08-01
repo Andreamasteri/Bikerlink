@@ -26,7 +26,7 @@ declare module "http" {
 function getAllowedOrigins(): Set<string> {
   const origins = new Set<string>();
   const configured = process.env.EXPO_PUBLIC_DOMAIN?.trim();
-  if (configured) origins.add(`https://${configured.replace(/^https?:\\/\\//, "")}`);
+  if (configured) origins.add(`https://${configured.replace(/^https?:\/\//, "")}`);
   return origins;
 }
 
@@ -84,7 +84,7 @@ export function setupMiddleware(app: express.Application) {
     const origins = new Set<string>();
 
     const configured = process.env.EXPO_PUBLIC_DOMAIN?.trim();
-    if (configured) origins.add(`https://${configured.replace(/^https?:\\/\\//, "")}`);
+    if (configured) origins.add(`https://${configured.replace(/^https?:\/\//, "")}`);
 
     const origin = req.header("origin");
 
