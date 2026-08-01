@@ -51,7 +51,9 @@ function main(): void {
     }
   }
 
-  if (process.env.R2_PUBLIC_BUCKET?.trim() === process.env.R2_PRIVATE_BUCKET?.trim()) {
+  const publicBucket = process.env.R2_PUBLIC_BUCKET?.trim();
+  const privateBucket = process.env.R2_PRIVATE_BUCKET?.trim();
+  if (publicBucket && privateBucket && publicBucket === privateBucket) {
     errors.push("R2_PUBLIC_BUCKET e R2_PRIVATE_BUCKET devono essere bucket distinti.");
   }
 
