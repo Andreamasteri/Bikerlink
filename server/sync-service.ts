@@ -45,20 +45,13 @@ async function readJsonSetting<T>(key: string): Promise<T | null> {
 }
 
 /**
- * Rileva se siamo nell'ambiente di produzione Replit.
- *
- * NOTA TECNICA: In questo progetto start-backend.sh imposta NODE_ENV=production
- * anche nel dev workspace (necessario per Metro proxy e static-build routing),
- * quindi NODE_ENV non può essere usato come discriminante dev/prod.
- * I flag affidabili sono quelli iniettati esclusivamente dall'infrastruttura
- * Replit nella deployed app:
- *   - REPLIT_DEPLOYMENT="1"       → flag canonico Replit per deployed app
- *   - REPLIT_INTERNAL_APP_DOMAIN  → dominio interno, solo in produzione
+ * Rileva l'ambiente di produzione.
+ * Railway imposta BIKERLINK_DEPLOY_ENV=production; in locale il sync
+ * rimane disponibile solo quando esistono URL DB distinti.
  */
 function isProductionEnvironment(): boolean {
-  if (process.env.REPLIT_DEPLOYMENT === "1") return true;
-  if (process.env.REPLIT_INTERNAL_APP_DOMAIN) return true;
-  return false;
+  return process.env.BIKERLINK_DEPLOY_ENV === "production" ||
+    process.env.NODE_ENV === "production";
 }
 
 function getSyncUrls(): { prodUrl: string; devUrl: string } | null {
