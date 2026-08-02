@@ -10,7 +10,8 @@
  */
 import { Pool } from "pg";
 
-const json = process.argv.includes("--json");
+async function main(): Promise<void> {
+  const json = process.argv.includes("--json");
 const url = process.env.DATABASE_URL;
 if (!url) {
   console.error("DATABASE_URL non configurato: audit non eseguito.");
@@ -89,3 +90,9 @@ try {
   client.release();
   await pool.end();
 }
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});
