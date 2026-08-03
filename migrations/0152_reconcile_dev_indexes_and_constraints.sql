@@ -7,6 +7,14 @@
 -- objects. All statements are idempotent; no rows are updated or deleted.
 -- Indexes are built concurrently to minimize write blocking.
 
+-- Candidate and Production currently carry a non-unique legacy index with this
+-- name, while Dev enforces uniqueness on (hazard_id, user_id). The preflight
+-- audit found the table empty in both target environments, so rebuilding it
+-- concurrently is safe and makes the Dev invariant explicit.
+DROP INDEX CONCURRENTLY IF EXISTS public.road_hazard_confirms_unique_idx;
+CREATE UNIQUE INDEX CONCURRENTLY road_hazard_confirms_unique_idx
+  ON public.road_hazard_confirms USING btree (hazard_id, user_id);
+
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_fk_ab_assignments_user_id ON public.ab_assignments USING btree (user_id);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_fk_ab_events_user_id ON public.ab_events USING btree (user_id);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_fk_arcade_scores_user_id ON public.arcade_scores USING btree (user_id);
