@@ -15,7 +15,7 @@ DROP INDEX CONCURRENTLY IF EXISTS public.road_hazard_confirms_unique_idx;
 --> statement-breakpoint
 CREATE UNIQUE INDEX CONCURRENTLY road_hazard_confirms_unique_idx
   ON public.road_hazard_confirms USING btree (hazard_id, user_id);
-
+--> statement-breakpoint
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_fk_ab_assignments_user_id ON public.ab_assignments USING btree (user_id);
 --> statement-breakpoint
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_fk_ab_events_user_id ON public.ab_events USING btree (user_id);
@@ -97,7 +97,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_fk_weekly_recaps_user_id ON public.w
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_fk_workshop_contacts_user_id ON public.workshop_contacts USING btree (user_id);
 --> statement-breakpoint
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_fk_zavorrina_wishlists_user_id ON public.zavorrina_wishlists USING btree (user_id);
-
+--> statement-breakpoint
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -110,7 +110,7 @@ BEGIN
   END IF;
 END
 $$;
-
+--> statement-breakpoint
 DO $$
 BEGIN
   IF NOT EXISTS (
