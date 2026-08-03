@@ -43,7 +43,6 @@
       },
       "env": {
         "NODE_OPTIONS": "--max_old_space_size=8192",
-        "EXPO_PUBLIC_DOMAIN": "biker-link.net",
         "EXPO_PUBLIC_BUILD_PROFILE": "staging"
       }
     },
