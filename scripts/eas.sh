@@ -4,7 +4,7 @@
 #
 #  Usa eas-cli tramite npx con versione ^21.0.0 (npx usa la cache locale,
 #  quindi non scarica il pacchetto ad ogni run dopo la prima volta).
-#  La versione minima è imposta anche in eas.json "cli.version": ">= 20.0.0".
+#  La versione minima è imposta anche in eas.json "cli.version": ">= 21.0.0".
 #
 #  Uso (da altri script):
 #    bash scripts/eas.sh <eas-command> [args...]
@@ -60,6 +60,35 @@ if [[ "$FIRST_ARG" == "build" ]]; then
   echo "" >&2
 fi
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  PRE-FLIGHT: preview deve puntare a Candidate, mai a Production/Replit
+# ─────────────────────────────────────────────────────────────────────────────
+PROFILE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --profile) PROFILE="${2:-}"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+if [[ "$FIRST_ARG" == "build" && "$PROFILE" == "preview" ]]; then
+  CANDIDATE_DOMAIN="${EXPO_PUBLIC_DOMAIN:-}"
+  if [[ -z "$CANDIDATE_DOMAIN" ]]; then
+    echo "✖ preview bloccata: EXPO_PUBLIC_DOMAIN deve contenere l'host HTTPS di Candidate." >&2
+    exit 1
+  fi
+  if [[ "$CANDIDATE_DOMAIN" != https://* ]]; then
+    echo "✖ preview bloccata: EXPO_PUBLIC_DOMAIN deve usare HTTPS." >&2
+    exit 1
+  fi
+  case "$CANDIDATE_DOMAIN" in
+    https://biker-link.net|https://www.biker-link.net|*replit.app*|*replit.dev*|http://localhost*|http://127.0.0.1*)
+      echo "✖ preview bloccata: il dominio indicato è Production, Replit o locale." >&2
+      exit 1
+      ;;
+  esac
+  echo "  ✔  Candidate domain verificato: $CANDIDATE_DOMAIN" >&2
+fi
 # (nessun check necessario: npx è sempre disponibile)
 
 # ─────────────────────────────────────────────────────────────────────────────
