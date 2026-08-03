@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as fs from "fs";
+import * as path from "path";
 
 vi.mock("../db", () => ({
   pool: {
@@ -23,7 +24,7 @@ vi.mock("fs", async () => {
   };
 });
 
-import { isPostgisOwnerError, isNoTransactionMigration, applyMigration, applyMigrationNoTransaction, runMigrations } from "../migrate";
+import { isPostgisOwnerError, isNoTransactionMigration, splitStatements, applyMigration, applyMigrationNoTransaction, runMigrations } from "../migrate";
 import { pool } from "../db";
 
 // ---------------------------------------------------------------------------
@@ -165,6 +166,32 @@ describe("isNoTransactionMigration", () => {
 
   it("returns false for an empty string", () => {
     expect(isNoTransactionMigration("")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression test — 0152 concurrent reconciliation statement boundaries
+// ---------------------------------------------------------------------------
+
+describe("0152 reconciliation migration boundaries", () => {
+  it("keeps every concurrent DDL command isolated for autocommit execution", () => {
+    const migrationPath = path.resolve(
+      process.cwd(),
+      "migrations",
+      "0152_reconcile_dev_indexes_and_constraints.sql"
+    );
+    const sql = fs.readFileSync(migrationPath, "utf-8");
+    const statements = splitStatements(sql);
+
+    expect(isNoTransactionMigration(sql)).toBe(true);
+    expect(statements).toHaveLength(45);
+    expect(statements.filter((statement) =>
+      /CREATE (?:UNIQUE )?INDEX CONCURRENTLY/.test(statement)
+    )).toHaveLength(42);
+    expect(statements.filter((statement) => statement.includes("DO $"))).toHaveLength(2);
+    expect(statements.every((statement) =>
+      (statement.match(/CREATE (?:UNIQUE )?INDEX CONCURRENTLY/g) ?? []).length <= 1
+    )).toBe(true);
   });
 });
 
