@@ -67,6 +67,7 @@ const GPS_ERRORS_FULL_PURGE_FLAG = "logRetention.gpsErrorsPurgedV1";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const FIVE_DAYS_MS = 5 * ONE_DAY_MS;
 const INITIAL_DELAY_MS = 2 * 60 * 1000;
+const RETENTION_BATCH_SIZE = 1000;
 
 // notification_history non è una tabella drizzle (è creata via SQL raw in
 // boot-phase3-db-init.ts), quindi ha un purge dedicato con SQL grezzo. La
@@ -88,15 +89,37 @@ async function countOlderThan(target: RetentionTarget, cutoff: Date): Promise<nu
 async function purgeTarget(target: RetentionTarget): Promise<number> {
   const cutoff = new Date(Date.now() - target.retentionDays * ONE_DAY_MS);
   const count = await countOlderThan(target, cutoff);
-  if (count > 0) {
-    await withDbRetry(`[log-retention:${target.name}]`, () =>
-      db.delete(target.table).where(lt(target.tsColumn, cutoff)),
+  if (count <= 0) return 0;
+
+  // Delete in bounded batches to avoid long transactions, lock amplification,
+  // and large WAL/temp bursts on append-only tables.
+  let deleted = 0;
+  const tableName = `public.${target.name}`;
+
+  while (deleted < count) {
+    const result = await withDbRetry(`[log-retention:${target.name}]`, () =>
+      db.execute(sql.raw(`
+        WITH doomed AS (
+          SELECT ctid
+          FROM ${tableName}
+          WHERE ${target.tsColumn.name} < '${cutoff.toISOString()}'
+          LIMIT ${RETENTION_BATCH_SIZE}
+        )
+        DELETE FROM ${tableName} AS target
+        USING doomed
+        WHERE target.ctid = doomed.ctid
+      `)),
     );
-    console.log(
-      `[LOG-RETENTION] ${target.name}: rimosse ${count} righe più vecchie di ${target.retentionDays}gg`
-    );
+
+    const batchDeleted = Number((result as { rowCount?: number }).rowCount ?? 0);
+    deleted += batchDeleted;
+    if (batchDeleted === 0) break;
   }
-  return count;
+
+  console.log(
+    `[LOG-RETENTION] ${target.name}: rimosse ${deleted} righe più vecchie di ${target.retentionDays}gg in batch da ${RETENTION_BATCH_SIZE}`
+  );
+  return deleted;
 }
 
 // Svuotamento totale una-tantum di gps_errors (flood storico pre-fix buffer offline).
