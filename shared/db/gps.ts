@@ -91,6 +91,8 @@ export const gpsRejectionStats = pgTable("gps_rejection_stats", {
 
 export const rideTelemetry = pgTable("ride_telemetry", {
   id: serial("id").primaryKey(),
+  // Deterministic key used to ignore retried mobile batches.
+  ingestKey: varchar("ingest_key", { length: 64 }),
   userId: varchar("user_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
