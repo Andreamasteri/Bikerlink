@@ -2,8 +2,8 @@ name: Smoke Test
 
 on:
   schedule:
-    # GitHub cron uses UTC. Runs every 30 minutes.
-    - cron: "*/30 * * * *"
+    # GitHub cron uses UTC. Runs every 10 minutes.
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
