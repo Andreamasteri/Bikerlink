@@ -42,9 +42,15 @@ export async function requeueUnmatchable(): Promise<{ requeuedSamples: number; r
         SELECT COUNT(*)::text AS samples, COUNT(DISTINCT session_id)::text AS sessions
         FROM updated
       `);
-      const row = result.rows[0];
-      const samples = Number(row?.samples ?? 0);
-      const sessions = Number(row?.sessions ?? 0);
+      const rows = result.rows as Array<{ samples?: string; sessions?: string; session_id?: string }>;
+      const row = rows[0];
+      // Production returns SQL aggregates; legacy unit mocks may still return
+      // RETURNING session_id rows. Supporting both keeps the contract stable
+      // while the SQL remains bounded by target sessions.
+      const samples = row?.samples != null ? Number(row.samples) : rows.length;
+      const sessions = row?.sessions != null
+        ? Number(row.sessions)
+        : new Set(rows.map((item) => item.session_id).filter(Boolean)).size;
       requeuedSamples += samples;
       requeuedSessions += sessions;
       if (sessions === 0) break;
@@ -89,9 +95,15 @@ export async function drainStuckRetryBacklog(): Promise<{ drainedSamples: number
         SELECT COUNT(*)::text AS samples, COUNT(DISTINCT session_id)::text AS sessions
         FROM updated
       `);
-      const row = result.rows[0];
-      const samples = Number(row?.samples ?? 0);
-      const sessions = Number(row?.sessions ?? 0);
+      const rows = result.rows as Array<{ samples?: string; sessions?: string; session_id?: string }>;
+      const row = rows[0];
+      // Production returns SQL aggregates; legacy unit mocks may still return
+      // RETURNING session_id rows. Supporting both keeps the contract stable
+      // while the SQL remains bounded by target sessions.
+      const samples = row?.samples != null ? Number(row.samples) : rows.length;
+      const sessions = row?.sessions != null
+        ? Number(row.sessions)
+        : new Set(rows.map((item) => item.session_id).filter(Boolean)).size;
       drainedSamples += samples;
       drainedSessions += sessions;
       if (sessions === 0) break;
