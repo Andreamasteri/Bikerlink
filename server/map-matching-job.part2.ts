@@ -53,6 +53,7 @@ export async function requeueUnmatchable(): Promise<{ requeuedSamples: number; r
         : new Set(rows.map((item) => item.session_id).filter(Boolean)).size;
       requeuedSamples += samples;
       requeuedSessions += sessions;
+      if (row?.samples == null) break;
       if (sessions === 0) break;
     }
     console.log(`[MAP-MATCH] Requeue — ${requeuedSamples} campioni / ${requeuedSessions} sessioni riportati a 'pending'`);
@@ -106,6 +107,7 @@ export async function drainStuckRetryBacklog(): Promise<{ drainedSamples: number
         : new Set(rows.map((item) => item.session_id).filter(Boolean)).size;
       drainedSamples += samples;
       drainedSessions += sessions;
+      if (row?.samples == null) break;
       if (sessions === 0) break;
     }
     console.log(`[MAP-MATCH] Drain backlog — ${drainedSamples} campioni / ${drainedSessions} sessioni retry oltre cap o stale → 'exhausted'`);
