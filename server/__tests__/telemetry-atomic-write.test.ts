@@ -7,7 +7,17 @@ import request from "supertest";
 const { txExecute, tx, transaction, dbExecute, dbUpdateReturning } = vi.hoisted(() => {
   const txExecute = vi.fn();
   const tx = {
-    insert: vi.fn(() => ({ values: vi.fn() })),
+    insert: vi.fn(() => ({
+      values: vi.fn((rows: unknown) => ({
+        onConflictDoNothing: vi.fn(() => ({
+          returning: vi.fn(async () =>
+            Array.isArray(rows)
+              ? rows.map((row) => ({ ingestKey: (row as { ingestKey?: string }).ingestKey ?? null }))
+              : [],
+          ),
+        })),
+      })),
+    })),
     execute: txExecute,
   };
   // `db.transaction(cb)` esegue davvero il callback con la fake tx: se il callback
