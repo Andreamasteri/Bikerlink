@@ -162,12 +162,12 @@ router.post("/batch", async (req: Request, res: Response) => {
     }
 
     const CHUNK = 500;
+    let insertedRows: typeof rows = [];
     try {
       // Task #81 — insert campioni + aggiornamento del riepilogo per-sessione
       // (telemetry_session_stats) ATOMICI in un'unica transazione: o entrambi
       // committati o entrambi annullati. Così GET /stats (che legge SOLO il
       // riepilogo) non può mai divergere dai campioni realmente salvati.
-      const insertedRows: typeof rows = [];
       await db.transaction(async (tx) => {
         for (let i = 0; i < rows.length; i += CHUNK) {
           const chunk = rows.slice(i, i + CHUNK);
@@ -177,7 +177,7 @@ router.post("/batch", async (req: Request, res: Response) => {
             .onConflictDoNothing()
             .returning({ ingestKey: rideTelemetry.ingestKey });
           const insertedKeys = new Set(
-            inserted.rows
+            inserted
               .map((row) => row.ingestKey)
               .filter((key): key is string => Boolean(key)),
           );
