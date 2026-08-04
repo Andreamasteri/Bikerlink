@@ -121,6 +121,6 @@ describe("Telemetry writes keep the per-session summary in sync atomically (Task
     // insert + riepilogo dentro la stessa transazione
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(tx.insert).toHaveBeenCalled();
-    expect(txExecute).toHaveBeenCalledTimes(2); // SELECT prior + UPSERT summary
+    expect(txExecute).toHaveBeenCalledTimes(3); // advisory lock + SELECT prior + UPSERT summary
   });
 });
