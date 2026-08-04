@@ -77,9 +77,6 @@ describe("POST /api/telemetry/batch — campioni sensor-only", () => {
     app = buildApp();
 
     vi.mocked(db.execute).mockResolvedValue({ rows: [] } as unknown as Awaited<ReturnType<typeof db.execute>>);
-    vi.mocked(db.insert).mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ReturnType<typeof db.insert>);
   });
 
   // ── (a) lat/lon esplicitamente null → salvato ─────────────────────────────
