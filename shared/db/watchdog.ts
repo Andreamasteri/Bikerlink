@@ -68,6 +68,19 @@ export const aiWatchdogLog = pgTable("ai_watchdog_log", {
 export type AiWatchdogLog = typeof aiWatchdogLog.$inferSelect;
 export type InsertAiWatchdogLog = typeof aiWatchdogLog.$inferInsert;
 
+// Persistent state used by writeWatchdogLog to suppress repeated events.
+// The event key excludes summary/details so changing diagnostics cannot create duplicates.
+export const aiWatchdogEventState = pgTable("ai_watchdog_event_state", {
+  eventKey: varchar("event_key", { length: 180 }).primaryKey(),
+  lastStatus: varchar("last_status", { length: 20 }).notNull(),
+  lastLogId: varchar("last_log_id", { length: 36 }),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => [
+  index("ai_watchdog_event_state_updated_idx").on(t.updatedAt),
+]);
+export type AiWatchdogEventState = typeof aiWatchdogEventState.$inferSelect;
+export type InsertAiWatchdogEventState = typeof aiWatchdogEventState.$inferInsert;
+
 // Report settimanale generato dall'AI ogni lunedì 07:00 Europe/Rome.
 export const weeklySystemReports = pgTable("weekly_system_reports", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),

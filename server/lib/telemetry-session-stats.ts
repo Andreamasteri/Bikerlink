@@ -132,6 +132,13 @@ export async function updateTelemetrySessionStats(
 ): Promise<void> {
   if (rows.length === 0) return;
 
+  // Serialize batches for the same session. Without this transaction-scoped
+  // advisory lock, two concurrent uploads could read the same anchor and lose
+  // distance/sample deltas while both inserts still succeed.
+  await executor.execute(sql`
+    SELECT pg_advisory_xact_lock(hashtextextended(${userId + ":" + sessionId}, 0))
+  `);
+
   // Àncora = ultimo campione (per ts) già visto per questa sessione. Può essere
   // null (nessun batch precedente, oppure ultimo campione sensor-only).
   const priorRes = await executor.execute(sql`

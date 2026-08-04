@@ -10,6 +10,7 @@ import { getInternalProbeToken, getInternalProbeHeaderName, isLoopback } from ".
 import idealLapsRouter from "./telemetry-ideal-laps";
 import calibrationRouter from "./telemetry-calibration";
 import { updateTelemetrySessionStats } from "../lib/telemetry-session-stats";
+import { buildTelemetryIngestKey } from "../lib/telemetry-ingest-key";
 import drCorrectionRouter from "./telemetry-dr-correction";
 
 const router = Router();
@@ -123,7 +124,7 @@ router.post("/batch", async (req: Request, res: Response) => {
 
       const ts = coerceFiniteNumber(s.ts) as number;
 
-      rows.push({
+      const normalized = {
         userId,
         sessionId: session_id,
         sessionType: resolvedType,
@@ -138,6 +139,10 @@ router.post("/batch", async (req: Request, res: Response) => {
         gforceZ: coerceFiniteNumber(s.gforce_z),
         heading: coerceFiniteNumber(s.heading),
         altitudeM: coerceFiniteNumber(s.altitude_m),
+      };
+      rows.push({
+        ...normalized,
+        ingestKey: buildTelemetryIngestKey(normalized),
       });
     }
 
@@ -162,11 +167,24 @@ router.post("/batch", async (req: Request, res: Response) => {
       // (telemetry_session_stats) ATOMICI in un'unica transazione: o entrambi
       // committati o entrambi annullati. Così GET /stats (che legge SOLO il
       // riepilogo) non può mai divergere dai campioni realmente salvati.
+      const insertedRows: typeof rows = [];
       await db.transaction(async (tx) => {
         for (let i = 0; i < rows.length; i += CHUNK) {
-          await tx.insert(rideTelemetry).values(rows.slice(i, i + CHUNK));
+          const chunk = rows.slice(i, i + CHUNK);
+          const inserted = await tx
+            .insert(rideTelemetry)
+            .values(chunk)
+            .onConflictDoNothing()
+            .returning({ ingestKey: rideTelemetry.ingestKey });
+          const insertedKeys = new Set(
+            inserted.rows
+              .map((row) => row.ingestKey)
+              .filter((key): key is string => Boolean(key)),
+          );
+          insertedRows.push(...chunk.filter((row) => insertedKeys.has(row.ingestKey!)));
         }
-        await updateTelemetrySessionStats(userId, session_id, resolvedType, rows, tx);
+        // Only newly inserted samples contribute to the incremental totals.
+        await updateTelemetrySessionStats(userId, session_id, resolvedType, insertedRows, tx);
       });
     } catch (dbErr) {
       const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
@@ -189,7 +207,7 @@ router.post("/batch", async (req: Request, res: Response) => {
       ts: new Date().toISOString(),
       type: "INFO",
       context: "telemetry/batch",
-      message: `Insert OK — received=${received} inserted=${rows.length} discarded=${discarded} type=${resolvedType}`,
+      message: `Insert OK — received=${received} inserted=${insertedRows.length} duplicates=${rows.length - insertedRows.length} discarded=${discarded} type=${resolvedType}`,
       userId,
       sessionId: session_id,
     });
@@ -204,7 +222,7 @@ router.post("/batch", async (req: Request, res: Response) => {
       });
     }
 
-    return res.status(200).json({ inserted: rows.length, session_id });
+    return res.status(200).json({ inserted: insertedRows.length, duplicates: rows.length - insertedRows.length, session_id });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : undefined;
