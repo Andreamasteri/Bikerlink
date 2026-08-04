@@ -8,7 +8,7 @@ SET event_key = 'legacy:' || id
 WHERE event_key IS NULL;
 --> statement-breakpoint
 ALTER TABLE ai_watchdog_log ALTER COLUMN event_key SET NOT NULL;
-
+--> statement-breakpoint
 CREATE INDEX CONCURRENTLY IF NOT EXISTS site_visits_event_created_id_idx
   ON site_visits (event, created_at DESC, id DESC);
 --> statement-breakpoint
