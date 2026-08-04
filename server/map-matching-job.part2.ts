@@ -38,6 +38,11 @@ export async function requeueUnmatchable(): Promise<{ requeuedSamples: number; r
   }));
 }
 
+export function getStaleRetryDays(): number {
+  const value = Number.parseInt(process.env.MAP_MATCHING_STALE_RETRY_DAYS ?? "7", 10);
+  return Number.isFinite(value) && value > 0 ? Math.min(value, 90) : 7;
+}
+
 export async function drainStuckRetryBacklog(): Promise<{ drainedSamples: number; drainedSessions: number }> {
   const maxAttempts = getMaxAttempts();
   return withBgDbSlot(() => withDbRetry(async () => {
@@ -47,14 +52,21 @@ export async function drainStuckRetryBacklog(): Promise<{ drainedSamples: number
         SET match_status = 'exhausted',
             matched = false
         WHERE match_status = 'retry'
-          AND match_attempts >= ${maxAttempts}
+          AND (
+            match_attempts >= ${maxAttempts}
+            OR (
+              match_attempts > 0
+              AND last_match_attempt_at IS NOT NULL
+              AND last_match_attempt_at < NOW() - (INTERVAL '1 day' * ${getStaleRetryDays()})
+            )
+          )
         RETURNING session_id
       `,
     );
     const drainedSamples = result.rows.length;
     const drainedSessions = new Set(result.rows.map((r) => r.session_id)).size;
     console.log(
-      `[MAP-MATCH] Drain backlog — ${drainedSamples} campioni / ${drainedSessions} sessioni 'retry' oltre il cap → 'exhausted'`,
+      `[MAP-MATCH] Drain backlog — ${drainedSamples} campioni / ${drainedSessions} sessioni retry oltre cap o stale → 'exhausted'`,
     );
     return { drainedSamples, drainedSessions };
   }));
