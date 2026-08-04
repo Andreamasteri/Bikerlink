@@ -25,7 +25,6 @@ const router = Router();
 const TARGET_KM_SETTING = "telemetry_target_km";
 const DEFAULT_TARGET_KM = parseFloat(process.env.TELEMETRY_TARGET_KM ?? "1000");
 
-const KM_WINDOW_DAYS = 90;
 
 type CacheEntry = { data: unknown; expiresAt: number };
 const serverCache = new Map<string, CacheEntry>();
