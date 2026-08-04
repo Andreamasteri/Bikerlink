@@ -141,7 +141,7 @@ function pendingFiles(all: string[], applied: Set<string>): string[] {
   return all.filter((f) => !applied.has(f));
 }
 
-function splitStatements(sql: string): string[] {
+export function splitStatements(sql: string): string[] {
   return sql
     .split(/--> statement-breakpoint/g)
     .map((s) => s.trim())
