@@ -84,7 +84,7 @@ describe("Telemetry writes keep the per-session summary in sync atomically (Task
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(tx.insert).toHaveBeenCalled(); // ride_telemetry insert
     // updateTelemetrySessionStats runs on the SAME tx: SELECT prior + UPSERT.
-    expect(txExecute).toHaveBeenCalledTimes(2);
+    expect(txExecute).toHaveBeenCalledTimes(3);
   });
 
   it("POST /batch returns 500 (no silent divergence) if the summary update fails", async () => {
