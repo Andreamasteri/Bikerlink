@@ -67,6 +67,7 @@ const GPS_ERRORS_FULL_PURGE_FLAG = "logRetention.gpsErrorsPurgedV1";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const FIVE_DAYS_MS = 5 * ONE_DAY_MS;
 const INITIAL_DELAY_MS = 2 * 60 * 1000;
+const PURGE_BATCH_SIZE = 1_000;
 
 // notification_history non è una tabella drizzle (è creata via SQL raw in
 // boot-phase3-db-init.ts), quindi ha un purge dedicato con SQL grezzo. La
@@ -87,16 +88,35 @@ async function countOlderThan(target: RetentionTarget, cutoff: Date): Promise<nu
 
 async function purgeTarget(target: RetentionTarget): Promise<number> {
   const cutoff = new Date(Date.now() - target.retentionDays * ONE_DAY_MS);
-  const count = await countOlderThan(target, cutoff);
-  if (count > 0) {
-    await withDbRetry(`[log-retention:${target.name}]`, () =>
-      db.delete(target.table).where(lt(target.tsColumn, cutoff)),
+  let deleted = 0;
+
+  // A single DELETE can retain locks and generate a large WAL burst. Delete
+  // bounded physical batches so foreground writes can keep progressing.
+  while (true) {
+    const result = await withDbRetry(`[log-retention:${target.name}]`, () =>
+      db.execute(sql`
+        WITH victims AS (
+          SELECT ctid
+          FROM ${target.table}
+          WHERE ${target.tsColumn} < ${cutoff}
+          LIMIT ${PURGE_BATCH_SIZE}
+        )
+        DELETE FROM ${target.table} AS retained
+        USING victims
+        WHERE retained.ctid = victims.ctid
+      `),
     );
+    const batch = (result as { rowCount?: number }).rowCount ?? 0;
+    deleted += batch;
+    if (batch < PURGE_BATCH_SIZE) break;
+  }
+
+  if (deleted > 0) {
     console.log(
-      `[LOG-RETENTION] ${target.name}: rimosse ${count} righe più vecchie di ${target.retentionDays}gg`
+      `[LOG-RETENTION] ${target.name}: rimosse ${deleted} righe più vecchie di ${target.retentionDays}gg in batch da ${PURGE_BATCH_SIZE}`,
     );
   }
-  return count;
+  return deleted;
 }
 
 // Svuotamento totale una-tantum di gps_errors (flood storico pre-fix buffer offline).
