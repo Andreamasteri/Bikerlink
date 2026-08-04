@@ -47,6 +47,8 @@ export type InsertSystemHealthSnapshot = typeof systemHealthSnapshot.$inferInser
 // chat con admin. Audit completo + cost tracking shared con #2532 (aiSuggestionsLog).
 export const aiWatchdogLog = pgTable("ai_watchdog_log", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  // Identità stabile dell’evento: non include summary/details variabili.
+  eventKey: varchar("event_key", { length: 180 }).notNull(),
   kind: varchar("kind", { length: 30 }).notNull(), // auto_fix|proposal|alert|chat|report|signal
   scope: varchar("scope", { length: 60 }),          // es. "queue.matching" o "scheduler"
   status: varchar("status", { length: 20 }).notNull().default("ok"), // ok|warn|error|pending|accepted|rejected
@@ -61,7 +63,8 @@ export const aiWatchdogLog = pgTable("ai_watchdog_log", {
   costUsd: doublePrecision("cost_usd").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
-  index("ai_watchdog_log_kind_idx").on(t.kind),
+  index("ai_watchdog_log_kind_created_idx").on(t.kind, t.createdAt, t.id),
+  index("ai_watchdog_log_event_created_idx").on(t.eventKey, t.createdAt, t.id),
   index("ai_watchdog_log_status_idx").on(t.status),
   index("ai_watchdog_log_created_idx").on(t.createdAt),
 ]);
