@@ -61,132 +61,50 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
   const CACHE_KEY = "telemetry-stats";
   const cached = getCached<object>(CACHE_KEY);
   if (cached) return res.json(cached);
-
   const startMs = Date.now();
-  logTelemetryEvent({ ts: new Date().toISOString(), type: "INFO", context: "admin/telemetry-stats", message: "Avvio query statistiche" });
-
   try {
     const targetKm = await getTargetKm();
-
-    const rawCountResult = await db.execute<{ raw_total: string }>(
-      sql`SELECT COUNT(*)::text AS raw_total FROM ride_telemetry`
-    );
-    const rawTotal = parseInt(rawCountResult.rows[0]?.raw_total ?? "0", 10);
-    logTelemetryEvent({
-      ts: new Date().toISOString(),
-      type: "INFO",
-      context: "admin/telemetry-stats",
-      message: `Conteggio grezzo ride_telemetry: ${rawTotal} righe (senza filtri)`,
-    });
-
-    if (rawTotal === 0) {
-      logTelemetryEvent({
-        ts: new Date().toISOString(),
-        type: "WARN",
-        context: "admin/telemetry-stats",
-        message: "Tabella ride_telemetry vuota — nessun dato inviato dall'app",
-      });
-    }
-
-    const [countResult, kmResult] = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       await tx.execute(sql`SET LOCAL statement_timeout = '8000'`);
-
-      const count = await tx.execute<{
-        users_with_telemetry: string;
-        active_users_24h: string;
-        total_rides: string;
-        total_samples: string;
-        latest_sample: string | null;
+      return tx.execute<{
+        users_with_telemetry: string; active_users_24h: string; total_rides: string;
+        total_samples: string; latest_sample: string | null; total_km: string;
       }>(sql`
         SELECT
           COUNT(DISTINCT user_id)::text AS users_with_telemetry,
-          COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL '24 hours' THEN user_id END)::text AS active_users_24h,
-          COUNT(DISTINCT session_id)::text AS total_rides,
-          COUNT(*)::text AS total_samples,
-          MAX(created_at)::text AS latest_sample
-        FROM ride_telemetry
-        WHERE session_type NOT IN ('ideal_lap')
+          COUNT(DISTINCT user_id) FILTER (WHERE updated_at >= NOW() - INTERVAL '24 hours')::text AS active_users_24h,
+          COUNT(*)::text AS total_rides,
+          COALESCE(SUM(sample_count), 0)::text AS total_samples,
+          MAX(updated_at)::text AS latest_sample,
+          COALESCE(SUM(dist_speed_filtered), 0)::text AS total_km
+        FROM telemetry_session_stats
+        WHERE session_type <> 'ideal_lap'
       `);
-
-      const km = await tx.execute<{ total_km: string }>(sql`
-        WITH ordered AS (
-          SELECT
-            session_id,
-            lat, lon, ts,
-            speed_kmh,
-            LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
-            LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
-          FROM ride_telemetry
-          WHERE session_type NOT IN ('ideal_lap')
-            AND created_at >= NOW() - INTERVAL '${sql.raw(String(KM_WINDOW_DAYS))} days'
-        ),
-        distances AS (
-          SELECT
-            2 * 6371 * ASIN(
-              SQRT(
-                POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
-                + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
-                * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
-              )
-            ) AS dist_km
-          FROM ordered
-          WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
-            AND ABS(lat - prev_lat) < 0.5
-            AND ABS(lon - prev_lon) < 0.5
-            AND (speed_kmh IS NULL OR speed_kmh >= 20)
-        )
-        SELECT COALESCE(SUM(dist_km), 0)::text AS total_km FROM distances
-      `);
-
-      return [count, km] as const;
     });
-
-    const countRow = countResult.rows[0];
-    const activeUsers = parseInt(countRow?.active_users_24h ?? "0", 10);
-    const totalUsersWithTelemetry = parseInt(countRow?.users_with_telemetry ?? "0", 10);
-    const totalRides = parseInt(countRow?.total_rides ?? "0", 10);
-    const totalSamples = parseInt(countRow?.total_samples ?? "0", 10);
-    const latestSample = countRow?.latest_sample ?? null;
-    const kmCollected = Math.round(parseFloat(kmResult.rows[0]?.total_km ?? "0") * 10) / 10;
-    const avgKmPerUser = totalUsersWithTelemetry > 0
-      ? Math.round((kmCollected / totalUsersWithTelemetry) * 10) / 10
-      : 0;
-
-    const elapsedMs = Date.now() - startMs;
-    logTelemetryEvent({
-      ts: new Date().toISOString(),
-      type: "INFO",
-      context: "admin/telemetry-stats",
-      message: `OK in ${elapsedMs}ms — campioni=${totalSamples} utenti=${totalUsersWithTelemetry} attivi24h=${activeUsers} km=${kmCollected} latestSample=${latestSample ?? "null"}`,
-    });
-
+    const row = result.rows[0];
+    const activeUsers = parseInt(row?.active_users_24h ?? "0", 10);
+    const totalUsersWithTelemetry = parseInt(row?.users_with_telemetry ?? "0", 10);
+    const totalRides = parseInt(row?.total_rides ?? "0", 10);
+    const totalSamples = parseInt(row?.total_samples ?? "0", 10);
+    const latestSample = row?.latest_sample ?? null;
+    const kmCollected = Math.round(parseFloat(row?.total_km ?? "0") * 10) / 10;
+    const avgKmPerUser = totalUsersWithTelemetry > 0 ? Math.round((kmCollected / totalUsersWithTelemetry) * 10) / 10 : 0;
     const payload = {
-      totalSamples,
-      activeUsers,
-      kmCollected,
-      latestSample,
-      totalRides,
-      avgKmPerUser,
-      targetKm,
-      kmWindowDays: KM_WINDOW_DAYS,
+      totalSamples, activeUsers, kmCollected, latestSample, totalRides, avgKmPerUser, targetKm,
+      // This is now cumulative. A time-windowed value needs a separate daily rollup,
+      // never another Haversine scan over raw telemetry.
+      kmWindowDays: 0,
     };
-
     setCached(CACHE_KEY, payload);
+    logTelemetryEvent({ ts: new Date().toISOString(), type: "INFO", context: "admin/telemetry-stats", message: `OK in ${Date.now() - startMs}ms — summary rows only; campioni=${totalSamples} utenti=${totalUsersWithTelemetry} km=${kmCollected}` });
     return res.json(payload);
   } catch (err) {
     const elapsedMs = Date.now() - startMs;
     const pgMsg = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
-    const cause = pgMsg || errMsg;
     console.error("[admin/telemetry-stats] error:", err, pgMsg ? `| PG: ${pgMsg}` : "");
-    logTelemetryEvent({
-      ts: new Date().toISOString(),
-      type: "ERROR",
-      context: "admin/telemetry-stats",
-      message: `Fallita dopo ${elapsedMs}ms: ${errMsg}`,
-      detail: pgMsg || (err instanceof Error ? err.stack : undefined),
-    });
-    return res.status(500).json({ success: false, message: "Errore lettura statistiche telemetria", detail: cause });
+    logTelemetryEvent({ ts: new Date().toISOString(), type: "ERROR", context: "admin/telemetry-stats", message: `Fallita dopo ${elapsedMs}ms: ${errMsg}`, detail: pgMsg || (err instanceof Error ? err.stack : undefined) });
+    return res.status(500).json({ success: false, message: "Errore lettura statistiche telemetria", detail: pgMsg || errMsg });
   }
 });
 
