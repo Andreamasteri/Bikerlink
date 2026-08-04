@@ -142,16 +142,57 @@ export async function updateTelemetrySessionStats(
   // Àncora = ultimo campione (per ts) già visto per questa sessione. Può essere
   // null (nessun batch precedente, oppure ultimo campione sensor-only).
   const priorRes = await executor.execute(sql`
-    SELECT last_lat, last_lon
+    SELECT last_lat, last_lon, last_ts
     FROM telemetry_session_stats
     WHERE user_id = ${userId} AND session_id = ${sessionId}
     LIMIT 1
   `);
-  const prior = priorRes.rows[0] as { last_lat: number | null; last_lon: number | null } | undefined;
+  const prior = priorRes.rows[0] as {
+    last_lat: number | null; last_lon: number | null; last_ts: number | null;
+  } | undefined;
+  const firstTs = Math.min(...rows.map((row) => row.ts));
+  const requiresRebuild = prior?.last_ts != null && firstTs <= Number(prior.last_ts);
+
+  // A retry can contain samples that precede the current anchor. Incrementing
+  // from the newest point would double-count or bridge points in the wrong
+  // direction. Rebuild that *single* session under the same advisory lock.
+  if (requiresRebuild) {
+    const samplesRes = await executor.execute(sql`
+      SELECT ts, lat, lon, speed_kmh
+      FROM ride_telemetry
+      WHERE user_id = ${userId} AND session_id = ${sessionId}
+      ORDER BY ts ASC
+    `);
+    const samples = samplesRes.rows.map((row) => ({
+      ts: Number((row as { ts: number }).ts),
+      lat: (row as { lat: number | null }).lat,
+      lon: (row as { lon: number | null }).lon,
+      speedKmh: (row as { speed_kmh: number | null }).speed_kmh,
+    })) as InsertRideTelemetry[];
+    const rebuilt = computeSessionStatsDelta(null, null, samples);
+    await executor.execute(sql`
+      INSERT INTO telemetry_session_stats
+        (user_id, session_id, session_type, dist_all, dist_speed_filtered,
+         sample_count, sensor_only_count, last_lat, last_lon, last_ts, updated_at)
+      VALUES
+        (${userId}, ${sessionId}, ${sessionType}, ${rebuilt.deltaAll}, ${rebuilt.deltaSpeedFiltered},
+         ${rebuilt.sampleCount}, ${rebuilt.sensorOnly}, ${rebuilt.lastLat}, ${rebuilt.lastLon}, ${rebuilt.lastTs}, NOW())
+      ON CONFLICT (user_id, session_id) DO UPDATE SET
+        session_type = EXCLUDED.session_type,
+        dist_all = EXCLUDED.dist_all,
+        dist_speed_filtered = EXCLUDED.dist_speed_filtered,
+        sample_count = EXCLUDED.sample_count,
+        sensor_only_count = EXCLUDED.sensor_only_count,
+        last_lat = EXCLUDED.last_lat,
+        last_lon = EXCLUDED.last_lon,
+        last_ts = EXCLUDED.last_ts,
+        updated_at = NOW()
+    `);
+    return;
+  }
 
   const prevLat = prior?.last_lat != null ? Number(prior.last_lat) : null;
   const prevLon = prior?.last_lon != null ? Number(prior.last_lon) : null;
-
   const { deltaAll, deltaSpeedFiltered, sensorOnly, sampleCount, lastLat, lastLon, lastTs } =
     computeSessionStatsDelta(prevLat, prevLon, rows);
 
