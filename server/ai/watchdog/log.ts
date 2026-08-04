@@ -56,6 +56,7 @@ export async function writeWatchdogLog(entry: WatchdogLogEntry): Promise<string 
         const [row] = await tx
           .insert(aiWatchdogLog)
           .values({
+            eventKey,
             kind: entry.kind,
             scope: entry.scope ?? null,
             status,
@@ -88,11 +89,18 @@ export async function writeWatchdogLog(entry: WatchdogLogEntry): Promise<string 
 
 export async function markProposalAccepted(id: string, adminId: string): Promise<void> {
   try {
-    await db.update(aiWatchdogLog).set({
-      status: "accepted",
-      acceptedByAdminId: adminId,
-      acceptedAt: new Date(),
-    }).where(eq(aiWatchdogLog.id, id));
+    await db.transaction(async (tx) => {
+      const [row] = await tx.update(aiWatchdogLog).set({
+        status: "accepted",
+        acceptedByAdminId: adminId,
+        acceptedAt: new Date(),
+      }).where(eq(aiWatchdogLog.id, id)).returning({ eventKey: aiWatchdogLog.eventKey });
+      if (row?.eventKey) {
+        await tx.update(aiWatchdogEventState).set({
+          lastStatus: "accepted", lastLogId: id, updatedAt: new Date(),
+        }).where(eq(aiWatchdogEventState.eventKey, row.eventKey));
+      }
+    });
   } catch (err) {
     console.warn("[watchdog/log] accept error:", err);
   }
@@ -100,12 +108,19 @@ export async function markProposalAccepted(id: string, adminId: string): Promise
 
 export async function markProposalRejected(id: string, adminId: string, reason?: string): Promise<void> {
   try {
-    await db.update(aiWatchdogLog).set({
-      status: "rejected",
-      rejectedByAdminId: adminId,
-      rejectedAt: new Date(),
-      rejectReason: reason ? reason.slice(0, 300) : null,
-    }).where(eq(aiWatchdogLog.id, id));
+    await db.transaction(async (tx) => {
+      const [row] = await tx.update(aiWatchdogLog).set({
+        status: "rejected",
+        rejectedByAdminId: adminId,
+        rejectedAt: new Date(),
+        rejectReason: reason ? reason.slice(0, 300) : null,
+      }).where(eq(aiWatchdogLog.id, id)).returning({ eventKey: aiWatchdogLog.eventKey });
+      if (row?.eventKey) {
+        await tx.update(aiWatchdogEventState).set({
+          lastStatus: "rejected", lastLogId: id, updatedAt: new Date(),
+        }).where(eq(aiWatchdogEventState.eventKey, row.eventKey));
+      }
+    });
   } catch (err) {
     console.warn("[watchdog/log] reject error:", err);
   }
