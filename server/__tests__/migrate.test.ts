@@ -193,6 +193,29 @@ describe("0152 reconciliation migration boundaries", () => {
       (statement.match(/CREATE (?:UNIQUE )?INDEX CONCURRENTLY/g) ?? []).length <= 1
     )).toBe(true);
   });
+
+  it("isolates every 0155 statement so CREATE INDEX CONCURRENTLY is autocommit-safe", () => {
+    const migrationPath = path.resolve(
+      process.cwd(),
+      "migrations",
+      "0155_temp_spill_indexes_and_watchdog_identity.sql"
+    );
+    const sql = fs.readFileSync(migrationPath, "utf-8");
+    const statements = splitStatements(sql);
+
+    expect(isNoTransactionMigration(sql)).toBe(true);
+    expect(statements).toHaveLength(9);
+    expect(statements.filter((statement) =>
+      /CREATE (?:UNIQUE )?INDEX CONCURRENTLY/.test(statement)
+    )).toHaveLength(6);
+    expect(statements.every((statement) =>
+      (statement.match(/CREATE (?:UNIQUE )?INDEX CONCURRENTLY/g) ?? []).length <= 1
+    )).toBe(true);
+    expect(statements.some((statement) =>
+      statement.includes("ALTER TABLE ai_watchdog_log ALTER COLUMN event_key SET NOT NULL;") &&
+      statement.includes("CREATE INDEX CONCURRENTLY")
+    )).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
