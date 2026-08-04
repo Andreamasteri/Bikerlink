@@ -8,7 +8,7 @@
     "npm": "10.9.x"
   },
   "scripts": {
-    "postinstall": "patch-package",
+    "postinstall": "node scripts/patch-package-safe.cjs",
     "test": "vitest run",
     "expo:dev": "npx expo start --localhost",
     "server:dev": "NODE_ENV=development tsx server/index.ts",
