@@ -134,7 +134,7 @@ export async function handleCalculateRoute(req: Request, res: Response) {
     ) => {
       // Richiediamo i details osm_way_id per poter valutare la copertura
       // telemetrica sui segmenti effettivi del percorso.
-      const reqBody: Record<string, unknown> = { ...body, details: ["osm_way_id"] };
+      const reqBody: Record<string, unknown> = { ...body, details: ["osm_way_id", "max_speed"] };
       const customModel: Record<string, unknown> = {};
       if (priorityRules.length > 0) customModel.priority = priorityRules;
       if (geo.distanceInfluence !== undefined) customModel.distance_influence = geo.distanceInfluence;
@@ -230,7 +230,11 @@ export async function handleCalculateRoute(req: Request, res: Response) {
       .filter((point): point is [number, number] => Array.isArray(point) && point.length >= 2 && Number.isFinite(point[0]) && Number.isFinite(point[1]))
       .map(([lng, lat]) => ({ lat, lng }));
     const encodedPolyline = encodePolyline(rawPoints);
-    const technicalCheckpoints = buildTechnicalCheckpoints(coordinates, (path.instructions ?? []) as Array<{ sign?: number; interval?: number[]; text?: string; maxSpeedKmh?: number; max_speed?: number }>);
+    const technicalCheckpoints = buildTechnicalCheckpoints(
+      coordinates,
+      (path.instructions ?? []) as Array<{ sign?: number; interval?: number[]; text?: string; maxSpeedKmh?: number; max_speed?: number }>,
+      (path as { details?: Record<string, unknown> }).details,
+    );
 
     return res.json({
       encoded: encodedPolyline,
