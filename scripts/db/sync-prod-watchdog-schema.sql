@@ -9,7 +9,8 @@
 --
 -- Schema drizzle di riferimento:
 --   shared/db/watchdog.ts      (system_signals, system_health_snapshot,
---                               ai_watchdog_log, weekly_system_reports)
+--                               ai_watchdog_log, ai_watchdog_event_state,
+--                               weekly_system_reports)
 --   shared/db/db-integrity.ts  (db_integrity_runs, db_integrity_violations,
 --                               db_integrity_quarantine)
 --   shared/db/matching.ts      (match_preferences.time_overlap, .weekly_recap)
@@ -57,6 +58,7 @@ CREATE INDEX IF NOT EXISTS system_health_snapshot_status_idx
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS ai_watchdog_log (
   id                   VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_key            VARCHAR(180) NOT NULL,
   kind                 VARCHAR(30)  NOT NULL,
   scope                VARCHAR(60),
   status               VARCHAR(20)  NOT NULL DEFAULT 'ok',
@@ -71,9 +73,49 @@ CREATE TABLE IF NOT EXISTS ai_watchdog_log (
   cost_usd             DOUBLE PRECISION NOT NULL DEFAULT 0,
   created_at           TIMESTAMP    NOT NULL DEFAULT NOW()
 );
+ALTER TABLE ai_watchdog_log
+  ADD COLUMN IF NOT EXISTS event_key VARCHAR(180);
+UPDATE ai_watchdog_log
+SET event_key = LEFT(kind || ':' || COALESCE(scope, 'global'), 180)
+WHERE event_key IS NULL;
+ALTER TABLE ai_watchdog_log
+  ALTER COLUMN event_key SET NOT NULL;
+CREATE INDEX IF NOT EXISTS ai_watchdog_log_event_created_idx
+  ON ai_watchdog_log (event_key, created_at, id);
 CREATE INDEX IF NOT EXISTS ai_watchdog_log_kind_idx    ON ai_watchdog_log (kind);
 CREATE INDEX IF NOT EXISTS ai_watchdog_log_status_idx  ON ai_watchdog_log (status);
 CREATE INDEX IF NOT EXISTS ai_watchdog_log_created_idx ON ai_watchdog_log (created_at);
+
+-- ---------------------------------------------------------------------------
+-- 3b) ai_watchdog_event_state (dedup persistente)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ai_watchdog_event_state (
+  event_key    VARCHAR(180) PRIMARY KEY,
+  last_status  VARCHAR(20) NOT NULL,
+  last_log_id  VARCHAR(36),
+  updated_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ai_watchdog_event_state_updated_idx
+  ON ai_watchdog_event_state (updated_at);
+INSERT INTO ai_watchdog_event_state (event_key, last_status, last_log_id, updated_at)
+SELECT event_key, status, id, created_at
+FROM (
+  SELECT
+    event_key,
+    status,
+    id,
+    created_at,
+    ROW_NUMBER() OVER (
+      PARTITION BY event_key
+      ORDER BY created_at DESC, id DESC
+    ) AS rn
+  FROM ai_watchdog_log
+) latest
+WHERE rn = 1
+ON CONFLICT (event_key) DO UPDATE SET
+  last_status = EXCLUDED.last_status,
+  last_log_id = EXCLUDED.last_log_id,
+  updated_at = EXCLUDED.updated_at;
 
 -- ---------------------------------------------------------------------------
 -- 4) weekly_system_reports (+ 1 indice, unique su week_start)
