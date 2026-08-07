@@ -390,6 +390,10 @@ export function useNavigateState() {
 
       if (newPts.length > 1) {
         activeStepsRef.current = newRoute.navigationSteps ?? null;
+        activeTechnicalCheckpointsRef.current = newRoute.technicalCheckpoints ?? [];
+        announcedCheckpointRef.current.clear();
+        isOffRouteRef.current = false;
+        setIsOffRoute(false);
         if (newRoute.distanceKm) activeTotalKmRef.current = newRoute.distanceKm;
         if (newRoute.durationMinutes) activeTotalMinRef.current = newRoute.durationMinutes;
         announcedFarRef.current.clear();
