@@ -77,12 +77,42 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
   const [plannedLocations, setPlannedLocations] = useState<PlanLocation[] | null>(null);
   const [plannedRoundTrip, setPlannedRoundTrip] = useState(false);
   const [plannedSchedule, setPlannedSchedule] = useState<AiRouteResult["schedule"]>(null);
+  const [geocodingLocationIndex, setGeocodingLocationIndex] = useState<number | null>(null);
 
   const closeModal = () => {
     if (loading) return;
     setPlannedLocations(null);
     setPlannedSchedule(null);
+    setGeocodingLocationIndex(null);
     onClose();
+  };
+
+  const updateLocationQuery = (index: number, query: string) => {
+    setPlannedLocations((current) => current?.map((item, itemIndex) =>
+      itemIndex === index
+        ? { ...item, query, candidates: [], selectedIndex: null }
+        : item
+    ) ?? null);
+  };
+
+  const handleRegeocodeLocation = async (index: number) => {
+    const location = plannedLocations?.[index];
+    const query = location?.query.trim() ?? "";
+    if (!query) return;
+    setGeocodingLocationIndex(index);
+    setPlannedLocations((current) => current?.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, candidates: [], selectedIndex: null } : item
+    ) ?? null);
+    try {
+      const candidates = await geocodeViaServer(query);
+      setPlannedLocations((current) => current?.map((item, itemIndex) =>
+        itemIndex === index
+          ? { ...item, candidates, selectedIndex: candidates.length === 1 ? 0 : null }
+          : item
+      ) ?? null);
+    } finally {
+      setGeocodingLocationIndex(null);
+    }
   };
 
   const handleGenerate = async () => {
@@ -169,6 +199,7 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
     setPrompt("");
     setPlannedLocations(null);
     setPlannedSchedule(null);
+    setGeocodingLocationIndex(null);
     onClose();
   };
 
@@ -249,9 +280,29 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
                         ? "Arrivo"
                         : "Tappa " + locationIndex}
                   </Text>
-                  <Text style={styles.queryText}>{location.query}</Text>
+                  <View style={styles.queryRow}>
+                    <TextInput
+                      style={styles.queryInput}
+                      value={location.query}
+                      onChangeText={(value) => updateLocationQuery(locationIndex, value)}
+                      placeholder="Correggi località o indirizzo"
+                      placeholderTextColor={Colors.textSecondary}
+                      editable={geocodingLocationIndex === null}
+                      onSubmitEditing={() => handleRegeocodeLocation(locationIndex)}
+                      returnKeyType="search"
+                    />
+                    <TouchableOpacity
+                      style={styles.regeocodeBtn}
+                      onPress={() => handleRegeocodeLocation(locationIndex)}
+                      disabled={geocodingLocationIndex !== null || !location.query.trim()}
+                    >
+                      {geocodingLocationIndex === locationIndex
+                        ? <ActivityIndicator size="small" color="#000" />
+                        : <MaterialCommunityIcons name="magnify" size={18} color="#000" />}
+                    </TouchableOpacity>
+                  </View>
                   {location.candidates.length === 0 ? (
-                    <Text style={styles.noResult}>Nessun risultato: modifica la richiesta e riprova.</Text>
+                    <Text style={styles.noResult}>Nessun risultato. Correggi il testo e premi la lente.</Text>
                   ) : (
                     location.candidates.map((candidate, candidateIndex) => (
                       <TouchableOpacity
@@ -336,7 +387,9 @@ const styles = StyleSheet.create({
   previewHint: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18 },
   locationCard: { backgroundColor: Colors.surface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: Colors.border, gap: 6 },
   locationLabel: { fontSize: 14, fontWeight: "700", color: Colors.accent },
-  queryText: { fontSize: 13, color: Colors.textSecondary },
+  queryRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  queryInput: { flex: 1, color: Colors.text, fontSize: 13, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 7 },
+  regeocodeBtn: { width: 34, height: 34, borderRadius: 8, backgroundColor: Colors.accent, justifyContent: "center", alignItems: "center" },
   candidate: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 9, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1, borderColor: Colors.border },
   candidateSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "18" },
   candidateText: { flex: 1, color: Colors.text, fontSize: 13 },
