@@ -359,7 +359,6 @@ import aiAssistantAdminRouter from './admin/ai-assistant';
 import backupPreviewRouter from './admin/backup-preview';
 import exportsRouter from './admin/exports';
 import legalRouter from './admin/legal';
-import whisperConfigRouter from './admin-whisper-config';
 import legalNextRouter from './admin/legal.next';
 // Task #2852 — Test stato server Ollama (provider AI primario).
 import aiTestOllamaRouter from './admin/ai/test-ollama';
@@ -370,7 +369,7 @@ import aiMetricsRouter from './admin/ai/metrics';
 import bowieStandaloneRouter from './admin/bowie-standalone';
 // Task #51 — Conversazione osservabile a più agenti (Horus/Bowie/Quebracho).
 import aiGroupChatRouter from './admin/ai-group-chat';
-// Salute unificata servizi self-hosted ThinkCentre (GraphHopper/Ollama/Whisper/Photon).
+// Salute unificata servizi self-hosted ThinkCentre (GraphHopper/Ollama/Photon).
 import thinkcentreHealthRouter from './admin/thinkcentre-health';
 // Metriche hardware ThinkCentre (CPU/RAM/uptime via agente Node.js sul mini-PC).
 import thinkcentreMetricsRouter from './admin/thinkcentre-metrics';
@@ -535,7 +534,6 @@ router.use('/', _requireAdmin, metricsRouter);
 router.use('/', _requireAdmin, aiAssistantAdminRouter);
 router.use('/', _requireAdmin, backupPreviewRouter);
 router.use('/', _requireAdmin, exportsRouter);
-router.use('/', _requireAdmin, whisperConfigRouter);
 router.use('/legal', _requireAdmin, legalRouter);
 router.use('/legal', _requireAdmin, legalNextRouter);
 // Task #3894 — Raccolta bug FAB.
