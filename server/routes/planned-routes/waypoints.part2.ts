@@ -59,7 +59,7 @@ export async function handleCalculateRoute(req: Request, res: Response) {
   const normProfile = normalizeDrivingProfile(drivingProfile);
   // "auto panoramica": profilo veicolo Valhalla (costing auto curvy). È un asse
   // distinto dallo stile/telemetria moto — quando attivo, il router-selector
-  // instrada SEMPRE a Valhalla senza fallback a GraphHopper.
+  // instrada SEMPRE a Valhalla, senza passare da GraphHopper.
   const isAutoCurvy = routingProfile === "auto_curvy";
   // Profilo GH self-hosted da usare: se l'utente ha scelto esplicitamente
   // "motorcycle_fast" o "car", usiamo quel profilo; altrimenti il default
