@@ -7,7 +7,6 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
-  Platform,
   StyleSheet,
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -15,8 +14,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
-import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
-import { t } from "@/lib/i18n";
 
 type RouteStyle = "curvy" | "balanced" | "fast";
 type GeoCandidate = { lat: number; lng: number; name: string };
@@ -81,29 +78,11 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
   const [plannedRoundTrip, setPlannedRoundTrip] = useState(false);
   const [plannedSchedule, setPlannedSchedule] = useState<AiRouteResult["schedule"]>(null);
 
-  const whisper = useWhisperRecorder();
-  const micAvailable = Platform.OS !== "web" && whisper.error !== "Permesso microfono negato";
-
   const closeModal = () => {
     if (loading) return;
     setPlannedLocations(null);
     setPlannedSchedule(null);
     onClose();
-  };
-
-  const handleMicPress = async () => {
-    if (whisper.recording) {
-      const text = await whisper.stopAndTranscribe();
-      if (text === null) {
-        Alert.alert(t("aiPlan.mic.errorMic"), whisper.error || t("aiPlan.mic.noAudio"));
-      } else if (text.trim().length === 0) {
-        Alert.alert(t("aiPlan.mic.noAudio"), "");
-      } else {
-        setPrompt((prev) => (prev.trim() ? prev.trim() + " " + text.trim() : text.trim()));
-      }
-    } else {
-      await whisper.startRecording();
-    }
   };
 
   const handleGenerate = async () => {
@@ -231,30 +210,9 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
               multiline
               numberOfLines={4}
               textAlignVertical="top"
-              editable={!loading && !whisper.transcribing && !plannedLocations}
+              editable={!loading && !plannedLocations}
             />
-            {micAvailable && (
-              <TouchableOpacity
-                style={[styles.micBtn, whisper.recording && styles.micBtnActive]}
-                onPress={handleMicPress}
-                disabled={loading || whisper.transcribing || !!plannedLocations}
-                hitSlop={8}
-              >
-                {whisper.transcribing ? (
-                  <ActivityIndicator size="small" color={Colors.accent} />
-                ) : (
-                  <MaterialCommunityIcons
-                    name={whisper.recording ? "microphone" : "microphone-outline"}
-                    size={24}
-                    color={whisper.recording ? Colors.accent : Colors.textSecondary}
-                  />
-                )}
-              </TouchableOpacity>
-            )}
           </View>
-          {whisper.recording && <Text style={styles.micStatus}>{t("aiPlan.mic.recording")}</Text>}
-          {whisper.transcribing && <Text style={styles.micStatus}>{t("aiPlan.mic.transcribing")}</Text>}
-
           <Text style={styles.label}>Stile di guida</Text>
           <View style={styles.styleRow}>
             {STYLES.map((style) => (
@@ -336,9 +294,9 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
 
           {!plannedLocations && (
             <TouchableOpacity
-              style={[styles.generateBtn, (loading || whisper.recording || whisper.transcribing) && styles.generateBtnDisabled]}
+              style={[styles.generateBtn, loading && styles.generateBtnDisabled]}
               onPress={handleGenerate}
-              disabled={loading || whisper.recording || whisper.transcribing}
+              disabled={loading}
             >
               {loading ? <ActivityIndicator size="small" color="#000" /> : <MaterialCommunityIcons name="robot" size={20} color="#000" />}
               <Text style={styles.generateBtnText}>Genera percorso</Text>
@@ -346,7 +304,7 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
           )}
 
           <Text style={styles.hint}>
-            L'AI analizzerà richiesta, indirizzi e orari. Prima di caricare la proposta dovrai confermare i punti trovati.
+            L'AI analizzerà richiesta, indirizzi e orari. Puoi dettare il testo usando il microfono della tastiera Android/iOS.
           </Text>
         </KeyboardAwareScrollViewCompat>
       </View>
@@ -395,7 +353,4 @@ const styles = StyleSheet.create({
   hint: { fontSize: 12, color: Colors.textSecondary, marginTop: 14, lineHeight: 18, textAlign: "center" },
   inputRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   inputFlex: { flex: 1 },
-  micBtn: { width: 44, height: 44, borderRadius: 10, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, alignItems: "center", justifyContent: "center" },
-  micBtnActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + "18" },
-  micStatus: { fontSize: 12, color: Colors.accent, marginTop: 6 },
 });
