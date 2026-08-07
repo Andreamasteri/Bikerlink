@@ -8,8 +8,7 @@ description: Gestire Photon self-hosted sul ThinkCentre BikerLink (geocoder unic
 Photon è il geocoder self-hosted di BikerLink, ed è l'unico geocoder autorizzato.
 Gira sul ThinkCentre ed è esposto via Cloudflare Tunnel + Cloudflare Access.
 
-> ⚠️ Photon è **solo self-hosted**: nessun fallback pubblico (né `photon.komoot.io`
-> né `nominatim.openstreetmap.org`). Se `PHOTON_URL`/`PHOTON_TOKEN` non sono
+> ⚠️ Photon è **solo self-hosted**. Le richieste usano esclusivamente il server Photon configurato. Se `PHOTON_URL`/`PHOTON_TOKEN` non sono
 > configurati o il ThinkCentre è offline, il geocoding fallisce in modo esplicito.
 
 ## Contratto d'integrazione app ↔ Photon (verificato nel codice)
