@@ -37,7 +37,7 @@ export default function TelemetryUserDetailScreen() {
   const [resettingCalibration, setResettingCalibration] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error, refetch } = useQuery<{ sessions: Session[]; userId: number }>({
+  const { data, isLoading, error, refetch } = useQuery<{ sessions: Session[]; userId: string }>({
     queryKey: ["/api/admin/telemetry/users", userId, "sessions"],
     queryFn: () => adminFetch(`/api/admin/telemetry/users/${userId}/sessions`),
     staleTime: 30_000,
@@ -133,7 +133,7 @@ export default function TelemetryUserDetailScreen() {
 
       <View style={styles.sessionsContainer}>
         {sessions.map((session) => (
-          <SessionCard key={session.sessionId} session={session} />
+          <SessionCard key={`${session.userId}:${session.sessionId}`} session={session} />
         ))}
         {!isLoading && sessions.length === 0 && (
           <View style={styles.emptyState}>
