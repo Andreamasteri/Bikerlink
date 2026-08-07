@@ -9,8 +9,8 @@
  * formato GeoJSON: features[].geometry.coordinates = [lon, lat] e
  * features[].properties con i campi indirizzo.
  *
- * SOLO self-hosted: nessun fallback a server pubblici (né photon.komoot.io né
- * provider precedente.openstreetmap.org). Se PHOTON_URL/PHOTON_TOKEN non sono configurati
+ * SOLO self-hosted: le richieste usano esclusivamente il server Photon configurato.
+ * Non vengono contattati servizi pubblici o provider esterni. Se PHOTON_URL/PHOTON_TOKEN non sono configurati
  * o il ThinkCentre è offline, le chiamate falliscono in modo esplicito.
  *
  * Variabili d'ambiente (secret Replit):
