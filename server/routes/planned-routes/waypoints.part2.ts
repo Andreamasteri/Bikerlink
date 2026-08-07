@@ -168,7 +168,7 @@ export async function handleCalculateRoute(req: Request, res: Response) {
           effectivePriority = [...basePriority, ...telemetry.priority];
         } catch (telemetryErr: unknown) {
           // Lo strato telemetrico (regole su osm_way_id) può non essere supportato
-          // dal motore di routing: mantieni il geometrico (fallback stabile) e
+          // dal motore di routing: mantieni il percorso geometrico di base e
           // segnala lo stato strutturato all'utente.
           console.warn("[routing] telemetry layer failed, keep geometric:", (telemetryErr as Error)?.message ?? telemetryErr);
           myStyleWarning = "insufficient_data";
