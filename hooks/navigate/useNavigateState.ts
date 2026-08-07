@@ -15,7 +15,7 @@ import { haversineM, closestPointIndexOnPolyline } from "@/lib/geo";
 import { useMapConfig } from "@/lib/map-context";
 import { useLocale, useT } from "@/lib/language-context";
 import { decodePolylineTuples as decodePolyline } from "@/lib/polyline";
-import type { NavigationStep, PlannedRoute } from "@/components/navigate/navigate-types";
+import type { NavigationStep, PlannedRoute, TechnicalCheckpoint } from "@/components/navigate/navigate-types";
 import {
   saveRouteToCache,
   loadRouteFromCache,
@@ -39,6 +39,23 @@ export function announceStep(distM: number, stepIdx: number, nextStep: any, anno
     announcedNear.add(stepIdx);
     Speech.speak(nextStep.text, { language: locale });
   }
+}
+
+const LOCAL_TURN_PHRASES: Record<string, string> = {
+  "navigation.turn.left": "Svoltare a sinistra",
+  "navigation.turn.right": "Svoltare a destra",
+  "navigation.turn.u_turn": "Fare inversione a U",
+};
+
+export function announceTechnicalCheckpoint(
+  checkpoint: TechnicalCheckpoint,
+  announced: Set<string>,
+  locale: string,
+): void {
+  if (announced.has(checkpoint.id)) return;
+  announced.add(checkpoint.id);
+  const phrase = LOCAL_TURN_PHRASES[checkpoint.audioKey] ?? checkpoint.instruction;
+  Speech.speak(phrase, { language: locale });
 }
 
 export function calculateRemainingDist(polylinePoints: Array<[number, number]>, closestIdx: number): number {
@@ -176,6 +193,8 @@ export function useNavigateState() {
   const isReroutingRef = useRef(false);
   const lastKnownPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const activeStepsRef = useRef<NavigationStep[] | null>(null);
+  const activeTechnicalCheckpointsRef = useRef<TechnicalCheckpoint[]>([]);
+  const announcedCheckpointRef = useRef<Set<string>>(new Set());
   const activeTotalKmRef = useRef<number | null>(null);
   const activeTotalMinRef = useRef<number | null>(null);
   const liveLastSentAtRef = useRef(0);
@@ -275,6 +294,8 @@ export function useNavigateState() {
       activeTotalMinRef.current = route.durationMinutes;
     }
     activeStepsRef.current = route.navigationSteps ?? null;
+    activeTechnicalCheckpointsRef.current = route.metadata?.technicalCheckpoints ?? [];
+    announcedCheckpointRef.current.clear();
   }, [route, setPolylinePoints, setRemainingKm, setRemainingMin]);
 
   useEffect(() => {
@@ -346,6 +367,8 @@ export function useNavigateState() {
 
       if (newPts.length > 1) {
         activeStepsRef.current = newRoute.navigationSteps ?? null;
+        activeTechnicalCheckpointsRef.current = newRoute.technicalCheckpoints ?? [];
+        announcedCheckpointRef.current.clear();
         if (newRoute.distanceKm) activeTotalKmRef.current = newRoute.distanceKm;
         if (newRoute.durationMinutes) activeTotalMinRef.current = newRoute.durationMinutes;
         announcedFarRef.current.clear();
@@ -484,6 +507,14 @@ export function useNavigateState() {
   const handlePositionUpdate = useCallback((lat: number, lng: number, heading: number) => {
     if (polylinePoints.length === 0) return;
     lastKnownPosRef.current = { lat, lng };
+
+    for (const checkpoint of activeTechnicalCheckpointsRef.current) {
+      const distanceToCheckpoint = haversineM(lat, lng, checkpoint.latitude, checkpoint.longitude);
+      const triggerRadius = Math.max(35, Math.min(75, checkpoint.distanceBeforeM * 0.35));
+      if (distanceToCheckpoint <= triggerRadius) {
+        announceTechnicalCheckpoint(checkpoint, announcedCheckpointRef.current, locale);
+      }
+    }
 
     const closestIdx = closestPointIndexOnPolyline(lat, lng, polylinePoints);
     const closestDist = haversineM(lat, lng, polylinePoints[closestIdx][0], polylinePoints[closestIdx][1]);
