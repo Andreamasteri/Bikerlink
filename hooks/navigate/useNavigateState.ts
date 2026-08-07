@@ -75,7 +75,8 @@ export const useNavigateStates = () => {
   const [remainingKm, setRemainingKm] = useState<number | null>(null);
   const [remainingMin, setRemainingMin] = useState<number | null>(null);
   const [isFinished, setIsFinished] = useState(false);
-  const [polylinePoints, setPolylinePoints] = useState<Array<[number, number]>>([]);
+  const [isOffRoute, setIsOffRoute] = useState(false);
+  const [polylinePoints, setPolylinePoints = useState<Array<[number, number]>>([]);
   const [hasPermission, setHasPermission] = useState(false);
   const [isRerouting, setIsRerouting] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
@@ -91,6 +92,7 @@ export const useNavigateStates = () => {
     remainingKm, setRemainingKm,
     remainingMin, setRemainingMin,
     isFinished, setIsFinished,
+    isOffRoute, setIsOffRoute,
     polylinePoints, setPolylinePoints,
     hasPermission, setHasPermission,
     isRerouting, setIsRerouting,
@@ -190,6 +192,7 @@ export function useNavigateState() {
   const announcedNearRef = useRef<Set<number>>(new Set());
 
   const offRouteStartRef = useRef<number | null>(null);
+  const isOffRouteRef = useRef(false);
   const isReroutingRef = useRef(false);
   const lastKnownPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const activeStepsRef = useRef<NavigationStep[] | null>(null);
@@ -296,6 +299,9 @@ export function useNavigateState() {
     activeStepsRef.current = route.navigationSteps ?? null;
     activeTechnicalCheckpointsRef.current = route.metadata?.technicalCheckpoints ?? [];
     announcedCheckpointRef.current.clear();
+    offRouteStartRef.current = null;
+    isOffRouteRef.current = false;
+    setIsOffRoute(false);
   }, [route, setPolylinePoints, setRemainingKm, setRemainingMin]);
 
   useEffect(() => {
@@ -524,30 +530,41 @@ export function useNavigateState() {
         if (offRouteStartRef.current === null) {
           offRouteStartRef.current = Date.now();
         } else if (Date.now() - offRouteStartRef.current >= REROUTE_DELAY_MS) {
-          triggerRerouteRef.current(lat, lng);
+          isOffRouteRef.current = true;
+          setIsOffRoute(true);
         }
       } else {
         offRouteStartRef.current = null;
+        if (isOffRouteRef.current) {
+          isOffRouteRef.current = false;
+          setIsOffRoute(false);
+        }
       }
     }
 
     const pct = Math.min(100, Math.round((closestIdx / Math.max(1, polylinePoints.length - 1)) * 100));
-    setProgressPct(pct);
     const nearbyWaypointIndex = (route?.waypoints ?? []).findIndex((wp) =>
       haversineM(lat, lng, wp.lat, wp.lng) <= 100
     );
-    const liveEvent = nearbyWaypointIndex >= 0
-      ? "waypoint"
-      : (closestDist > REROUTE_DISTANCE_M ? "off_route" : (liveStartedRef.current ? "position" : "start"));
+    const liveEvent = isOffRouteRef.current
+      ? "off_route"
+      : nearbyWaypointIndex >= 0
+        ? "waypoint"
+        : (liveStartedRef.current ? "position" : "start");
     sendLiveEvent(liveEvent, lat, lng, "gps", pct, nearbyWaypointIndex >= 0 ? nearbyWaypointIndex : null);
-
-    fetchNavWeatherRef.current(lat, lng, closestIdx);
 
     if (mapReady && webViewRef.current) {
       webViewRef.current.injectJavaScript(
         `window.navBridge && window.navBridge.updatePosition(${lat}, ${lng}, ${heading}, ${closestIdx}); true;`
       );
     }
+
+    // Fuori percorso: mantieni la mappa e la rotta programmata visibili, ma
+    // congela progressione e contatori finché l’utente non rientra sul tracciato.
+    if (isOffRouteRef.current) return;
+
+    setProgressPct(pct);
+    fetchNavWeatherRef.current(lat, lng, closestIdx);
 
     const steps = activeStepsRef.current ?? route?.navigationSteps;
     if (!steps || steps.length === 0) return;
@@ -582,7 +599,7 @@ export function useNavigateState() {
         Speech.speak(t("nav.announce.arrived"), { language: locale });
       }
     }
-  }, [polylinePoints, route, mapReady, isFinished, locale, t, sendLiveEvent, setCurrentStep, setDistanceToNext, setIsFinished, setProgressPct, setRemainingKm, setRemainingMin]);
+  }, [polylinePoints, route, mapReady, isFinished, locale, t, sendLiveEvent, setCurrentStep, setDistanceToNext, setIsFinished, setIsOffRoute, setProgressPct, setRemainingKm, setRemainingMin]);
 
   const [minimalMode, setMinimalMode] = useState(false);
   const minimalManualRef = useRef(false);
@@ -634,7 +651,7 @@ export function useNavigateState() {
     webViewRef, route, isLoading, isFinished,
     mapReady, currentStep, distanceToNext, progressPct,
     remainingKm, remainingMin, polylinePoints,
-    hasPermission, isRerouting, isOffline,
+    hasPermission, isRerouting, isOffRoute, isOffline,
     weatherLoading, currentWeather,
     mapUri, offline, activeStepsRef,
     minimalMode, handleToggleMinimal,
