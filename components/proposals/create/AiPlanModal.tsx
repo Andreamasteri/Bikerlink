@@ -143,8 +143,11 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
           }
         }
       }
-      if (!aiData.isRoundTrip && typeof aiData.endLocation === "string" && aiData.endLocation.trim()) {
-        sources.push({ role: "destination", query: aiData.endLocation.trim() });
+      const startQuery = typeof aiData.startLocation === "string" ? aiData.startLocation.trim() : "";
+      const endQuery = typeof aiData.endLocation === "string" ? aiData.endLocation.trim() : "";
+      const hasDistinctDestination = !!endQuery && endQuery.toLowerCase() !== startQuery.toLowerCase();
+      if (hasDistinctDestination) {
+        sources.push({ role: "destination", query: endQuery });
       }
 
       const candidates = await Promise.all(sources.map((source) => geocodeViaServer(source.query)));
@@ -157,7 +160,7 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
         candidates: candidates[index],
         selectedIndex: candidates[index].length === 1 ? 0 : null,
       })));
-      setPlannedRoundTrip(aiData.isRoundTrip === true);
+      setPlannedRoundTrip(aiData.isRoundTrip === true && !hasDistinctDestination);
       setPlannedSchedule(aiData.schedule ?? null);
     } catch (err: unknown) {
       Alert.alert("Errore pianificazione", err instanceof Error ? err.message : "Errore durante la pianificazione AI");
