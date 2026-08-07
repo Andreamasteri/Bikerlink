@@ -4,6 +4,7 @@ import { requireAuth } from "./utils";
 import { sendError } from "../../lib/api-response";
 import { calculateRouteRequestSchema } from "@shared/validators";
 import { extractElevationProfile } from "./waypoints-helpers";
+import { encodePolyline, buildTechnicalCheckpoints } from "./utils";
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
 import {
   getActiveRouter,
@@ -224,8 +225,17 @@ export async function handleCalculateRoute(req: Request, res: Response) {
       }
     }
 
+    const coordinates = (path.points as { coordinates?: number[][] })?.coordinates ?? [];
+    const rawPoints = coordinates
+      .filter((point): point is [number, number] => Array.isArray(point) && point.length >= 2 && Number.isFinite(point[0]) && Number.isFinite(point[1]))
+      .map(([lng, lat]) => ({ lat, lng }));
+    const encodedPolyline = encodePolyline(rawPoints);
+    const technicalCheckpoints = buildTechnicalCheckpoints(coordinates, (path.instructions ?? []) as Array<{ sign?: number; interval?: number[]; text?: string; maxSpeedKmh?: number; max_speed?: number }>);
+
     return res.json({
-      encoded: path.points,
+      encoded: encodedPolyline,
+      rawPoints,
+      technicalCheckpoints,
       distanceKm: Math.round(path.distance / 100) / 10,
       durationMinutes: Math.round(path.time / 60000),
       instructions: path.instructions ?? [],
