@@ -39,13 +39,12 @@ function readLive(metadata: unknown): LiveState | null {
 function routeTargets(route: { waypoints: unknown }, dynamicPoint: { latitude: number; longitude: number } | null) {
   if (dynamicPoint) return [dynamicPoint];
   const waypoints = Array.isArray(route.waypoints) ? route.waypoints : [];
-  return waypoints
-    .filter((wp): wp is { lat: number; lng: number } => {
-      if (!wp || typeof wp !== "object") return false;
-      const item = wp as Record<string, unknown>;
-      return typeof item.lat === "number" && typeof item.lng === "number" && (item.lat !== 0 || item.lng !== 0);
-    })
-    .map((wp) => ({ latitude: wp.lat, longitude: wp.lng }));
+  const start = waypoints.find((wp): wp is { lat: number; lng: number } => {
+    if (!wp || typeof wp !== "object") return false;
+    const item = wp as Record<string, unknown>;
+    return typeof item.lat === "number" && typeof item.lng === "number" && (item.lat !== 0 || item.lng !== 0);
+  });
+  return start ? [{ latitude: start.lat, longitude: start.lng }] : [];
 }
 
 export interface LiveRouteMatchingResult {
