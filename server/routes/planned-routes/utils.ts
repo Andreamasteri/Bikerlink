@@ -133,9 +133,44 @@ function turnLabel(sign: number): string | null {
   return null;
 }
 
+function maxSpeedFromDetails(
+  details: Record<string, unknown> | undefined,
+  intervalStart: number,
+  intervalEnd: number,
+): number | undefined {
+  const ranges = details?.max_speed;
+  if (!Array.isArray(ranges)) return undefined;
+
+  for (const range of ranges) {
+    let from: number | undefined;
+    let to: number | undefined;
+    let rawValue: unknown;
+    if (Array.isArray(range)) {
+      from = Number(range[0]);
+      to = Number(range[1]);
+      rawValue = range[2];
+    } else if (range && typeof range === "object") {
+      const item = range as Record<string, unknown>;
+      from = Number(item.from ?? item.start ?? item.fromIndex);
+      to = Number(item.to ?? item.end ?? item.toIndex);
+      rawValue = item.value ?? item.speed ?? item.max_speed;
+    }
+    const value = typeof rawValue === "object" && rawValue !== null
+      ? (rawValue as Record<string, unknown>).value ?? (rawValue as Record<string, unknown>).speed
+      : rawValue;
+    const speed = Number(value);
+    if (Number.isFinite(from) && Number.isFinite(to) && Number.isFinite(speed)
+      && speed > 0 && intervalStart < to && intervalEnd >= from) {
+      return speed;
+    }
+  }
+  return undefined;
+}
+
 export function buildTechnicalCheckpoints(
   coordinates: number[][],
   instructions: RouteInstructionForCheckpoint[],
+  details?: Record<string, unknown>,
 ): TechnicalCheckpoint[] {
   if (coordinates.length < 2) return [];
   const checkpoints: TechnicalCheckpoint[] = [];
@@ -145,7 +180,9 @@ export function buildTechnicalCheckpoints(
     const direction = turnLabel(sign);
     if (!direction) continue;
     const intervalStart = Math.max(0, Math.min(coordinates.length - 1, Number(instruction.interval?.[0] ?? 0)));
-    const rawSpeed = Number(instruction.maxSpeedKmh ?? instruction.max_speed ?? 50);
+    const intervalEnd = Math.max(intervalStart, Math.min(coordinates.length - 1, Number(instruction.interval?.[1] ?? intervalStart)));
+    const detailSpeed = maxSpeedFromDetails(details, intervalStart, intervalEnd);
+    const rawSpeed = Number(instruction.maxSpeedKmh ?? instruction.max_speed ?? detailSpeed ?? 50);
     const maxSpeedKmh = Number.isFinite(rawSpeed) && rawSpeed > 0 ? Math.min(rawSpeed, 130) : 50;
     // Tre secondi di preavviso, con un limite operativo per evitare punti troppo lontani.
     const distanceBeforeM = Math.round(Math.max(25, Math.min(150, (maxSpeedKmh / 3.6) * 3 + 10)));
