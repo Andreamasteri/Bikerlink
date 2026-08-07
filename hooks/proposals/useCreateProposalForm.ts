@@ -141,6 +141,9 @@ export function useCreateProposalForm() {
 
   const applyRouteToForm = useCallback(
     (result: AiRouteResult | LoadedRouteResult) => {
+      if ("title" in result && typeof result.title === "string" && result.title.trim()) {
+        setTitle(result.title.trim());
+      }
       setDepartureLat(result.departure.lat);
       setDepartureLng(result.departure.lng);
       setDepartureAddress(result.departure.name);
