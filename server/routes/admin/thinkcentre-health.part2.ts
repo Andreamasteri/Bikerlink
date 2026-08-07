@@ -2,7 +2,6 @@ import { updateSystemStatus, type DotStatus as CachedDotStatus } from "../../lib
 import {
   probeGraphHopperAreas,
   probeOllama,
-  probeWhisper,
   type ServiceHealth,
   type GraphHopperHealth,
   type AreaServiceHealth,
@@ -96,7 +95,6 @@ export async function updateThinkCentreSystemStatus(
       valhalla: "unknown",
       photon: "unknown",
       ollama: "unknown",
-      whisper: "unknown",
       ufw: "unknown",
       dragonfly: "unknown",
       nginx: "unknown",
@@ -110,7 +108,6 @@ export async function updateThinkCentreSystemStatus(
       valhalla: svcDot(svcMap.get("valhalla")),
       photon: svcDot(svcMap.get("photon")),
       ollama: svcDot(svcMap.get("ollama")),
-      whisper: svcDot(svcMap.get("whisper")),
       ufw: ufwDot(),
       dragonfly: svcDot(svcMap.get("dragonfly")),
       nginx: svcDot(svcMap.get("nginx")),
@@ -131,7 +128,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
   Pick<
     import("../../lib/system-status-cache").SystemStatusSnapshot,
     | "thinkcentre" | "graphhopper" | "valhalla" | "photon"
-    | "ollama" | "whisper" | "ufw"
+    | "ollama" | "ufw"
     | "dragonfly" | "nginx" | "uptimeKuma" | "aihub"
   >
 > {
@@ -143,7 +140,6 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
       valhalla: "unknown" as CachedDotStatus,
       photon: "unknown" as CachedDotStatus,
       ollama: "unknown" as CachedDotStatus,
-      whisper: "unknown" as CachedDotStatus,
       ufw: "unknown" as CachedDotStatus,
       dragonfly: "unknown" as CachedDotStatus,
       nginx: "unknown" as CachedDotStatus,
@@ -177,7 +173,6 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     valhallaDetail,
     photonDetail,
     ollama,
-    whisper,
     ufwDetail,
     dragonflyInfra,
     nginxInfra,
@@ -188,7 +183,6 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     probeValhallaDetailed(),
     probePhotonDetailed(),
     probeOllama(),
-    probeWhisper(),
     probeUfwDetailed(),
     probeDragonflyInfra(),
     probeNginxInfra(),
@@ -212,7 +206,7 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     return "offline";
   };
 
-  const configuredServices = [valhallaDetail, photonDetail, ollama, whisper, dragonflyInfra, nginxInfra, uptimeKumaInfra, aihubInfra].filter((s) => s.configured);
+  const configuredServices = [valhallaDetail, photonDetail, ollama, dragonflyInfra, nginxInfra, uptimeKumaInfra, aihubInfra].filter((s) => s.configured);
   const ghContributes = graphhopper.configured && graphhopper.areas.some((a: AreaServiceHealth) => a.enabled);
   const configuredCount = configuredServices.length + (ghContributes ? 1 : 0);
   const onlineCount = configuredServices.filter((s) => s.ok).length + (ghContributes && graphhopper.ok ? 1 : 0);
@@ -227,7 +221,6 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
     valhalla: svc(valhallaDetail),
     photon: svc(photonDetail),
     ollama: svc(ollama),
-    whisper: svc(whisper),
     ufw: ufwDetail.configured ? (ufwDetail.ok ? "ok" : "offline") as CachedDotStatus : "unknown",
     dragonfly: svc(dragonflyInfra),
     nginx: svc(nginxInfra),
