@@ -34,6 +34,14 @@ router.post("/:id/live", async (req: Request, res: Response) => {
     const body = parsed.data;
     const hasPosition = body.latitude != null && body.longitude != null;
     const previous = ((route.metadata ?? {}) as Record<string, unknown>).live;
+    const eventAt = body.eventAt ?? new Date().toISOString();
+    const previousEventAt = typeof previous === "object" && previous !== null && "eventAt" in previous
+      ? Date.parse(String((previous as { eventAt?: unknown }).eventAt ?? ""))
+      : NaN;
+    const incomingEventAt = Date.parse(eventAt);
+    if (Number.isFinite(previousEventAt) && Number.isFinite(incomingEventAt) && incomingEventAt < previousEventAt) {
+      return res.json({ ok: true, ignored: true, live: previous });
+    }
     const live = {
       event: body.event,
       latitude: hasPosition ? body.latitude : null,
@@ -48,7 +56,7 @@ router.post("/:id/live", async (req: Request, res: Response) => {
       locationAgeMs: body.locationAgeMs ?? null,
       waypointIndex: body.waypointIndex ?? null,
       progressPct: body.progressPct ?? null,
-      eventAt: body.eventAt ?? new Date().toISOString(),
+      eventAt,
       previousEventAt: typeof previous === "object" && previous !== null && "eventAt" in previous
         ? (previous as { eventAt?: unknown }).eventAt ?? null
         : null,
