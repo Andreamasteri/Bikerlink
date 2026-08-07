@@ -65,7 +65,6 @@ export interface SystemStatuses {
   valhalla: DotStatus;
   photon: DotStatus;
   ollama: DotStatus;
-  whisper: DotStatus;
   ufw: DotStatus;
   dragonfly: DotStatus;
   nginx: DotStatus;
@@ -87,7 +86,6 @@ const DOT_DEFS: { key: keyof SystemStatuses; label: string }[] = [
   { key: "valhalla",     label: "Valhalla"        },
   { key: "photon",       label: "Photon"          },
   { key: "ollama",       label: "Ollama AI"       },
-  { key: "whisper",      label: "Whisper ASR"     },
   { key: "ufw",          label: "Firewall"        },
   { key: "dragonfly",    label: "DragonflyDB"     },
   { key: "nginx",        label: "nginx"           },
