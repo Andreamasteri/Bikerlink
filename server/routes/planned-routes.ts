@@ -6,6 +6,7 @@ import sharingRouter from "./planned-routes/sharing";
 import sharingNextRouter from "./planned-routes/sharing.next";
 import extrasRouter from "./planned-routes/extras";
 import matchingIntegrationRouter from "./planned-routes/matching-integration";
+import liveRouter from "./planned-routes/live";
 
 const router = Router();
 
@@ -27,6 +28,7 @@ router.use("/", extrasRouter);
 
 // integrazione matching ↔ planned routes
 router.use("/", matchingIntegrationRouter);
+router.use("/", liveRouter);
 
 // CRUD operations (/, /:id) — MUST be last: GET /:id wildcard intercepts all unmatched GET paths
 router.use("/", crudRouter);
