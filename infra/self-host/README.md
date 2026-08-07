@@ -139,7 +139,7 @@ Le credenziali di Postgres e pgAdmin sono generate da `setup.sh` e salvate in `.
 > docker compose stop  graphhopper-grecia   # spegni
 > ```
 
-### Nominatim 4.4 — geocoding self-hosted (profilo `nominatim`)
+### Geocoding Photon
 
 | Servizio | URL locale | Health | Default |
 |----------|-----------|--------|---------|
