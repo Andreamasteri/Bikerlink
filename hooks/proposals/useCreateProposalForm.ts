@@ -155,6 +155,14 @@ export function useCreateProposalForm() {
         setDestinationLat(null);
         setDestinationLng(null);
       }
+      // Un nuovo percorso deve sostituire completamente gli orari precedenti:
+      // evita di riutilizzare date/ore rimaste da una pianificazione precedente.
+      setDateStr("");
+      setTimeFrom("");
+      setTimeTo("");
+      setReturnDeadlineEnabled(false);
+      setReturnDeadlineTime("");
+
       if ("schedule" in result && result.schedule) {
         const schedule = result.schedule;
         if (schedule.departureDate && /^\d{4}-\d{2}-\d{2}$/.test(schedule.departureDate)) {
@@ -392,7 +400,10 @@ export function useCreateProposalForm() {
 
     let finalDestinationLat = destinationLat;
     let finalDestinationLng = destinationLng;
-    if (destinationRequired && (!Number.isFinite(finalDestinationLat) || !Number.isFinite(finalDestinationLng))) {
+    // Se l'AI o l'utente ha fornito una destinazione, la risolviamo sempre:
+    // la destinazione del viaggio non deve sparire solo perché il matching
+    // alla destinazione non è stato attivato.
+    if (destinationAddress.trim() && (!Number.isFinite(finalDestinationLat) || !Number.isFinite(finalDestinationLng))) {
       const geo = await geocodeAddress(destinationAddress.trim());
       if (!geo) {
         Alert.alert(
@@ -431,7 +442,9 @@ export function useCreateProposalForm() {
       data.wishlistMotoId = anyMotoOk ? null : selectedWishlistMotoId;
       data.anyMotoOk = anyMotoOk;
     }
-    if (needsDestination) {
+    const hasDestinationCoordinates =
+      Number.isFinite(finalDestinationLat) && Number.isFinite(finalDestinationLng);
+    if (destinationAddress.trim() && hasDestinationCoordinates) {
       data.destinationAddress = destinationAddress.trim();
       data.destinationLatitude = finalDestinationLat;
       data.destinationLongitude = finalDestinationLng;
