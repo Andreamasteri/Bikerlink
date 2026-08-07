@@ -7,6 +7,7 @@ import { sendPlannedRouteInvitePushNotifications } from "../push-notifications";
 
 const LIVE_MAX_AGE_MS = 5 * 60_000;
 const MAX_LIVE_ACCURACY_M = 250;
+const MAX_DR_LOCATION_AGE_MS = 60_000;
 const MAX_EVENT_FUTURE_SKEW_MS = 60_000;
 const PROFILE_MAX_AGE_MS = 10 * 60_000;
 const DYNAMIC_RADIUS_KM = 25;
@@ -133,6 +134,8 @@ export async function runLiveRouteMatching(): Promise<LiveRouteMatchingResult> {
       || (Number.isFinite(live.locationAgeMs) && live.locationAgeMs <= LIVE_MAX_AGE_MS);
     const locationPrecise = live?.accuracyM == null
       || (Number.isFinite(live.accuracyM) && live.accuracyM <= MAX_LIVE_ACCURACY_M);
+    const sourceFresh = live?.positionSource !== "dead_reckoning"
+      || (live.locationAgeMs != null && live.locationAgeMs <= MAX_DR_LOCATION_AGE_MS);
     const dynamic = !!live
       && live.positionKnown === true
       && live.positionReliable !== false
@@ -141,7 +144,8 @@ export async function runLiveRouteMatching(): Promise<LiveRouteMatchingResult> {
       && liveCandidateEvent
       && eventFresh
       && locationFresh
-      && locationPrecise;
+      && locationPrecise
+      && sourceFresh;
     // Un viaggio già concluso, fermato o con telemetria live scaduta non torna
     // statico: la posizione non è sufficientemente affidabile per una proposta.
     if (liveEvent === "arrived" || liveEvent === "stopped" || (liveCandidateEvent && !dynamic)) continue;
