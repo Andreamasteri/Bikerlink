@@ -144,7 +144,14 @@ export const regeocodePillItemHelper = (
     () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", name); return fetch(url.toString(), { credentials: "include" }); },
     async (resp: Response) => { if (!resp.ok) return []; return resp.json(); }
   ).then((results: any[]) => {
-    const best = results[0];
+    const candidates = (Array.isArray(results) ? results : [])
+      .map((item: any) => ({
+        name: String(item.name ?? ""),
+        lat: Number(item.lat),
+        lng: Number(item.lng ?? item.lon),
+      }))
+      .filter((item: GeoResult) => item.name && Number.isFinite(item.lat) && Number.isFinite(item.lng));
+    const best = candidates.length === 1 ? candidates[0] : null;
     setAiPreview((prev) => {
       if (!prev) return prev;
       const updatedItems = [...prev.items];
