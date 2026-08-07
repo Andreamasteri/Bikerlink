@@ -303,104 +303,6 @@ services:
       start_period: 180m
 
   # ---------------------------------------------------------------------------
-  # Nominatim 4.4 — geocoding/reverse-geocoding self-hosted (OSM)
-  #
-  # Sorgente PBF: europeecuador-merged.osm.pbf (Europa intera + Ecuador, ~33 GB)
-  # Il file è in DATA_DIR_HOST (montata in /nominatim_data:ro nel container).
-  # È lo stesso file condiviso con il build tile Valhalla — nessun download aggiuntivo.
-  #
-  # Prima esecuzione: il container importa il PBF indicato da NOMINATIM_PBF_URL.
-  # Con Europa+Ecuador l'import richiede 24-48h; spazio DB ~400 GB.
-  # FREEZE=true (default): DB statico, nessun aggiornamento OSM automatico.
-  # Monitorare con:  docker compose logs -f nominatim
-  # Una volta terminato l'import, Nominatim risponde su http://127.0.0.1:7070
-  #
-  # Profilo "nominatim": non parte con `docker compose up -d`.
-  # Avvio manuale (DOPO aver letto infra/self-host/setup-nominatim.sh):
-  #   docker compose --env-file .env up -d nominatim
-  #
-  # Avvio non-interattivo con il file locale Europa+Ecuador:
-  #   NONINTERACTIVE=1 NOMINATIM_PBF_URL=file:///nominatim_data/europeecuador-merged.osm.pbf \
-  #   NOMINATIM_FREEZE=true ./setup-nominatim.sh --pbf-url file:///nominatim_data/europeecuador-merged.osm.pbf --freeze --no-wait
-  #
-  # Variabili override in .env (opzionali — i default sono già pronti):
-  #   NOMINATIM_PBF_URL   URL o path del PBF da importare
-  #                       (default: file locale europeecuador-merged.osm.pbf)
-  #   NOMINATIM_REPLICATION_URL  URL aggiornamenti OSM (ignorato con FREEZE=true)
-  #   NOMINATIM_FREEZE    "true" = DB statico, nessuna replica (default: true)
-  # ---------------------------------------------------------------------------
-  nominatim:
-    image: mediagis/nominatim:5.3
-    container_name: bikerlink-nominatim
-    restart: unless-stopped
-    profiles: ["nominatim"]
-    shm_size: "4gb"
-    environment:
-      # Default: usa il PBF unificato già presente in DATA_DIR_HOST.
-      # Il file europeecuador-merged.osm.pbf è prodotto da download-osm.sh ed è
-      # condiviso con il build tile Valhalla (nessun download duplicato).
-      PBF_URL: ${NOMINATIM_PBF_URL:-file:///nominatim_data/europeecuador-merged.osm.pbf}
-      REPLICATION_URL: ${NOMINATIM_REPLICATION_URL:-https://download.geofabrik.de/europe-updates/}
-      # FREEZE=true: DB statico, aggiornamenti incrementali disabilitati.
-      # Cambia in "false" in .env solo se vuoi la replica OSM automatica.
-      FREEZE: ${NOMINATIM_FREEZE:-true}
-      IMPORT_WIKIPEDIA: "false"
-      IMPORT_STYLE: extratags
-      NOMINATIM_PASSWORD: ${NOMINATIM_DB_PASSWORD:-nominatim}
-    ports:
-      - "127.0.0.1:7070:8080"
-    volumes:
-      - nominatimdata:/var/lib/postgresql/16/main
-      # DATA_DIR_HOST montata in sola lettura: contiene europeecuador-merged.osm.pbf
-      # accessibile internamente come /nominatim_data/europeecuador-merged.osm.pbf.
-      - ${DATA_DIR_HOST:-./data}:/nominatim_data:ro
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS 'http://localhost:8080/status.php' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 180m
-
-  # ---------------------------------------------------------------------------
-  # Whisper ASR — trascrizione vocale self-hosted (openai-whisper-asr-webservice)
-  #
-  # Espone /inference (POST multipart) su 127.0.0.1:8080.
-  # Il reverse proxy nginx (nginx-bikerlink.conf) lo pubblica su
-  # https://whisper.__BASE_DOMAIN__ con autenticazione X-Whisper-Token.
-  #
-  # Variabili opzionali in .env:
-  #   WHISPER_MODEL   modello Whisper (default: small — buon bilanciamento CPU/qualità)
-  #                   Valori: tiny | base | small | medium | large-v2
-  #   WHISPER_ENGINE  motore ASR (default: faster_whisper — più veloce su CPU)
-  #                   Valori: faster_whisper | openai_whisper
-  #
-  # Prima esecuzione: il container scarica il modello (~500 MB per "small").
-  # Monitorare con: docker compose logs -f whisper
-  #
-  # Profilo "whisper": non parte con `docker compose up -d`.
-  # Avvio manuale:
-  #   docker compose --env-file .env up -d whisper
-  # ---------------------------------------------------------------------------
-  whisper:
-    image: onerahmet/openai-whisper-asr-webservice:latest
-    container_name: bikerlink-whisper
-    restart: unless-stopped
-    profiles: ["whisper"]
-    environment:
-      ASR_MODEL: ${WHISPER_MODEL:-large-v2}
-      ASR_ENGINE: ${WHISPER_ENGINE:-faster_whisper}
-    ports:
-      - "127.0.0.1:8080:9000"
-    volumes:
-      - whisperdata:/root/.cache/whisper
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/docs || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 120s
-
-  # ---------------------------------------------------------------------------
   # pgAdmin 4 — UI di amministrazione DB
   # ---------------------------------------------------------------------------
   pgadmin:
@@ -448,6 +350,4 @@ volumes:
   dragonflydata:
   valhalladata:
   pgadmindata:
-  nominatimdata:
-  whisperdata:
   uptimekumadata:
