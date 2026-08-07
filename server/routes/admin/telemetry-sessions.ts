@@ -165,7 +165,7 @@ router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Respon
           END
         ), 0)::numeric, 2)::text AS km
       FROM ordered
-      GROUP BY session_id
+      GROUP BY user_id, session_id
       ORDER BY MIN(ts) DESC
     `);
 
