@@ -141,70 +141,9 @@ Le credenziali di Postgres e pgAdmin sono generate da `setup.sh` e salvate in `.
 
 ### Geocoding Photon
 
-| Servizio | URL locale | Health | Default |
-|----------|-----------|--------|---------|
-| Nominatim | `http://127.0.0.1:7070` | `GET /status.php` | OFF |
-
-Nominatim fornisce geocoding (indirizzo → coordinate) e reverse geocoding
-(coordinate → indirizzo) basato su dati OSM, in alternativa al server pubblico
-`nominatim.openstreetmap.org` (rate-limited).
-
-> ⚠ Il servizio è sotto il profilo `nominatim` e **non parte** con
-> `docker compose up -d`. Deve essere avviato manualmente dopo l'import iniziale.
-
-#### Prima configurazione (ThinkCentre)
-
-```bash
-cd infra/self-host
-chmod +x setup-nominatim.sh
-./setup-nominatim.sh
-```
-
-Lo script:
-1. Chiede quale dataset OSM importare (Italy default, ~1.7 GB PBF / ~30 GB DB / ~1-2h)
-2. Salva `NOMINATIM_PBF_URL` nel `.env`
-3. Avvia il container e monitora il log dell'import
-4. Stampa le istruzioni per configurare `NOMINATIM_URL` e `NOMINATIM_TOKEN` nel `.env.local`
-
-Dataset disponibili:
-
-| Dataset | PBF | DB | Tempo |
-|---------|-----|-----|-------|
-| **Italia intera** (default) | ~1.7 GB | ~30 GB | 1-2h |
-| Nord-Ovest Italia | ~350 MB | ~5 GB | ~15 min |
-| Nord-Est Italia | ~300 MB | ~5 GB | ~15 min |
-
-#### Avvio/stop manuale
-
-```bash
-docker compose up -d nominatim      # avvia (o riprende dopo reboot)
-docker compose stop nominatim       # ferma senza perdere dati
-docker compose logs -f nominatim    # monitora import e log
-```
-
-#### Variabili .env per Nominatim
-
-| Variabile | Default | Descrizione |
-|-----------|---------|-------------|
-| `NOMINATIM_PBF_URL` | Italy Geofabrik | URL PBF da importare alla prima esecuzione |
-| `NOMINATIM_REPLICATION_URL` | Italy updates | URL aggiornamenti OSM periodici |
-| `NOMINATIM_FREEZE` | `false` | Se `true` disabilita gli aggiornamenti (DB statico) |
-
-Queste variabili si impostano nel `.env` (non in `.env.local`).
-
-#### Variabili .env.local dell'app
-
-Dopo l'import, aggiungi in `.env.local`:
-
-```
-NOMINATIM_URL=https://nominatim.<tuo-dominio>
-NOMINATIM_TOKEN=<token-da-setup-expose.sh>
-```
-
-Il token si genera (se non esiste già) con:
-```bash
-cd infra/self-host/expose && ./setup-expose.sh --gen-tokens
-```
+Photon self-hosted è l'unico geocoder previsto dall'app. Le richieste di forward e
+reverse geocoding passano dal contratto Photon configurato con `PHOTON_URL`;
+GraphHopper e Valhalla restano esclusivamente motori di routing e metadati stradali.
 
 ## Kalman filter service (stima bias DR/GPS)
 
