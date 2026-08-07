@@ -438,8 +438,8 @@ export function useCreateProposalForm() {
     if (selectedClubId) data.clubId = selectedClubId;
     if (canExtendToDestination && extendToDestination) {
       data.extendToDestination = true;
-      data.destinationLatitude = finalLat;
-      data.destinationLongitude = finalLng;
+      data.destinationLatitude = finalDestinationLat;
+      data.destinationLongitude = finalDestinationLng;
       data.destinationSearchRadius = parseInt(destinationExtRadius) || 50;
     }
 
