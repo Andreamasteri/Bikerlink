@@ -170,6 +170,7 @@ router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Respon
     `);
 
     const sessions = result.rows.map((r) => ({
+      userId: r.user_id,
       sessionId: r.session_id,
       sessionType: r.session_type,
       lapName: r.lap_name ?? null,
