@@ -27,9 +27,10 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
             session_id,
             session_type,
             created_at,
+            id,
             lat, lon,
-            LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
-            LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
+            LAG(lat) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lat,
+            LAG(lon) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lon
           FROM ride_telemetry
         ),
         session_km AS (
@@ -60,7 +61,7 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
             user_id,
             COALESCE(SUM(km) FILTER (WHERE session_type NOT IN ('ideal_lap')), 0) AS km_ride,
             COALESCE(SUM(km) FILTER (WHERE session_type = 'ideal_lap'), 0) AS km_track,
-            COUNT(DISTINCT session_id) AS session_count,
+            COUNT(*) AS session_count,
             MAX(last_sample) AS last_sample
           FROM session_km
           GROUP BY user_id
@@ -118,6 +119,7 @@ router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Respon
     if (!userId || userId.length < 1) return sendError(res, 400, "userId non valido");
 
     const result = await db.execute<{
+      user_id: string;
       session_id: string;
       session_type: string;
       lap_name: string | null;
@@ -128,17 +130,20 @@ router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Respon
     }>(sql`
       WITH ordered AS (
         SELECT
+          user_id,
           session_id,
+          id,
           session_type,
           lap_name,
           ts,
           lat, lon,
-          LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
-          LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
+          LAG(lat) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lat,
+          LAG(lon) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lon
         FROM ride_telemetry
         WHERE user_id = ${userId}
       )
       SELECT
+        user_id,
         session_id,
         MAX(session_type) AS session_type,
         MAX(lap_name) AS lap_name,
@@ -193,12 +198,16 @@ router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Respon
 router.get("/telemetry/sessions/:sessionId/samples", async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
+    const userId = String(req.query.userId ?? "");
     if (!sessionId) return sendError(res, 400, "sessionId obbligatorio");
+    if (!userId) return sendError(res, 400, "userId obbligatorio");
 
     const MAX_SAMPLES = 200;
 
     const countResult = await db.execute<{ total: string }>(sql`
-      SELECT COUNT(*)::text AS total FROM ride_telemetry WHERE session_id = ${sessionId}
+      SELECT COUNT(*)::text AS total
+      FROM ride_telemetry
+      WHERE user_id = ${userId} AND session_id = ${sessionId}
     `);
     const total = parseInt(countResult.rows[0]?.total ?? "0", 10);
 
@@ -214,10 +223,10 @@ router.get("/telemetry/sessions/:sessionId/samples", async (req: Request, res: R
     }>(sql`
       WITH numbered AS (
         SELECT
-          ts, lat, lon, speed_kmh, lean_angle,
-          ROW_NUMBER() OVER (ORDER BY ts) AS rn
+          id, ts, lat, lon, speed_kmh, lean_angle,
+          ROW_NUMBER() OVER (ORDER BY ts, id) AS rn
         FROM ride_telemetry
-        WHERE session_id = ${sessionId}
+        WHERE user_id = ${userId} AND session_id = ${sessionId}
       )
       SELECT ts::text, lat::text, lon::text, speed_kmh::text, lean_angle::text, rn::text
       FROM numbered
