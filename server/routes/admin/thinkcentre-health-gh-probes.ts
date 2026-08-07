@@ -377,7 +377,7 @@ export async function probeOllama(): Promise<ServiceHealth> {
   return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, startingUp: r.ok ? false : isStartingUp("ollama"), latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing, availableModels, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
 }
 
-// ── Whisper ───────────────────────────────────────────────────────────────────
+
 
 export async function probeWhisper(): Promise<ServiceHealth> {
   const base = process.env.WHISPER_URL?.replace(/\/$/, "");
