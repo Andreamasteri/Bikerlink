@@ -17,7 +17,7 @@ export default function NavigateScreen() {
     route, isLoading, isFinished,
     currentStep, distanceToNext, progressPct, remainingKm, remainingMin,
     isRerouting, isOffline, weatherLoading, currentWeather, aheadWeather,
-    voiceCmdToast, mapUri, offline, whisper, activeStepsRef,
+    mapUri, offline, activeStepsRef,
     minimalMode, handleToggleMinimal,
     handleMapMessage, handleVoiceCommand, handleClose, triggerWeatherReroute,
   } = useNavigateState();
@@ -75,9 +75,6 @@ export default function NavigateScreen() {
       <NavigationOfflineBanners
         isOffline={isOffline}
         offline={offline}
-        whisper={whisper}
-        voiceCmdToast={voiceCmdToast}
-        onVoiceCommandRelease={handleVoiceCommand}
         styles={s}
       />
 
