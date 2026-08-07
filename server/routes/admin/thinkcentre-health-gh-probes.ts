@@ -1,5 +1,5 @@
 /**
- * ThinkCentre — GraphHopper, Ollama e Whisper probes.
+ * ThinkCentre — GraphHopper e Ollama probes.
  * Estratti da thinkcentre-health.ts per mantenere i file sotto 600 righe.
  */
 
