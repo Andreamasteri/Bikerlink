@@ -25,6 +25,7 @@ type PlanLocation = {
 };
 
 export interface AiRouteResult {
+  title?: string | null;
   departure: GeoCandidate;
   stops: string[];
   destination: GeoCandidate | null;
@@ -77,12 +78,14 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
   const [plannedLocations, setPlannedLocations] = useState<PlanLocation[] | null>(null);
   const [plannedRoundTrip, setPlannedRoundTrip] = useState(false);
   const [plannedSchedule, setPlannedSchedule] = useState<AiRouteResult["schedule"]>(null);
+  const [plannedTitle, setPlannedTitle] = useState<string | null>(null);
   const [geocodingLocationIndex, setGeocodingLocationIndex] = useState<number | null>(null);
 
   const closeModal = () => {
     if (loading) return;
     setPlannedLocations(null);
     setPlannedSchedule(null);
+    setPlannedTitle(null);
     setGeocodingLocationIndex(null);
     onClose();
   };
@@ -171,6 +174,7 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
       })));
       setPlannedRoundTrip(aiData.isRoundTrip === true && !hasDistinctDestination);
       setPlannedSchedule(aiData.schedule ?? null);
+      setPlannedTitle(typeof aiData.title === "string" && aiData.title.trim() ? aiData.title.trim() : null);
     } catch (err: unknown) {
       Alert.alert("Errore pianificazione", err instanceof Error ? err.message : "Errore durante la pianificazione AI");
     } finally {
@@ -195,10 +199,11 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
     const stops = hasDestination
       ? selected.slice(1, -1).map((item) => item.name)
       : selected.slice(1).map((item) => item.name);
-    onRouteReady({ departure, stops, destination, schedule: plannedSchedule });
+    onRouteReady({ title: plannedTitle, departure, stops, destination, schedule: plannedSchedule });
     setPrompt("");
     setPlannedLocations(null);
     setPlannedSchedule(null);
+    setPlannedTitle(null);
     setGeocodingLocationIndex(null);
     onClose();
   };
