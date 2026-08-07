@@ -26,7 +26,7 @@ export async function requeueUnmatchable(): Promise<{ requeuedSamples: number; r
         WHERE match_status = 'unmatchable'
            OR match_status = 'exhausted'
            OR (match_status = 'retry' AND match_attempts >= ${maxAttempts})
-        RETURNING session_id
+        RETURNING user_id, session_id
       `,
     );
     const requeuedSamples = result.rows.length;
@@ -60,7 +60,7 @@ export async function drainStuckRetryBacklog(): Promise<{ drainedSamples: number
               AND last_match_attempt_at < NOW() - (INTERVAL '1 day' * ${getStaleRetryDays()})
             )
           )
-        RETURNING session_id
+        RETURNING user_id, session_id
       `,
     );
     const drainedSamples = result.rows.length;
