@@ -108,8 +108,6 @@ echo "--- Container Docker (Valhalla) ---"
 if docker info &>/dev/null 2>&1; then
   VALHALLA_OUT=$(docker ps -a --filter "name=valhalla" \
     --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}" 2>/dev/null)
-  NOMINATIM_OUT=$(docker ps -a --filter "name=nominatim" \
-    --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}" 2>/dev/null)
 
   if [ -n "$VALHALLA_OUT" ] && [ "$(echo "$VALHALLA_OUT" | wc -l)" -gt 1 ]; then
     echo "Valhalla:"
