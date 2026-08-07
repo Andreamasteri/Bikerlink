@@ -76,7 +76,7 @@ export const useNavigateStates = () => {
   const [remainingMin, setRemainingMin] = useState<number | null>(null);
   const [isFinished, setIsFinished] = useState(false);
   const [isOffRoute, setIsOffRoute] = useState(false);
-  const [polylinePoints, setPolylinePoints = useState<Array<[number, number]>>([]);
+  const [polylinePoints, setPolylinePoints] = useState<Array<[number, number]>>([]);
   const [hasPermission, setHasPermission] = useState(false);
   const [isRerouting, setIsRerouting] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
