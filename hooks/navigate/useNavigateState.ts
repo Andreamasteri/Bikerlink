@@ -21,7 +21,6 @@ import {
   loadRouteFromCache,
   activeStepIndex,
 } from "@/components/navigate/navigate-helpers";
-import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
 import { useLocationGate } from "@/lib/location-context";
 import type { NavWeatherZone } from "@/components/navigate/NavigationWeather";
 
@@ -50,58 +49,6 @@ export function calculateRemainingDist(polylinePoints: Array<[number, number]>, 
   }
   return remDist;
 }
-
-export const useVoiceCommandInternal = (
-  whisper: any,
-  setVoiceCmdToast: (val: string | null) => void,
-  triggerRerouteToDestination: (lat: number, lon: number) => Promise<void>,
-) => {
-  const handleVoiceCommand = async () => {
-    const text = await whisper.stopAndTranscribe();
-    if (!text) {
-      setVoiceCmdToast(whisper.error ?? "Trascrizione fallita");
-      setTimeout(() => setVoiceCmdToast(null), 3000);
-      return;
-    }
-
-    setVoiceCmdToast(`🎤 "${text}" — geocodifica...`);
-
-    try {
-      const geocodeUrl = new URL("/api/planned-routes/geocode", getApiUrl());
-      geocodeUrl.searchParams.set("q", text);
-      const geocodeRes = await apiRequest("GET", geocodeUrl.pathname + geocodeUrl.search);
-      const results = await geocodeRes.json() as Array<{
-        lat: number;
-        lng?: number;
-        lon?: number;
-        name?: string;
-        display_name?: string;
-      }>;
-
-      if (!Array.isArray(results) || results.length === 0) {
-        setVoiceCmdToast("Destinazione non trovata");
-        setTimeout(() => setVoiceCmdToast(null), 3000);
-        return;
-      }
-
-      const result = results[0];
-      const lng = result.lng ?? result.lon;
-      if (!Number.isFinite(result.lat) || typeof lng !== "number" || !Number.isFinite(lng)) {
-        setVoiceCmdToast("Destinazione non valida");
-        setTimeout(() => setVoiceCmdToast(null), 3000);
-        return;
-      }
-      setVoiceCmdToast(`Ricalcolo verso ${result.name ?? result.display_name ?? text}...`);
-      await triggerRerouteToDestination(result.lat, lng);
-      setTimeout(() => setVoiceCmdToast(null), 4000);
-    } catch {
-      setVoiceCmdToast("Errore geocodifica");
-      setTimeout(() => setVoiceCmdToast(null), 3000);
-    }
-  };
-
-  return { handleVoiceCommand };
-};
 
 export const useNavigateStates = () => {
   const [mapReady, setMapReady] = useState(false);
@@ -215,7 +162,6 @@ export function useNavigateState() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const locale = useLocale();
   const t = useT();
-  const whisper = useWhisperRecorder();
   const { suspendSharedWatch, resumeSharedWatch } = useLocationGate();
 
   const topPad = insets.top;
@@ -594,10 +540,6 @@ export function useNavigateState() {
     }
   }, [setMapReady]);
 
-  const [voiceCmdToast, setVoiceCmdToast] = useState<string | null>(null);
-
-  const { handleVoiceCommand } = useVoiceCommandInternal(whisper, setVoiceCmdToast, triggerRerouteToDestination);
-
   const handleClose = useCallback(() => {
     Speech.stop();
     locationSubRef.current?.remove();
@@ -626,9 +568,9 @@ export function useNavigateState() {
     mapReady, currentStep, distanceToNext, progressPct,
     remainingKm, remainingMin, polylinePoints,
     hasPermission, isRerouting, isOffline,
-    weatherLoading, currentWeather, aheadWeather, voiceCmdToast,
-    mapUri, offline, whisper, activeStepsRef,
+    weatherLoading, currentWeather, aheadWeather,
+    mapUri, offline, activeStepsRef,
     minimalMode, handleToggleMinimal,
-    handleMapMessage, handleVoiceCommand, handleClose, triggerWeatherReroute,
+    handleMapMessage, handleClose, triggerWeatherReroute,
   };
 }
