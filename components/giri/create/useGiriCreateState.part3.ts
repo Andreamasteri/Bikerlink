@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Waypoint, Style, WeatherWaypoint, ResolvedPoiStop, PoiResult, AiPreviewItem, AiPreviewState, RouteResult, Style as StyleType } from "./types";
+import { Waypoint, Style, WeatherWaypoint, ResolvedPoiStop, PoiResult, AiPreviewItem, AiPreviewState, RouteResult, GeoResult, Style as StyleType } from "./types";
 import { parseAI, clientFallbackAiParse, AiKeyMissingError } from "./api";
 import { getApiUrl } from "@/lib/query-client";
 import { COMPASS_DIRECTIONS } from "./types";
