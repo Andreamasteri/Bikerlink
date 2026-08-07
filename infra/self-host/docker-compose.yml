@@ -362,45 +362,6 @@ services:
       start_period: 180m
 
   # ---------------------------------------------------------------------------
-  # Whisper ASR — trascrizione vocale self-hosted (openai-whisper-asr-webservice)
-  #
-  # Espone /inference (POST multipart) su 127.0.0.1:8080.
-  # Il reverse proxy nginx (nginx-bikerlink.conf) lo pubblica su
-  # https://whisper.__BASE_DOMAIN__ con autenticazione X-Whisper-Token.
-  #
-  # Variabili opzionali in .env:
-  #   WHISPER_MODEL   modello Whisper (default: small — buon bilanciamento CPU/qualità)
-  #                   Valori: tiny | base | small | medium | large-v2
-  #   WHISPER_ENGINE  motore ASR (default: faster_whisper — più veloce su CPU)
-  #                   Valori: faster_whisper | openai_whisper
-  #
-  # Prima esecuzione: il container scarica il modello (~500 MB per "small").
-  # Monitorare con: docker compose logs -f whisper
-  #
-  # Profilo "whisper": non parte con `docker compose up -d`.
-  # Avvio manuale:
-  #   docker compose --env-file .env up -d whisper
-  # ---------------------------------------------------------------------------
-  whisper:
-    image: onerahmet/openai-whisper-asr-webservice:latest
-    container_name: bikerlink-whisper
-    restart: unless-stopped
-    profiles: ["whisper"]
-    environment:
-      ASR_MODEL: ${WHISPER_MODEL:-large-v2}
-      ASR_ENGINE: ${WHISPER_ENGINE:-faster_whisper}
-    ports:
-      - "127.0.0.1:8080:9000"
-    volumes:
-      - whisperdata:/root/.cache/whisper
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/docs || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 120s
-
-  # ---------------------------------------------------------------------------
   # pgAdmin 4 — UI di amministrazione DB
   # ---------------------------------------------------------------------------
   pgadmin:
@@ -449,5 +410,4 @@ volumes:
   valhalladata:
   pgadmindata:
   nominatimdata:
-  whisperdata:
   uptimekumadata:
