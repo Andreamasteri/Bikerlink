@@ -45,16 +45,12 @@ persistente al reboot).
 | `04.sh`   | Check pre-build: PBF, Docker, disco, **RAM + swap** (OK/WARN/FAIL)       |
 | `05.sh`   | Avvia build grafo Valhalla in background (screen), `--shm-size=16g`      |
 | `06.sh`   | Verifica post-build: tiles, container, test HTTP /status                 |
-| `07.sh`   | Prepara workspace Nominatim + crea docker-compose.yml                    |
-| `08.sh`   | Avvia import Nominatim in background (screen)                            |
-| `09.sh`   | Monitor import Nominatim: container, log, test HTTP                      |
 | `reset.sh`| **Soft reset** (default) o **reset completo**: ferma container, rimuove tiles; opzionalmente elimina anche il PBF |
 | `install-valhalla.sh` | Installa Docker (repo ufficiale) + `docker pull` immagine Valhalla (idempotente) |
 | `config-valhalla.sh`  | Fonte unica dei parametri di serve (porta `8002`, tiles/data); sorgeabile da `05.sh`/`99.sh` |
 | `usb.sh`  | **Monta** la USB raw, **copia** `europe-latest.osm.pbf` in `~/valhalla/data/`, **smonta** |
 | `swap.sh` | Crea/verifica swapfile su SSD, default 16 GB su 32 GB RAM (idempotente)  |
 | `cpu.sh`  | CPU governor → `performance`, persistente al reboot (riusa la unit systemd) |
-| `99.sh`   | **Boot check**: riavvia Valhalla (serve-only) e Nominatim dopo un reboot |
 | `diag-system.sh` | **Diagnostica sistema post-crash**: RAM, swap, disco, carico CPU, container Docker, temperatura CPU |
 | `diag-build.sh`  | **Diagnostica build post-crash**: causa del crash, conteggio errori, durata, ultime righe log, stato container |
 | `recover.sh`     | **Recovery guidato post-crash**: esegue entrambe le diagnostiche, interpreta i `[FAIL]` e propone/esegue le azioni correttive passo-passo |
@@ -150,14 +146,6 @@ al reboot): alle build successive puoi ripartire da `04.sh`.
 
 Se la build è fallita ma il PBF è già in `~/valhalla/data/`: `03.sh` poi `05.sh`.
 
-### Nominatim (geocoding self-hosted)
-
-```
-07.sh   ← prepara workspace e docker-compose.yml
-08.sh   ← avvia import (6–24h per Europe)
-09.sh   ← monitora (in un'altra sessione SSH)
-```
-
 ### Boot check dopo riavvio ThinkCentre
 
 ```
@@ -174,7 +162,6 @@ Se i tiles non esistono, avvisa e salta Valhalla — esegui prima `05.sh`.
 - **Ctrl+C** sui monitor (01/02/09) esce dal monitor, **non** ferma la build.
 - `screen -ls` → lista sessioni attive
 - `screen -r valhalla-build` → rientra nella sessione Valhalla
-- `screen -r nominatim-import` → rientra nella sessione Nominatim
 - I log sono sempre in `/tmp/*.log`
 
 ---
@@ -184,4 +171,3 @@ Se i tiles non esistono, avvisa e salta Valhalla — esegui prima `05.sh`.
 | Servizio   | Porta         |
 |------------|---------------|
 | Valhalla   | `8002`        |
-| Nominatim  | `8080`        |
