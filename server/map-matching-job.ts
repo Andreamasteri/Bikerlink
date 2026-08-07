@@ -43,7 +43,7 @@
 import { db, withDbRetry } from "./db";
 import { withBgDbSlot } from "./lib/bg-db-limiter";
 import { rideTelemetry } from "@shared/db";
-import { eq, sql, and, lte, inArray } from "drizzle-orm";
+import { eq, sql, and, lte, inArray, asc } from "drizzle-orm";
 import { mapMatch, isSelfHosted, GHPoint } from "./graphhopper-client";
 import { isRoutingEnabled } from "./routing/routing-kill-switch";
 import { isThinkCentreOffline } from "./lib/thinkcentre-offline";
@@ -186,7 +186,7 @@ export async function runMapMatchingJob(): Promise<{
             eq(rideTelemetry.sessionId, sessionId),
             inArray(rideTelemetry.matchStatus, ["pending", "retry"]),
           ))
-          .orderBy(rideTelemetry.ts);
+          .orderBy(asc(rideTelemetry.ts), asc(rideTelemetry.id));
 
         // Limita gli UPDATE agli id letti: campioni arrivati durante
         // l'elaborazione (id > maxSampleId) restano 'pending' e verranno
