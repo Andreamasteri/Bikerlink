@@ -13,7 +13,6 @@ export interface SystemStatusSnapshot {
   valhalla: DotStatus;
   photon: DotStatus;
   ollama: DotStatus;
-  whisper: DotStatus;
   ufw: DotStatus;
   dragonfly: DotStatus;
   nginx: DotStatus;
@@ -30,7 +29,6 @@ const _defaults: SystemStatusSnapshot = {
   valhalla: "unknown",
   photon: "unknown",
   ollama: "unknown",
-  whisper: "unknown",
   ufw: "unknown",
   dragonfly: "unknown",
   nginx: "unknown",
