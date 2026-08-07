@@ -355,7 +355,7 @@ export function useCreateProposalForm() {
     let finalLng = departureLng;
     let geocodingOk = true;
 
-    if (!finalLat || !finalLng) {
+    if (!Number.isFinite(finalLat) || !Number.isFinite(finalLng)) {
       if (departureAddress.trim()) {
         const geo = await geocodeAddress(departureAddress.trim());
         if (geo) {
