@@ -92,16 +92,20 @@ export async function runLiveRouteMatching(): Promise<LiveRouteMatchingResult> {
   for (const route of routes) {
     const live = readLive(route.metadata);
     const eventAt = live?.eventAt ? Date.parse(live.eventAt) : NaN;
+    const liveEvent = live?.event ?? null;
+    const liveCandidateEvent = ["start", "position", "waypoint", "off_route"].includes(liveEvent ?? "");
     const dynamic = !!live
       && live.positionKnown === true
       && Number.isFinite(live.latitude)
       && Number.isFinite(live.longitude)
-      && ["start", "position", "waypoint", "off_route"].includes(live.event ?? "")
+      && liveCandidateEvent
       && Number.isFinite(eventAt)
       && Date.now() - eventAt <= LIVE_MAX_AGE_MS;
+    // Un viaggio già concluso, fermato o con telemetria live scaduta non torna
+    // statico: la posizione non è sufficientemente affidabile per una proposta.
+    if (liveEvent === "arrived" || liveEvent === "stopped" || (liveCandidateEvent && !dynamic)) continue;
     const targets = routeTargets(route, dynamic ? { latitude: live!.latitude!, longitude: live!.longitude! } : null);
     if (targets.length === 0) continue;
-    if (!dynamic && live?.event === "arrived") continue;
 
     if (allow.get(route.userId) === false || disabled.has(route.userId)) continue;
 
