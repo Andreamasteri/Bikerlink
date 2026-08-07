@@ -149,7 +149,7 @@ Se la build è fallita ma il PBF è già in `~/valhalla/data/`: `03.sh` poi `05.
 ### Boot check dopo riavvio ThinkCentre
 
 ```
-99.sh   ← avvia Valhalla (serve-only) + Nominatim e verifica HTTP
+99.sh   ← avvia Valhalla (serve-only) e verifica HTTP
 ```
 
 `99.sh` non esegue nessuna build. Usa i tiles già presenti su disco.
