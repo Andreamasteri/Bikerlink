@@ -344,6 +344,7 @@ export async function runMapMatchingJob(): Promise<{
               lastMatchAttemptAt: new Date(),
             })
             .where(and(
+              eq(rideTelemetry.userId, userId),
               eq(rideTelemetry.sessionId, sessionId),
               inArray(rideTelemetry.matchStatus, ["pending", "retry"]),
             ));
