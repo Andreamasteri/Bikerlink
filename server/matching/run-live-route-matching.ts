@@ -40,15 +40,40 @@ function readLive(metadata: unknown): LiveState | null {
   return live && typeof live === "object" ? live as LiveState : null;
 }
 
-function routeTargets(route: { waypoints: unknown }, dynamicPoint: { latitude: number; longitude: number } | null) {
+function routeTargets(
+  route: { waypoints: unknown; metadata: unknown },
+  dynamicPoint: { latitude: number; longitude: number } | null,
+) {
   if (dynamicPoint) return [dynamicPoint];
+
+  const targets: Array<{ latitude: number; longitude: number }> = [];
   const waypoints = Array.isArray(route.waypoints) ? route.waypoints : [];
-  const start = waypoints.find((wp): wp is { lat: number; lng: number } => {
-    if (!wp || typeof wp !== "object") return false;
-    const item = wp as Record<string, unknown>;
-    return typeof item.lat === "number" && typeof item.lng === "number" && (item.lat !== 0 || item.lng !== 0);
-  });
-  return start ? [{ latitude: start.lat, longitude: start.lng }] : [];
+  for (const waypoint of waypoints) {
+    if (!waypoint || typeof waypoint !== "object") continue;
+    const item = waypoint as Record<string, unknown>;
+    if (typeof item.lat === "number" && typeof item.lng === "number"
+      && Number.isFinite(item.lat) && Number.isFinite(item.lng)
+      && (item.lat !== 0 || item.lng !== 0)) {
+      targets.push({ latitude: item.lat, longitude: item.lng });
+    }
+  }
+
+  const metadata = route.metadata && typeof route.metadata === "object"
+    ? route.metadata as Record<string, unknown>
+    : {};
+  const checkpoints = Array.isArray(metadata.technicalCheckpoints)
+    ? metadata.technicalCheckpoints
+    : [];
+  for (const checkpoint of checkpoints) {
+    if (!checkpoint || typeof checkpoint !== "object") continue;
+    const item = checkpoint as Record<string, unknown>;
+    if (typeof item.latitude === "number" && typeof item.longitude === "number"
+      && Number.isFinite(item.latitude) && Number.isFinite(item.longitude)) {
+      targets.push({ latitude: item.latitude, longitude: item.longitude });
+    }
+  }
+
+  return targets;
 }
 
 export interface LiveRouteMatchingResult {
