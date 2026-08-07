@@ -162,7 +162,6 @@ export function useNavigateState() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const locale = useLocale();
   const t = useT();
-  const whisper = useWhisperRecorder();
   const { suspendSharedWatch, resumeSharedWatch } = useLocationGate();
 
   const topPad = insets.top;
