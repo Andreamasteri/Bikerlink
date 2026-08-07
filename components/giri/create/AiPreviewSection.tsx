@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   container: { marginBottom: 20 },
   sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 16, marginBottom: 16 },
   pillsContainer: { gap: 10, marginBottom: 20 },
-  pill: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, gap: 8 },
+  pill: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, gap: 8 },
   pillInput: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 14, padding: 0 },
   candidates: { width: "100%", marginTop: 8, gap: 6 },
   candidateTitle: { fontFamily: "Inter_400Regular", fontSize: 12 },
