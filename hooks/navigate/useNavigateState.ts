@@ -21,7 +21,6 @@ import {
   loadRouteFromCache,
   activeStepIndex,
 } from "@/components/navigate/navigate-helpers";
-import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
 import { useLocationGate } from "@/lib/location-context";
 import type { NavWeatherZone } from "@/components/navigate/NavigationWeather";
 
@@ -50,46 +49,6 @@ export function calculateRemainingDist(polylinePoints: Array<[number, number]>, 
   }
   return remDist;
 }
-
-export const useVoiceCommandInternal = (
-  whisper: any,
-  setVoiceCmdToast: (val: string | null) => void,
-  triggerRerouteToDestination: (lat: number, lon: number) => Promise<void>,
-) => {
-  const handleVoiceCommand = async () => {
-    const text = await whisper.stopAndTranscribe();
-    if (!text) {
-      setVoiceCmdToast(whisper.error ?? "Trascrizione fallita");
-      setTimeout(() => setVoiceCmdToast(null), 3000);
-      return;
-    }
-
-    setVoiceCmdToast(`🎤 "${text}" — geocodifica...`);
-
-    try {
-      const geocodeUrl = new URL("/api/planned-routes/geocode", getApiUrl());
-      geocodeUrl.searchParams.set("q", text);
-      const geocodeRes = await apiRequest("GET", geocodeUrl.pathname + geocodeUrl.search);
-      const results = await geocodeRes.json() as Array<{ lat: number; lon: number; display_name?: string }>;
-
-      if (!Array.isArray(results) || results.length === 0) {
-        setVoiceCmdToast("Destinazione non trovata");
-        setTimeout(() => setVoiceCmdToast(null), 3000);
-        return;
-      }
-
-      const { lat, lon } = results[0];
-      setVoiceCmdToast(`Ricalcolo verso ${results[0].display_name ?? text}...`);
-      await triggerRerouteToDestination(lat, lon);
-      setTimeout(() => setVoiceCmdToast(null), 4000);
-    } catch {
-      setVoiceCmdToast("Errore geocodifica");
-      setTimeout(() => setVoiceCmdToast(null), 3000);
-    }
-  };
-
-  return { handleVoiceCommand };
-};
 
 export const useNavigateStates = () => {
   const [mapReady, setMapReady] = useState(false);
@@ -220,6 +179,8 @@ export function useNavigateState() {
   const activeStepsRef = useRef<NavigationStep[] | null>(null);
   const activeTotalKmRef = useRef<number | null>(null);
   const activeTotalMinRef = useRef<number | null>(null);
+  const liveLastSentAtRef = useRef(0);
+  const liveStartedRef = useRef(false);
 
   const {
     mapReady, setMapReady,
@@ -263,6 +224,31 @@ export function useNavigateState() {
     enabled: !!id,
     retry: false,
   });
+
+  const sendLiveEvent = useCallback((
+    event: "start" | "position" | "waypoint" | "arrived" | "off_route" | "stopped",
+    latitude: number | null,
+    longitude: number | null,
+    positionSource: "gps" | "waypoint" | "destination" | "dead_reckoning" | "unknown",
+    progressPct: number | null,
+    waypointIndex: number | null,
+  ) => {
+    if (!route?.id) return;
+    const now = Date.now();
+    if (event === "position" && now - liveLastSentAtRef.current < 15_000) return;
+    liveLastSentAtRef.current = now;
+    if (event === "start") liveStartedRef.current = true;
+    void apiRequest("POST", "/api/planned-routes/" + route.id + "/live", {
+      event,
+      latitude,
+      longitude,
+      positionSource,
+      progressPct,
+      waypointIndex,
+      locationAgeMs: 0,
+      eventAt: new Date(now).toISOString(),
+    }).catch(() => {});
+  }, [route?.id]);
 
   const offlineRoutePoints = React.useMemo(
     () => polylinePoints.map(([lat, lng]) => ({ lat, lng })),
@@ -517,6 +503,13 @@ export function useNavigateState() {
 
     const pct = Math.min(100, Math.round((closestIdx / Math.max(1, polylinePoints.length - 1)) * 100));
     setProgressPct(pct);
+    const nearbyWaypointIndex = (route?.waypoints ?? []).findIndex((wp) =>
+      haversineM(lat, lng, wp.lat, wp.lng) <= 100
+    );
+    const liveEvent = nearbyWaypointIndex >= 0
+      ? "waypoint"
+      : (closestDist > REROUTE_DISTANCE_M ? "off_route" : (liveStartedRef.current ? "position" : "start"));
+    sendLiveEvent(liveEvent, lat, lng, "gps", pct, nearbyWaypointIndex >= 0 ? nearbyWaypointIndex : null);
 
     fetchNavWeatherRef.current(lat, lng, closestIdx);
 
@@ -555,10 +548,11 @@ export function useNavigateState() {
       if (!isFinished) {
         setIsFinished(true);
         setDistanceToNext(null);
+        sendLiveEvent("arrived", lat, lng, "destination", 100, (route?.waypoints?.length ?? 1) - 1);
         Speech.speak(t("nav.announce.arrived"), { language: locale });
       }
     }
-  }, [polylinePoints, route, mapReady, isFinished, locale, t, setCurrentStep, setDistanceToNext, setIsFinished, setProgressPct, setRemainingKm, setRemainingMin]);
+  }, [polylinePoints, route, mapReady, isFinished, locale, t, sendLiveEvent, setCurrentStep, setDistanceToNext, setIsFinished, setProgressPct, setRemainingKm, setRemainingMin]);
 
   const [minimalMode, setMinimalMode] = useState(false);
   const minimalManualRef = useRef(false);
@@ -582,9 +576,6 @@ export function useNavigateState() {
     }
   }, [setMapReady]);
 
-  const [voiceCmdToast, setVoiceCmdToast] = useState<string | null>(null);
-
-  const { handleVoiceCommand } = useVoiceCommandInternal(whisper, setVoiceCmdToast, triggerRerouteToDestination);
 
   const handleClose = useCallback(() => {
     Speech.stop();
@@ -614,9 +605,9 @@ export function useNavigateState() {
     mapReady, currentStep, distanceToNext, progressPct,
     remainingKm, remainingMin, polylinePoints,
     hasPermission, isRerouting, isOffline,
-    weatherLoading, currentWeather, aheadWeather, voiceCmdToast,
-    mapUri, offline, whisper, activeStepsRef,
+    weatherLoading, currentWeather,
+    mapUri, offline, activeStepsRef,
     minimalMode, handleToggleMinimal,
-    handleMapMessage, handleVoiceCommand, handleClose, triggerWeatherReroute,
+    handleMapMessage, handleClose, triggerWeatherReroute,
   };
 }
