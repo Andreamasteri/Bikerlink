@@ -15,8 +15,6 @@ SYSTEMD_HEAVY=(ollama)
 
 # Servizi pesanti Docker
 DOCKER_HEAVY=(
-  bikerlink-whisper
-  bikerlink-nominatim
   bikerlink-gh-balcani
   bikerlink-gh-grecia
   bikerlink-gh-arco-alpino
