@@ -16,7 +16,7 @@ export async function requeueUnmatchable(): Promise<{ requeuedSamples: number; r
   }
   const maxAttempts = getMaxAttempts();
   return withBgDbSlot(() => withDbRetry(async () => {
-    const result = await db.execute<{ session_id: string }>(
+    const result = await db.execute<{ user_id: string; session_id: string }>(
       sql`
         UPDATE ride_telemetry
         SET match_status = 'pending',
@@ -30,7 +30,7 @@ export async function requeueUnmatchable(): Promise<{ requeuedSamples: number; r
       `,
     );
     const requeuedSamples = result.rows.length;
-    const requeuedSessions = new Set(result.rows.map((r) => r.session_id)).size;
+    const requeuedSessions = new Set(result.rows.map((r) => `${r.user_id}:${r.session_id}`)).size;
     console.log(
       `[MAP-MATCH] Requeue — ${requeuedSamples} campioni / ${requeuedSessions} sessioni riportati a 'pending'`,
     );
@@ -46,7 +46,7 @@ export function getStaleRetryDays(): number {
 export async function drainStuckRetryBacklog(): Promise<{ drainedSamples: number; drainedSessions: number }> {
   const maxAttempts = getMaxAttempts();
   return withBgDbSlot(() => withDbRetry(async () => {
-    const result = await db.execute<{ session_id: string }>(
+    const result = await db.execute<{ user_id: string; session_id: string }>(
       sql`
         UPDATE ride_telemetry
         SET match_status = 'exhausted',
@@ -64,7 +64,7 @@ export async function drainStuckRetryBacklog(): Promise<{ drainedSamples: number
       `,
     );
     const drainedSamples = result.rows.length;
-    const drainedSessions = new Set(result.rows.map((r) => r.session_id)).size;
+    const drainedSessions = new Set(result.rows.map((r) => `${r.user_id}:${r.session_id}`)).size;
     console.log(
       `[MAP-MATCH] Drain backlog — ${drainedSamples} campioni / ${drainedSessions} sessioni retry oltre cap o stale → 'exhausted'`,
     );
