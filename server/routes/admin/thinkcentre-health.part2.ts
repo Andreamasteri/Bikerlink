@@ -157,7 +157,6 @@ export async function probeThinkCentreStatusSnapshot(): Promise<
       valhalla: "unknown" as CachedDotStatus,
       photon: "unknown" as CachedDotStatus,
       ollama: "unknown" as CachedDotStatus,
-      whisper: "unknown" as CachedDotStatus,
       ufw: "unknown" as CachedDotStatus,
       dragonfly: "unknown" as CachedDotStatus,
       nginx: "unknown" as CachedDotStatus,
