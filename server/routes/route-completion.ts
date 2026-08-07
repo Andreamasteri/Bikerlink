@@ -93,7 +93,7 @@ router.patch("/routes/:id", requireAuth, async (req: Request, res: Response) => 
           // Deduplicazione: se la sessione ha già campioni in DB, saltiamo.
           const existing = await db.execute(sql`
             SELECT 1 FROM ride_telemetry
-            WHERE session_id = ${id}
+            WHERE user_id = ${userId} AND session_id = ${id}
             LIMIT 1
           `);
           if (existing.rows.length === 0) {
