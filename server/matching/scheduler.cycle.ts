@@ -11,6 +11,7 @@ import { runMusicAffinityMatching } from "./run-music-affinity";
 import { runExtractRouteCellsJob } from "./jobs/extract-route-cells";
 import { runRouteSimilarityMatching } from "./run-route-similarity";
 import { runPlannedRouteAffinity } from "./run-planned-route-affinity";
+import { runLiveRouteMatching } from "./run-live-route-matching";
 import { enrichBikerMatchBreakdowns } from "./enrich-breakdowns";
 import { runDistanceMatching, runRouteTypeZoneMatching } from "./run-distance";
 import { runProposalToProfileMatching } from "./run-profile";
@@ -438,6 +439,12 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
             console.log(`[Matching] Planned route invites: ${priResult.invitesCreated} nuovi inviti su ${priResult.routesProcessed} route`);
             addMatchLog("INFO", "planned_route_invite", `Planned route invite: ${priResult.invitesCreated} inviti su ${priResult.routesProcessed} route`);
             void recordMatchesCreated("planned_route_invite", priResult.invitesCreated);
+          }
+          const liveResult = await withCycleTimeout("live_route_matching", cycleTimeoutMs, () => runLiveRouteMatching());
+          if (liveResult.invitesCreated > 0) {
+            console.log(`[Matching] Live/static route matching: ${liveResult.invitesCreated} inviti (dynamic=${liveResult.dynamicMatches}, static=${liveResult.staticMatches})`);
+            addMatchLog("INFO", "live_route_matching", `Route matching: ${liveResult.invitesCreated} inviti, dinamici=${liveResult.dynamicMatches}, statici=${liveResult.staticMatches}`);
+            void recordMatchesCreated("live_route_matching", liveResult.invitesCreated);
           }
         } catch (err) {
           if (err instanceof CycleTimeoutError) {
