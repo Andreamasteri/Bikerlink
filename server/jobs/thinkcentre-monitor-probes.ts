@@ -369,13 +369,19 @@ export async function runAllProbes(): Promise<AggregateProbeResult> {
   ];
 
 
+  const [otherResults, gh] = await Promise.all([
+    Promise.allSettled(probes.map((p) => p.fn())),
+    probeGraphHopperAreas(),
+  ]);
+
   const otherServices: ServiceProbeResult[] = probes.map((p, i) => {
     const r = otherResults[i];
     const ok = r.status === "fulfilled" ? r.value : false;
     return { key: p.key, label: p.label, ok };
   });
 
-
+  const services: ServiceProbeResult[] = [...otherServices, ...gh.areas];
+  const overall = computeOverallStatus([...otherServices.map((service) => service.ok), gh.unitOk]);
 
   return { overall, services };
 }
