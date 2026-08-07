@@ -15,6 +15,7 @@ export interface PlannedRoute {
   waypoints: Array<{ lat: number; lng: number; name?: string }>;
   polyline?: string | null;
   navigationSteps?: NavigationStep[] | null;
+  metadata?: PlannedRouteMetadata | null;
 }
 
 export interface TechnicalCheckpoint {
