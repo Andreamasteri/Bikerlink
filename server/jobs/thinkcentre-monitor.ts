@@ -2,7 +2,7 @@
  * ThinkCentre Monitor — Push notifications admin.
  *
  * Ogni 5 minuti proba i servizi self-hosted sul ThinkCentre
- * (GraphHopper, Ollama, Whisper, Photon, Valhalla) e invia una push agli
+ * (GraphHopper, Ollama, Photon, Valhalla) e invia una push agli
  * admin quando il server passa da online → offline o da offline → online.
  *
  * Stati globali:
@@ -324,7 +324,7 @@ export async function runThinkCentreProbe(): Promise<void> {
     if (shouldNotify("offline")) {
       const n = await sendSystemAlertPushToAdmins(
         "🔴 ThinkCentre offline",
-        "Nessun servizio self-hosted risponde (GraphHopper, Ollama, Whisper)",
+        "Nessun servizio self-hosted risponde (GraphHopper, Ollama, Photon, Valhalla)",
         { type: "thinkcentre_offline" },
       );
       console.log(`[thinkcentre-monitor] notifica offline inviata a ${n} admin`);
