@@ -85,7 +85,6 @@ echo "GRAPHHOPPER_TOKEN=${GRAPHHOPPER_TOKEN:-}" >> "$OUT"
 echo "GRAPHHOPPER_URL=${GRAPHHOPPER_URL:-}" >> "$OUT"
 echo "VALHALLA_API_KEY=${VALHALLA_API_KEY:-}" >> "$OUT"
 echo "VALHALLA_URL=${VALHALLA_URL:-}" >> "$OUT"
-echo "NOMINATIM_TOKEN=${NOMINATIM_TOKEN:-}" >> "$OUT"
 echo "PHOTON_TOKEN=${PHOTON_TOKEN:-}" >> "$OUT"
 echo "PHOTON_URL=${PHOTON_URL:-}" >> "$OUT"
 echo "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY:-}" >> "$OUT"
@@ -99,11 +98,6 @@ echo "HORUS_HUB_URL=${HORUS_HUB_URL:-}" >> "$OUT"
 echo "HORUS_SEARXNG_URL=${HORUS_SEARXNG_URL:-}" >> "$OUT"
 echo "" >> "$OUT"
 
-# ── Whisper ──────────────────────────────────────────────────
-echo "# --- Whisper ---" >> "$OUT"
-echo "WHISPER_HOME_URL=${WHISPER_HOME_URL:-}" >> "$OUT"
-echo "WHISPER_TOKEN=${WHISPER_TOKEN:-}" >> "$OUT"
-echo "WHISPER_URL=${WHISPER_URL:-}" >> "$OUT"
 echo "" >> "$OUT"
 
 # ── Expo / Mobile ────────────────────────────────────────────
