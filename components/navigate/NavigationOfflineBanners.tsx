@@ -18,6 +18,7 @@ interface OfflineState {
 
 interface Props {
   isOffline: boolean;
+  isOffRoute: boolean;
   offline: OfflineState;
   styles: {
     offlineBanner: object;
@@ -31,15 +32,14 @@ interface Props {
     staleBannerText: object;
     offlineAvailableBanner: object;
     offlineAvailableBannerText: object;
-    voiceMicBtn: object;
-    voiceMicBtnActive: object;
-    voiceToast: object;
-    voiceToastText: object;
+    offRouteBanner: object;
+    offRouteBannerText: object;
   };
 }
 
 export function NavigationOfflineBanners({
   isOffline,
+  isOffRoute,
   offline,
   styles: s,
 }: Props) {
@@ -47,6 +47,13 @@ export function NavigationOfflineBanners({
 
   return (
     <>
+      {isOffRoute && (
+        <View style={s.offRouteBanner}>
+          <Ionicons name="warning-outline" size={14} color="#fff" />
+          <Text style={s.offRouteBannerText}>Fuori percorso — progressione e contatori sospesi</Text>
+        </View>
+      )}
+
       {isOffline && (
         <View style={s.offlineBanner}>
           <Ionicons name="cloud-offline-outline" size={14} color="#fff" />
