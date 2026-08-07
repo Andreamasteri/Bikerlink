@@ -1,11 +1,11 @@
 ---
 name: photon-tc
-description: Gestire Photon self-hosted sul ThinkCentre BikerLink (geocoder che ha sostituito Nominatim). Usa questa skill quando l'utente dice "avvia photon", "stato photon", "controlla geocoding", "geocoding giù", o vuole verificare che il geocoding funzioni. Copre il contratto d'integrazione app↔Photon, la verifica di stato e il troubleshooting.
+description: Gestire Photon self-hosted sul ThinkCentre BikerLink (geocoder unico autorizzato). Usa questa skill quando l'utente dice "avvia photon", "stato photon", "controlla geocoding", "geocoding giù", o vuole verificare che il geocoding funzioni. Copre il contratto d'integrazione app↔Photon, la verifica di stato e il troubleshooting.
 ---
 
 # Photon — ThinkCentre BikerLink
 
-Photon è il geocoder self-hosted di BikerLink, che ha **sostituito Nominatim**.
+Photon è il geocoder self-hosted di BikerLink, ed è l'unico geocoder autorizzato.
 Gira sul ThinkCentre ed è esposto via Cloudflare Tunnel + Cloudflare Access.
 
 > ⚠️ Photon è **solo self-hosted**: nessun fallback pubblico (né `photon.komoot.io`
@@ -29,7 +29,7 @@ Gira sul ThinkCentre ed è esposto via Cloudflare Tunnel + Cloudflare Access.
 | Client server | `server/lib/photon-client.ts` |
 | Proxy diagnostica | `GET /api/routing/photon/search?q=<query>&limit=<n>` |
 
-Photon **non** usa il parametro `zoom` (proprio di Nominatim); il reverse geocode
+Photon **non** usa il parametro `zoom`; il reverse geocode
 lo mantiene in firma per compatibilità con i chiamanti ma non lo invia.
 
 ## SSH sul ThinkCentre
@@ -89,7 +89,7 @@ python3 .agents/skills/thinkcentre-access/tc.py exec \
 > ⚠️ **Dettagli di deployment del container** (nome esatto, immagine, porta locale,
 > procedura di build/import dell'indice) vanno **confermati contro il deployment
 > reale sul ThinkCentre** prima di eseguire comandi distruttivi: non sono
-> hardcodati in questo repo. Non assumere i vecchi valori di Nominatim.
+> hardcodati in questo repo. Non assumere valori precedenti.
 
 ## File di riferimento
 - `server/lib/photon-client.ts` — client Photon-only (geocode/reverse, cache, auth, health snapshot)
