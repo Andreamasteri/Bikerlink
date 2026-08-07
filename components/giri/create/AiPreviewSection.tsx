@@ -13,6 +13,7 @@ interface AiPreviewSectionProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- timer ref
   aiSuccessTimer: React.MutableRefObject<any>;
   updatePreviewItemName: (idx: number, name: string) => void;
+  selectPreviewCandidate: (idx: number, candidate: { name: string; lat: number; lng: number }) => void;
   regeocodePillItem: (idx: number, name: string) => void;
   handleConfirmPreview: () => void;
   hasUnresolvedPois?: boolean;
@@ -28,6 +29,7 @@ export const AiPreviewSection: React.FC<AiPreviewSectionProps> = ({
   aiPreview,
   setAiPreview,
   updatePreviewItemName,
+  selectPreviewCandidate,
   regeocodePillItem,
   handleConfirmPreview,
   hasUnresolvedPois = false,
@@ -36,6 +38,7 @@ export const AiPreviewSection: React.FC<AiPreviewSectionProps> = ({
 }) => {
   const colors = useColors();
   if (!aiPreview) return null;
+  const unresolvedLocations = aiPreview.items.some((item) => !item.resolved);
 
   return (
     <View style={styles.container}>
@@ -58,22 +61,37 @@ export const AiPreviewSection: React.FC<AiPreviewSectionProps> = ({
               placeholderTextColor={colors.textSecondary}
             />
             {item.geocoding && <ActivityIndicator size="small" color={colors.accent} />}
+            {item.candidates.length > 1 && !item.resolved && (
+              <View style={styles.candidates}>
+                <Text style={[styles.candidateTitle, { color: colors.textSecondary }]}>Seleziona il punto corretto:</Text>
+                {item.candidates.map((candidate, candidateIdx) => (
+                  <Pressable
+                    key={String(idx) + "-" + String(candidateIdx)}
+                    style={[styles.candidate, { borderColor: colors.border, backgroundColor: colors.background }]}
+                    onPress={() => selectPreviewCandidate(idx, candidate)}
+                  >
+                    <Ionicons name="location-outline" size={15} color={colors.accent} />
+                    <Text style={[styles.candidateText, { color: colors.text }]} numberOfLines={2}>{candidate.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
         ))}
       </View>
 
-      {hasUnresolvedPois && (
+      {(hasUnresolvedPois || unresolvedLocations) && (
         <Text style={[styles.poiHint, { color: colors.textSecondary }]}>
-          Seleziona una tappa per ogni fermata richiesta per continuare
+          {unresolvedLocations ? "Seleziona un risultato Photon per ogni punto del viaggio" : "Seleziona una tappa per ogni fermata richiesta per continuare"}
         </Text>
       )}
 
       <View style={styles.footerButtons}>
         <Pressable
-          style={[styles.confirmBtn, { backgroundColor: hasUnresolvedPois ? colors.surface : colors.accent, opacity: hasUnresolvedPois ? 0.5 : 1 }]}
-          onPress={hasUnresolvedPois ? undefined : handleConfirmPreview}
+          style={[styles.confirmBtn, { backgroundColor: hasUnresolvedPois || unresolvedLocations ? colors.surface : colors.accent, opacity: hasUnresolvedPois || unresolvedLocations ? 0.5 : 1 }]}
+          onPress={hasUnresolvedPois || unresolvedLocations ? undefined : handleConfirmPreview}
         >
-          <Text style={[styles.confirmBtnText, { color: hasUnresolvedPois ? colors.textSecondary : "#000" }]}>Conferma e Calcola</Text>
+          <Text style={[styles.confirmBtnText, { color: hasUnresolvedPois || unresolvedLocations ? colors.textSecondary : "#000" }]}>Conferma e Calcola</Text>
         </Pressable>
         <Pressable
           style={[styles.cancelBtn, { backgroundColor: colors.surface }]}
@@ -92,6 +110,10 @@ const styles = StyleSheet.create({
   pillsContainer: { gap: 10, marginBottom: 20 },
   pill: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, gap: 8 },
   pillInput: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 14, padding: 0 },
+  candidates: { width: "100%", marginTop: 8, gap: 6 },
+  candidateTitle: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  candidate: { flexDirection: "row", alignItems: "center", gap: 6, padding: 8, borderRadius: 8, borderWidth: 1 },
+  candidateText: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 13 },
   footerButtons: { gap: 10 },
   poiHint: { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginBottom: 10 },
   confirmBtn: { paddingVertical: 14, borderRadius: 12, alignItems: "center" },
