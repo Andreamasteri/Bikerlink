@@ -349,27 +349,91 @@ export function useNavigateState() {
     suspendSharedWatch();
 
     let sub: Location.LocationSubscription | null = null;
-    (async () => {
-      sub = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 1000, distanceInterval: 5 },
-        (loc) => {
-          const fixTimestamp = Number.isFinite(loc.timestamp) ? loc.timestamp : Date.now();
-          const locationAgeMs = Math.max(0, Date.now() - fixTimestamp);
-          handlePositionUpdate(
-            loc.coords.latitude,
-            loc.coords.longitude,
-            loc.coords.heading ?? 0,
-            "gps",
-            loc.coords.accuracy ?? null,
-            locationAgeMs,
-          );
+    let motionSub: { remove: () => void } | null = null;
+    let drTimer: ReturnType<typeof setInterval> | null = null;
+
+    try {
+      DeviceMotion.setUpdateInterval(500);
+      motionSub = DeviceMotion.addListener((data) => {
+        const alpha = (data.rotation as { alpha?: number } | undefined)?.alpha;
+        if (typeof alpha === "number" && Number.isFinite(alpha)) {
+          lastHeadingRef.current = (((alpha * 180) / Math.PI) % 360 + 360) % 360;
         }
-      );
-      locationSubRef.current = sub;
+      });
+    } catch (err) {
+      console.warn("[NavigationDR] DeviceMotion non disponibile:", err);
+    }
+
+    (async () => {
+      try {
+        sub = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, timeInterval: 1000, distanceInterval: 5 },
+          (loc) => {
+            const now = Date.now();
+            const fixTimestamp = Number.isFinite(loc.timestamp) ? loc.timestamp : now;
+            const locationAgeMs = Math.max(0, now - fixTimestamp);
+            const gpsSpeedKmh = loc.coords.speed != null && loc.coords.speed >= 0
+              ? loc.coords.speed * 3.6
+              : speedKmhRef.current;
+            const gpsHeading = loc.coords.heading != null && loc.coords.heading >= 0
+              ? loc.coords.heading
+              : (lastHeadingRef.current ?? 0);
+            handlePositionUpdate(
+              loc.coords.latitude,
+              loc.coords.longitude,
+              gpsHeading,
+              "gps",
+              loc.coords.accuracy ?? null,
+              locationAgeMs,
+              gpsSpeedKmh,
+            );
+          }
+        );
+        locationSubRef.current = sub;
+      } catch (err) {
+        console.warn("[NavigationGPS] watch non disponibile:", err);
+      }
     })();
+
+    drTimer = setInterval(() => {
+      const now = Date.now();
+      const gpsAgeMs = lastGpsFixAtRef.current > 0 ? now - lastGpsFixAtRef.current : Infinity;
+      if (gpsAgeMs <= GPS_STALE_MS || gpsAgeMs > DR_MAX_DURATION_MS) {
+        if (gpsAgeMs > DR_MAX_DURATION_MS) drStartedAtRef.current = null;
+        return;
+      }
+
+      const anchor = lastRoutePositionRef.current;
+      const heading = lastHeadingRef.current;
+      if (!anchor || heading == null || speedKmhRef.current <= 0.5) return;
+      if (drStartedAtRef.current == null) drStartedAtRef.current = now;
+      if (now - drStartedAtRef.current > DR_MAX_DURATION_MS) return;
+
+      const elapsedMs = Math.min(2000, Math.max(500, now - (lastDrTickAtRef.current || now - 1000)));
+      const estimated = deadReckonStep(
+        { lat: anchor.lat, lon: anchor.lng },
+        heading,
+        speedKmhRef.current,
+        elapsedMs,
+      );
+      lastDrTickAtRef.current = now;
+      if (estimated) {
+        handlePositionUpdate(
+          estimated.lat,
+          estimated.lon,
+          heading,
+          "dead_reckoning",
+          null,
+          gpsAgeMs,
+          speedKmhRef.current,
+        );
+      }
+    }, 1000);
 
     return () => {
       sub?.remove();
+      motionSub?.remove();
+      if (drTimer) clearInterval(drTimer);
       locationSubRef.current = null;
       resumeSharedWatch();
     };
@@ -451,8 +515,17 @@ export function useNavigateState() {
     positionSource: "gps" | "dead_reckoning" = "gps",
     accuracyM: number | null = null,
     locationAgeMs = 0,
+    speedKmh = 0,
   ) => {
     if (polylinePoints.length === 0) return;
+    if (positionSource === "gps") {
+      lastGpsFixAtRef.current = Date.now() - Math.max(0, locationAgeMs);
+      speedKmhRef.current = Math.max(0, speedKmh);
+      if (Number.isFinite(heading)) lastHeadingRef.current = heading;
+      drStartedAtRef.current = null;
+      lastDrTickAtRef.current = 0;
+    }
+    lastRoutePositionRef.current = { lat, lng };
     lastKnownPosRef.current = { lat, lng };
 
     for (const checkpoint of activeTechnicalCheckpointsRef.current) {
