@@ -174,20 +174,52 @@ export async function runLiveRouteMatching(): Promise<LiveRouteMatchingResult> {
 
     for (const candidate of candidates) {
       const score = Math.max(0.25, Math.min(1, 1 - candidate.distanceKm / (dynamic ? DYNAMIC_RADIUS_KM : STATIC_RADIUS_KM)));
+      const reasons = {
+        matchType: dynamic ? "dynamic_live" : "static_start",
+        distanceKm: Math.round(candidate.distanceKm * 10) / 10,
+        liveEvent: live?.event ?? null,
+        livePositionSource: live?.positionSource ?? null,
+        livePositionKnown: dynamic,
+        liveAccuracyM: live?.accuracyM ?? null,
+        liveLocationAgeMs: live?.locationAgeMs ?? null,
+      };
+
+      const existing = await db
+        .select({
+          id: plannedRouteInvites.id,
+          status: plannedRouteInvites.status,
+          priority: plannedRouteInvites.priority,
+        })
+        .from(plannedRouteInvites)
+        .where(and(
+          eq(plannedRouteInvites.routeId, route.id),
+          eq(plannedRouteInvites.suggestedUserId, candidate.profile.userId),
+        ))
+        .limit(1);
+
+      if (existing.length > 0) {
+        const current = existing[0];
+        // Una proposta già accettata/rifiutata non viene sovrascritta.
+        // Se era solo statica e il viaggio è partito, la promuoviamo a live.
+        if (!dynamic || current.status !== "suggested" || current.priority === "high") continue;
+        const upgraded = await db
+          .update(plannedRouteInvites)
+          .set({ score: Math.round(score * 10000) / 10000, reasons, priority: "high" })
+          .where(eq(plannedRouteInvites.id, current.id))
+          .returning({ id: plannedRouteInvites.id });
+        if (upgraded.length === 0) continue;
+        invitesCreated++;
+        dynamicMatches++;
+        void sendPlannedRouteInvitePushNotifications([candidate.profile.userId], { routeId: route.id }).catch(() => {});
+        continue;
+      }
+
       const inserted = await db.insert(plannedRouteInvites).values({
         routeId: route.id,
         ownerId: route.userId,
         suggestedUserId: candidate.profile.userId,
         score: Math.round(score * 10000) / 10000,
-        reasons: {
-          matchType: dynamic ? "dynamic_live" : "static_start",
-          distanceKm: Math.round(candidate.distanceKm * 10) / 10,
-          liveEvent: live?.event ?? null,
-          livePositionSource: live?.positionSource ?? null,
-          livePositionKnown: dynamic,
-          liveAccuracyM: live?.accuracyM ?? null,
-          liveLocationAgeMs: live?.locationAgeMs ?? null,
-        },
+        reasons,
         priority: dynamic ? "high" : "normal",
         status: "suggested",
       }).onConflictDoNothing().returning({ id: plannedRouteInvites.id });
