@@ -5,6 +5,8 @@ import { requireAuth } from "./utils";
 import { sendError } from "../../lib/api-response";
 
 const router = Router();
+const MAX_LIVE_AGE_MS = 5 * 60_000;
+const MAX_LIVE_ACCURACY_M = 250;
 
 const liveEventSchema = z.object({
   event: z.enum(["start", "position", "waypoint", "arrived", "off_route", "stopped"]),
@@ -37,6 +39,10 @@ router.post("/:id/live", async (req: Request, res: Response) => {
       latitude: hasPosition ? body.latitude : null,
       longitude: hasPosition ? body.longitude : null,
       positionKnown: hasPosition && body.positionSource !== "unknown",
+      positionReliable: hasPosition
+        && body.positionSource !== "unknown"
+        && (body.accuracyM == null || body.accuracyM <= MAX_LIVE_ACCURACY_M)
+        && (body.locationAgeMs == null || body.locationAgeMs <= MAX_LIVE_AGE_MS),
       accuracyM: body.accuracyM ?? null,
       positionSource: body.positionSource,
       locationAgeMs: body.locationAgeMs ?? null,
