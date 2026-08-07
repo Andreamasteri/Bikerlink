@@ -86,7 +86,7 @@ export const useVoiceCommandInternal = (
 
       const result = results[0];
       const lng = result.lng ?? result.lon;
-      if (!Number.isFinite(result.lat) || !Number.isFinite(lng)) {
+      if (!Number.isFinite(result.lat) || typeof lng !== "number" || !Number.isFinite(lng)) {
         setVoiceCmdToast("Destinazione non valida");
         setTimeout(() => setVoiceCmdToast(null), 3000);
         return;
