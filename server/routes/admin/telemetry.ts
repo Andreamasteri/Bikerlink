@@ -101,7 +101,7 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
         SELECT
           COUNT(DISTINCT user_id)::text AS users_with_telemetry,
           COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL '24 hours' THEN user_id END)::text AS active_users_24h,
-          COUNT(DISTINCT session_id)::text AS total_rides,
+          COUNT(DISTINCT (user_id, session_id))::text AS total_rides,
           COUNT(*)::text AS total_samples,
           MAX(created_at)::text AS latest_sample
         FROM ride_telemetry
@@ -384,9 +384,10 @@ router.get("/telemetry-top-riders", async (req: Request, res: Response) => {
         SELECT
           user_id,
           session_id,
+          id,
           lat, lon,
-          LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
-          LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
+          LAG(lat) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lat,
+          LAG(lon) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lon
         FROM ride_telemetry
         WHERE created_at >= NOW() - INTERVAL '24 hours'
           AND session_type NOT IN ('ideal_lap')
