@@ -10,7 +10,7 @@
  * features[].properties con i campi indirizzo.
  *
  * SOLO self-hosted: nessun fallback a server pubblici (né photon.komoot.io né
- * nominatim.openstreetmap.org). Se PHOTON_URL/PHOTON_TOKEN non sono configurati
+ * provider precedente.openstreetmap.org). Se PHOTON_URL/PHOTON_TOKEN non sono configurati
  * o il ThinkCentre è offline, le chiamate falliscono in modo esplicito.
  *
  * Variabili d'ambiente (secret Replit):
@@ -259,7 +259,7 @@ function composeName(p: PhotonProperties): string {
  * Geocodifica una stringa di query testuale in coordinate geografiche via
  * Photon self-hosted. I risultati sono cachati per 5 minuti.
  *
- * Nessun fallback pubblico: lancia eccezione se Photon non è configurato,
+ * Photon self-hosted: lancia eccezione se Photon non è configurato,
  * il ThinkCentre è offline, o il server risponde con errore HTTP.
  *
  * @param query   Stringa di ricerca (es: "Milano", "Via Roma, Roma")
@@ -299,7 +299,7 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
  * Nessun fallback pubblico: lancia eccezione se Photon non è configurato,
  * il ThinkCentre è offline, o il server risponde con errore HTTP.
  *
- * Nota: Photon non usa il parametro `zoom` (proprio di Nominatim); è mantenuto
+ * Nota: Photon non usa il parametro `zoom`; è mantenuto
  * nella firma per compatibilità con i chiamanti ma non viene inviato.
  *
  * @param lat   Latitudine
