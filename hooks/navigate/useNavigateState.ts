@@ -216,6 +216,7 @@ export function useNavigateState() {
     polylinePoints, setPolylinePoints,
     hasPermission, setHasPermission,
     isRerouting, setIsRerouting,
+    isOffRoute, setIsOffRoute,
     isOffline, setIsOffline,
     weatherLoading, setWeatherLoading,
     currentWeather, setCurrentWeather,
