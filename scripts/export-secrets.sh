@@ -99,13 +99,6 @@ echo "HORUS_HUB_URL=${HORUS_HUB_URL:-}" >> "$OUT"
 echo "HORUS_SEARXNG_URL=${HORUS_SEARXNG_URL:-}" >> "$OUT"
 echo "" >> "$OUT"
 
-# ── Whisper ──────────────────────────────────────────────────
-echo "# --- Whisper ---" >> "$OUT"
-echo "WHISPER_HOME_URL=${WHISPER_HOME_URL:-}" >> "$OUT"
-echo "WHISPER_TOKEN=${WHISPER_TOKEN:-}" >> "$OUT"
-echo "WHISPER_URL=${WHISPER_URL:-}" >> "$OUT"
-echo "" >> "$OUT"
-
 # ── Expo / Mobile ────────────────────────────────────────────
 echo "# --- Expo / Mobile ---" >> "$OUT"
 echo "EXPO_TOKEN=${EXPO_TOKEN:-}" >> "$OUT"
