@@ -26,6 +26,8 @@ CREATE INDEX IF NOT EXISTS "telemetry_session_stats_user_idx" ON "telemetry_sess
 --   dist_all           = SUM delle distanze consecutive (LAG per session ORDER BY ts)
 --   dist_speed_filtered = SUM solo dei segmenti con speed_kmh NULL o >= 20
 --   last_*             = ultimo campione per ts (àncora per i batch futuri)
+--   Tutte le aggregazioni sono partizionate per (user_id, session_id):
+--   session_id da solo non identifica una sessione globalmente.
 INSERT INTO "telemetry_session_stats"
   ("user_id", "session_id", "session_type", "dist_all", "dist_speed_filtered",
    "sample_count", "sensor_only_count", "last_lat", "last_lon", "last_ts", "updated_at")
@@ -53,11 +55,13 @@ FROM (
 ) m
 LEFT JOIN (
   SELECT
+    user_id,
     session_id,
     SUM(dist_km) AS dist_all,
     SUM(dist_km) FILTER (WHERE speed_kmh IS NULL OR speed_kmh >= 20) AS dist_speed_filtered
   FROM (
     SELECT
+      user_id,
       session_id,
       speed_kmh,
       2 * 6371 * ASIN(
@@ -69,25 +73,25 @@ LEFT JOIN (
       ) AS dist_km
     FROM (
       SELECT
-        session_id, lat, lon, speed_kmh,
-        LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
-        LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
+        user_id, session_id, lat, lon, speed_kmh,
+        LAG(lat) OVER (PARTITION BY user_id, session_id ORDER BY ts) AS prev_lat,
+        LAG(lon) OVER (PARTITION BY user_id, session_id ORDER BY ts) AS prev_lon
       FROM ride_telemetry
     ) ordered
     WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
       AND ABS(lat - prev_lat) < 0.5
       AND ABS(lon - prev_lon) < 0.5
   ) distances
-  GROUP BY session_id
-) d ON d.session_id = m.session_id
+  GROUP BY user_id, session_id
+) d ON d.user_id = m.user_id AND d.session_id = m.session_id
 LEFT JOIN (
-  SELECT session_id, lat AS last_lat, lon AS last_lon, ts AS last_ts
+  SELECT user_id, session_id, lat AS last_lat, lon AS last_lon, ts AS last_ts
   FROM (
     SELECT
-      session_id, lat, lon, ts,
-      ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY ts DESC) AS rn
+      user_id, session_id, lat, lon, ts,
+      ROW_NUMBER() OVER (PARTITION BY user_id, session_id ORDER BY ts DESC) AS rn
     FROM ride_telemetry
   ) ranked
   WHERE rn = 1
-) l ON l.session_id = m.session_id
+) l ON l.user_id = m.user_id AND l.session_id = m.session_id
 ON CONFLICT ("user_id","session_id") DO NOTHING;
