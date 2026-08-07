@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -6,13 +6,10 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  TouchableOpacity,
-  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import type { ThemeColors } from "@/constants/colors";
-import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
 
 interface AiInputSectionProps {
   aiPrompt: string;
@@ -29,52 +26,6 @@ export const AiInputSection: React.FC<AiInputSectionProps> = ({
 }) => {
   const colors = useColors();
   const s = styles(colors);
-  const whisper = useWhisperRecorder();
-  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showSource, setShowSource] = useState<"home" | "cloud" | null>(null);
-  const sourceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!whisper.error) return;
-    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-    errorTimerRef.current = setTimeout(() => {
-      whisper.reset();
-    }, 3000);
-    return () => {
-      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-    };
-  }, [whisper.error]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (whisper.recording) setShowSource(null);
-  }, [whisper.recording]);
-
-  useEffect(() => {
-    if (!whisper.lastSource) return;
-    setShowSource(whisper.lastSource);
-    if (sourceTimerRef.current) clearTimeout(sourceTimerRef.current);
-    sourceTimerRef.current = setTimeout(() => {
-      setShowSource(null);
-    }, 4000);
-    return () => {
-      if (sourceTimerRef.current) clearTimeout(sourceTimerRef.current);
-    };
-  }, [whisper.lastSource]);
-
-  const handleMicPress = async () => {
-    if (whisper.error) whisper.reset();
-
-    if (whisper.recording) {
-      const text = await whisper.stopAndTranscribe();
-      if (text) {
-        setAiPrompt(aiPrompt ? `${aiPrompt} ${text}` : text);
-      }
-    } else {
-      await whisper.startRecording();
-    }
-  };
-
-  const micDisabled = Platform.OS === "web" || whisper.transcribing || aiLoading;
 
   return (
     <View style={s.section}>
@@ -94,46 +45,8 @@ export const AiInputSection: React.FC<AiInputSectionProps> = ({
           textAlignVertical="top"
         />
 
-        <TouchableOpacity
-          style={[
-            s.micBtn,
-            whisper.recording && s.micBtnRecording,
-            micDisabled && s.micBtnDisabled,
-          ]}
-          onPress={handleMicPress}
-          disabled={micDisabled}
-          activeOpacity={0.7}
-          accessibilityLabel={
-            whisper.recording ? "Ferma registrazione" : "Registra con microfono"
-          }
-        >
-          {whisper.transcribing ? (
-            <ActivityIndicator size="small" color={colors.accent} />
-          ) : whisper.recording ? (
-            <Ionicons name="stop" size={18} color="#fff" />
-          ) : (
-            <Ionicons
-              name="mic"
-              size={18}
-              color={
-                Platform.OS === "web"
-                  ? colors.textSecondary
-                  : colors.text
-              }
-            />
-          )}
-        </TouchableOpacity>
       </View>
 
-      {!!whisper.error && (
-        <Text style={s.errorHint}>{whisper.error}</Text>
-      )}
-
-      {!whisper.recording && !whisper.transcribing && !!showSource && (
-        <Text style={s.sourceHint}>
-          {showSource === "home" ? "🏠 Trascritto in locale" : "☁️ Trascritto via cloud"}
-        </Text>
-      )}
 
       <Pressable
         style={[s.primaryBtn, (aiLoading || !aiPrompt.trim()) && { opacity: 0.6 }]}
@@ -176,7 +89,7 @@ const styles = (colors: ThemeColors) =>
       backgroundColor: colors.surface,
       borderRadius: 12,
       padding: 14,
-      paddingBottom: 44,
+      paddingBottom: 14,
       fontFamily: "Inter_400Regular",
       fontSize: 15,
       color: colors.text,
