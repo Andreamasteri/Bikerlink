@@ -2,7 +2,6 @@
 # =============================================================================
 # BikerLink — expose/setup-expose.sh
 # Genera i file di configurazione per esporre i servizi self-host (GraphHopper,
-# Valhalla, Ollama, Whisper, Nominatim) all'app cloud, compilando i segnaposto
 # nei template a partire dai valori del .env.local.
 #
 # Cosa fa:
@@ -21,7 +20,6 @@
 # Variabili d'ambiente per modalità non-interattiva (CI / scripting):
 #   BASE_DOMAIN, APP_ORIGIN, TUNNEL_UUID,
 #   GRAPHHOPPER_TOKEN, VALHALLA_API_KEY,
-#   OLLAMA_TOKEN, WHISPER_TOKEN, NOMINATIM_TOKEN,
 #   ENV_LOCAL_FILE, NONINTERACTIVE=1, GEN_TOKENS=1
 # =============================================================================
 set -euo pipefail
@@ -133,7 +131,6 @@ fi
 ENV_GH_TOKEN="$(read_env_value GRAPHHOPPER_TOKEN  "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 ENV_VALHALLA_KEY="$(read_env_value VALHALLA_API_KEY "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 ENV_OLLAMA_TOKEN="$(read_env_value OLLAMA_TOKEN     "$ENV_LOCAL_FILE" 2>/dev/null || true)"
-ENV_WHISPER_TOKEN="$(read_env_value WHISPER_TOKEN   "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 ENV_NOMINATIM_TOKEN="$(read_env_value NOMINATIM_TOKEN "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 ENV_TC_AGENT_TOKEN="$(read_env_value TC_AGENT_TOKEN  "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 
@@ -196,8 +193,6 @@ resolve_token "VALHALLA_API_KEY"  "$ENV_VALHALLA_KEY"   "${VALHALLA_API_KEY:-}"
 VALHALLA_KEY="$RESOLVED_TOKEN"
 resolve_token "OLLAMA_TOKEN"      "$ENV_OLLAMA_TOKEN"   "${OLLAMA_TOKEN:-}"
 OLLAMA_TOKEN_VAL="$RESOLVED_TOKEN"
-resolve_token "WHISPER_TOKEN"     "$ENV_WHISPER_TOKEN"  "${WHISPER_TOKEN:-}"
-WHISPER_TOKEN_VAL="$RESOLVED_TOKEN"
 resolve_token "NOMINATIM_TOKEN"   "$ENV_NOMINATIM_TOKEN" "${NOMINATIM_TOKEN:-}"
 NOMINATIM_TOKEN_VAL="$RESOLVED_TOKEN"
 resolve_token "TC_AGENT_TOKEN"    "$ENV_TC_AGENT_TOKEN"  "${TC_AGENT_TOKEN:-}"
@@ -209,7 +204,6 @@ if [[ "$GENERATED_ANY" == "1" ]]; then
   ENV_GH_TOKEN="$(read_env_value GRAPHHOPPER_TOKEN  "$ENV_LOCAL_FILE" 2>/dev/null || true)"
   ENV_VALHALLA_KEY="$(read_env_value VALHALLA_API_KEY "$ENV_LOCAL_FILE" 2>/dev/null || true)"
   ENV_OLLAMA_TOKEN="$(read_env_value OLLAMA_TOKEN     "$ENV_LOCAL_FILE" 2>/dev/null || true)"
-  ENV_WHISPER_TOKEN="$(read_env_value WHISPER_TOKEN   "$ENV_LOCAL_FILE" 2>/dev/null || true)"
   ENV_NOMINATIM_TOKEN="$(read_env_value NOMINATIM_TOKEN "$ENV_LOCAL_FILE" 2>/dev/null || true)"
   ENV_TC_AGENT_TOKEN="$(read_env_value TC_AGENT_TOKEN  "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 fi
@@ -220,8 +214,6 @@ fi
   || die "VALHALLA_API_KEY mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
 [[ -n "$OLLAMA_TOKEN_VAL"   && "$OLLAMA_TOKEN_VAL"    != "$PLACEHOLDER_VALUE" ]] \
   || die "OLLAMA_TOKEN mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
-[[ -n "$WHISPER_TOKEN_VAL"  && "$WHISPER_TOKEN_VAL"   != "$PLACEHOLDER_VALUE" ]] \
-  || die "WHISPER_TOKEN mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
 [[ -n "$NOMINATIM_TOKEN_VAL" && "$NOMINATIM_TOKEN_VAL" != "$PLACEHOLDER_VALUE" ]] \
   || die "NOMINATIM_TOKEN mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
 [[ -n "$TC_AGENT_TOKEN_VAL"  && "$TC_AGENT_TOKEN_VAL"  != "$PLACEHOLDER_VALUE" ]] \
@@ -250,7 +242,6 @@ validate_token() {
 validate_token "GRAPHHOPPER_TOKEN" "$GH_TOKEN"           "$ENV_GH_TOKEN"
 validate_token "VALHALLA_API_KEY"  "$VALHALLA_KEY"       "$ENV_VALHALLA_KEY"
 validate_token "OLLAMA_TOKEN"      "$OLLAMA_TOKEN_VAL"   "$ENV_OLLAMA_TOKEN"
-validate_token "WHISPER_TOKEN"     "$WHISPER_TOKEN_VAL"  "$ENV_WHISPER_TOKEN"
 validate_token "NOMINATIM_TOKEN"   "$NOMINATIM_TOKEN_VAL" "$ENV_NOMINATIM_TOKEN"
 validate_token "TC_AGENT_TOKEN"    "$TC_AGENT_TOKEN_VAL"  "$ENV_TC_AGENT_TOKEN"
 
@@ -264,7 +255,6 @@ E_APP_ORIGIN="$(sed_escape "$APP_ORIGIN")"
 E_GH_TOKEN="$(sed_escape "$GH_TOKEN")"
 E_VALHALLA_KEY="$(sed_escape "$VALHALLA_KEY")"
 E_OLLAMA_TOKEN="$(sed_escape "$OLLAMA_TOKEN_VAL")"
-E_WHISPER_TOKEN="$(sed_escape "$WHISPER_TOKEN_VAL")"
 E_NOMINATIM_TOKEN="$(sed_escape "$NOMINATIM_TOKEN_VAL")"
 E_TC_AGENT_TOKEN="$(sed_escape "$TC_AGENT_TOKEN_VAL")"
 E_TUNNEL_UUID="$(sed_escape "${TUNNEL_UUID:-__TUNNEL_UUID__}")"
@@ -276,7 +266,6 @@ sed \
   -e "s#__GH_TOKEN__#${E_GH_TOKEN}#g" \
   -e "s#__VALHALLA_KEY__#${E_VALHALLA_KEY}#g" \
   -e "s#__OLLAMA_TOKEN__#${E_OLLAMA_TOKEN}#g" \
-  -e "s#__WHISPER_TOKEN__#${E_WHISPER_TOKEN}#g" \
   -e "s#__NOMINATIM_TOKEN__#${E_NOMINATIM_TOKEN}#g" \
   -e "s#__TC_AGENT_TOKEN__#${E_TC_AGENT_TOKEN}#g" \
   "$NGINX_TEMPLATE" > "$NGINX_OUT"
@@ -308,7 +297,7 @@ $(bold "Nginx + Let's Encrypt (setup legacy — l'esposizione attiva è Cloudfla
   # 2. Emetti il certificato SAN unico (--cert-name bikerlink = lineage fisso)
   sudo certbot certonly --standalone --cert-name bikerlink \\
     -d gh.${BASE_DOMAIN} -d valhalla.${BASE_DOMAIN} \\
-    -d ollama.${BASE_DOMAIN} -d whisper.${BASE_DOMAIN} \\
+    -d ollama.${BASE_DOMAIN} \\
     -d nominatim.${BASE_DOMAIN} -d tc.${BASE_DOMAIN}
 
   # 3. Installa il config e avvia nginx
@@ -326,7 +315,6 @@ $(bold "Log auth-failure (401 token mismatch)")
     /var/log/nginx/gh-auth-fail.log
     /var/log/nginx/valhalla-auth-fail.log
     /var/log/nginx/ollama-auth-fail.log
-    /var/log/nginx/whisper-auth-fail.log
     /var/log/nginx/nominatim-auth-fail.log
     /var/log/nginx/tc-auth-fail.log
   Formato: timestamp | IP | request | header custom mascherato (4 char + ***) | Authorization mascherata
@@ -345,8 +333,6 @@ $(bold "Nota")
 $(bold "Secrets Replit da aggiornare")
   OLLAMA_URL=https://ollama.${BASE_DOMAIN}
   OLLAMA_TOKEN=<valore da .env.local>
-  WHISPER_URL=https://whisper.${BASE_DOMAIN}
-  WHISPER_TOKEN=<valore da .env.local>
   NOMINATIM_URL=https://nominatim.${BASE_DOMAIN}
   NOMINATIM_TOKEN=<valore da .env.local>
   GRAPHHOPPER_URL=https://gh.${BASE_DOMAIN}
