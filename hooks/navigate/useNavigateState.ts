@@ -22,6 +22,7 @@ import {
   activeStepIndex,
 } from "@/components/navigate/navigate-helpers";
 import { useLocationGate } from "@/lib/location-context";
+import { usePlayer } from "@/lib/player-context";
 import type { NavWeatherZone } from "@/components/navigate/NavigationWeather";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -182,6 +183,7 @@ export function useNavigateState() {
   const locale = useLocale();
   const t = useT();
   const { suspendSharedWatch, resumeSharedWatch } = useLocationGate();
+  const { stop: stopMusic } = usePlayer();
 
   const topPad = insets.top;
   const bottomPad = insets.bottom;
@@ -435,6 +437,8 @@ export function useNavigateState() {
         } else if (Date.now() - offRouteStartRef.current >= REROUTE_DELAY_MS) {
           isOffRouteRef.current = true;
           setIsOffRoute(true);
+          // La musica, se attiva, non deve continuare mentre il tracciato è perso.
+          stopMusic();
         }
       } else {
         offRouteStartRef.current = null;
@@ -502,7 +506,7 @@ export function useNavigateState() {
         Speech.speak(t("nav.announce.arrived"), { language: locale });
       }
     }
-  }, [polylinePoints, route, mapReady, isFinished, locale, t, sendLiveEvent, setCurrentStep, setDistanceToNext, setIsFinished, setIsOffRoute, setProgressPct, setRemainingKm, setRemainingMin]);
+  }, [polylinePoints, route, mapReady, isFinished, locale, t, sendLiveEvent, stopMusic, setCurrentStep, setDistanceToNext, setIsFinished, setIsOffRoute, setProgressPct, setRemainingKm, setRemainingMin]);
 
   const [minimalMode, setMinimalMode] = useState(false);
   const minimalManualRef = useRef(false);
