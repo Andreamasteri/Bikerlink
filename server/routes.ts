@@ -342,8 +342,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/routing", routingAreasRouter);
   app.use("/api/routing", valhallaFunctionsRouter);
 
-  const { default: whisperRoutes } = await import("./routes/whisper");
-  app.use("/api/whisper", whisperRoutes);
   app.use(customRoutesRouter);
   app.use(customRoutes2Router);
   // Task #2517 — Bull Board UI for inspecting BullMQ queues. Mounted BEFORE
