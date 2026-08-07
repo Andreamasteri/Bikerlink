@@ -145,13 +145,15 @@ export function useCreateProposalForm() {
       setDepartureLng(result.departure.lng);
       setDepartureAddress(result.departure.name);
       setGpsSource("map");
-      if (result.stops.length > 0) {
-        setStops(result.stops);
-      }
+      setStops(result.stops);
       if (result.destination) {
         setDestinationAddress(result.destination.name);
         setDestinationLat(result.destination.lat);
         setDestinationLng(result.destination.lng);
+      } else {
+        setDestinationAddress("");
+        setDestinationLat(null);
+        setDestinationLng(null);
       }
       if ("schedule" in result && result.schedule) {
         const schedule = result.schedule;
