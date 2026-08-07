@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
+import { DeviceMotion } from "expo-sensors";
 import * as Speech from "expo-speech";
 import { useColors } from "@/hooks/useColors";
 import { useOfflineTiles } from "@/hooks/useOfflineTiles";
@@ -24,6 +25,7 @@ import {
 import { useLocationGate } from "@/lib/location-context";
 import { usePlayer } from "@/lib/player-context";
 import type { NavWeatherZone } from "@/components/navigate/NavigationWeather";
+import { deadReckonStep } from "@shared/tracking-fusion";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function announceStep(distM: number, stepIdx: number, nextStep: any, announcedFar: Set<number>, announcedNear: Set<number>, t: any, locale: string) {
@@ -168,6 +170,8 @@ const _ANNOUNCE_DISTANCE_FAR = 200;
 const _ANNOUNCE_DISTANCE_NEAR = 50;
 const REROUTE_DISTANCE_M = 200;
 const REROUTE_DELAY_MS = 5000;
+const GPS_STALE_MS = 6000;
+const DR_MAX_DURATION_MS = 90_000;
 const WEATHER_AHEAD_KM = 15;
 const WEATHER_THROTTLE_MS = 10 * 60 * 1000;
 const WEATHER_AHEAD_REFETCH_M = 15000;
@@ -204,6 +208,12 @@ export function useNavigateState() {
   const activeTotalMinRef = useRef<number | null>(null);
   const liveLastSentAtRef = useRef(0);
   const liveStartedRef = useRef(false);
+  const lastGpsFixAtRef = useRef(0);
+  const lastRoutePositionRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lastHeadingRef = useRef<number | null>(null);
+  const speedKmhRef = useRef(0);
+  const drStartedAtRef = useRef<number | null>(null);
+  const lastDrTickAtRef = useRef(0);
 
   const {
     mapReady, setMapReady,
@@ -261,7 +271,7 @@ export function useNavigateState() {
   ) => {
     if (!route?.id) return;
     const now = Date.now();
-    if (event === "position" && now - liveLastSentAtRef.current < 15_000) return;
+    if ((event === "position" || event === "off_route") && now - liveLastSentAtRef.current < 15_000) return;
     liveLastSentAtRef.current = now;
     if (event === "start") liveStartedRef.current = true;
     void apiRequest("POST", "/api/planned-routes/" + route.id + "/live", {
@@ -308,6 +318,12 @@ export function useNavigateState() {
     offRouteStartRef.current = null;
     isOffRouteRef.current = false;
     setIsOffRoute(false);
+    lastGpsFixAtRef.current = 0;
+    lastRoutePositionRef.current = null;
+    lastHeadingRef.current = null;
+    speedKmhRef.current = 0;
+    drStartedAtRef.current = null;
+    lastDrTickAtRef.current = 0;
   }, [route, setPolylinePoints, setRemainingKm, setRemainingMin]);
 
   useEffect(() => {
