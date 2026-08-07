@@ -112,7 +112,7 @@ async function persistPattern(pattern: RecurringPattern, note: string, modelId: 
         question: `Pattern ricorrente coordinator: ${pattern.scope}`,
         answer: note,
         persona: "horus",
-        source: "horus-coordinator-auto-learn:pattern",
+        source: "auto-learn:horus",
         modelId,
       })
       .onConflictDoUpdate({
