@@ -144,9 +144,9 @@ export async function runMapMatchingJob(): Promise<{
     // abortire l'intero giro notturno in silenzio. withDbRetry resta interno per
     // gli errori pg transitori veloci; withBgDbSlot rispetta il budget connessioni.
     const pendingRides = await withSchedulerRetry(
-      () => withBgDbSlot(() => withDbRetry(() => db.execute<{ session_id: string; sample_count: string; attempts: number }>(
+      () => withBgDbSlot(() => withDbRetry(() => db.execute<{ user_id: string; session_id: string; sample_count: string; attempts: number }>(
         sql`
-          SELECT session_id, COUNT(*) AS sample_count, MAX(match_attempts)::int AS attempts
+          SELECT user_id, session_id, COUNT(*) AS sample_count, MAX(match_attempts)::int AS attempts
           FROM ride_telemetry
           WHERE match_status IN ('pending', 'retry')
             AND match_attempts < ${maxAttempts}
@@ -154,7 +154,7 @@ export async function runMapMatchingJob(): Promise<{
               last_match_attempt_at IS NULL
               OR last_match_attempt_at < NOW() - (INTERVAL '1 minute' * ${retryBaseMin} * POWER(2, GREATEST(match_attempts - 1, 0)))
             )
-          GROUP BY session_id
+          GROUP BY user_id, session_id
           ORDER BY MIN(ts) ASC
           LIMIT ${batchSize}
         `,
@@ -165,6 +165,7 @@ export async function runMapMatchingJob(): Promise<{
     console.log(`[MAP-MATCH] ${pendingRides.rows.length} ride da processare`);
 
     for (const row of pendingRides.rows) {
+      const userId = row.user_id as string;
       const sessionId = row.session_id as string;
       const currentAttempts = Number(row.attempts ?? 0);
       try {
@@ -181,6 +182,7 @@ export async function runMapMatchingJob(): Promise<{
           })
           .from(rideTelemetry)
           .where(and(
+            eq(rideTelemetry.userId, userId),
             eq(rideTelemetry.sessionId, sessionId),
             inArray(rideTelemetry.matchStatus, ["pending", "retry"]),
           ))
@@ -191,6 +193,7 @@ export async function runMapMatchingJob(): Promise<{
         // processati alla run successiva → niente race / niente doppio conteggio.
         const maxSampleId = samples.reduce((m, s) => (s.id > m ? s.id : m), 0);
         const sessionScope = and(
+          eq(rideTelemetry.userId, userId),
           eq(rideTelemetry.sessionId, sessionId),
           inArray(rideTelemetry.matchStatus, ["pending", "retry"]),
           lte(rideTelemetry.id, maxSampleId),
