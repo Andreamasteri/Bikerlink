@@ -108,6 +108,9 @@ export const handleAiParseHelper = async (
     });
   } catch (err: unknown) {
     console.warn("[AI parse] fallback attivato:", (err instanceof Error ? err.message : null));
+    // Evita di riutilizzare data/ora di una pianificazione AI precedente.
+    setDepartureAt(null);
+    setReturnAt(null);
     setAiProviderUsed(null);
     const fallback = clientFallbackAiParse(aiPrompt);
     setTitle(fallback.title);
