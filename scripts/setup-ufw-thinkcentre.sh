@@ -27,7 +27,6 @@
 #   Valhalla        8002      → solo LAN 192.168.0.0/24
 #   Nominatim       8080      → solo LAN 192.168.0.0/24
 #   Ollama          11434     → solo LAN 192.168.0.0/24
-#   Whisper         9000      → solo LAN 192.168.0.0/24
 #   ufw-status      9099      → solo localhost (health endpoint admin)
 #   PostgreSQL      5432      → solo localhost (mai LAN/internet)
 #   # Uptime Kuma   3001      → commentato — abilitare quando installato
@@ -167,8 +166,6 @@ ufw allow from "${LAN}" to any port 8990:8997 proto tcp
 echo "→ Ollama 11434/tcp — solo LAN..."
 ufw allow from "${LAN}" to any port 11434 proto tcp
 
-# ── Whisper: solo LAN ─────────────────────────────────────────────────────────
-echo "→ Whisper 9000/tcp — solo LAN..."
 ufw allow from "${LAN}" to any port 9000 proto tcp
 
 # ── ufw-status health endpoint: solo localhost ────────────────────────────────
