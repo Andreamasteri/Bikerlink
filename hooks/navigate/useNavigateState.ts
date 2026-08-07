@@ -256,6 +256,8 @@ export function useNavigateState() {
     positionSource: "gps" | "waypoint" | "destination" | "dead_reckoning" | "unknown",
     progressPct: number | null,
     waypointIndex: number | null,
+    accuracyM: number | null = null,
+    locationAgeMs = 0,
   ) => {
     if (!route?.id) return;
     const now = Date.now();
@@ -269,7 +271,8 @@ export function useNavigateState() {
       positionSource,
       progressPct,
       waypointIndex,
-      locationAgeMs: 0,
+      accuracyM,
+      locationAgeMs,
       eventAt: new Date(now).toISOString(),
     }).catch(() => {});
   }, [route?.id]);
@@ -334,7 +337,16 @@ export function useNavigateState() {
       sub = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.High, timeInterval: 1000, distanceInterval: 5 },
         (loc) => {
-          handlePositionUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.heading ?? 0);
+          const fixTimestamp = Number.isFinite(loc.timestamp) ? loc.timestamp : Date.now();
+          const locationAgeMs = Math.max(0, Date.now() - fixTimestamp);
+          handlePositionUpdate(
+            loc.coords.latitude,
+            loc.coords.longitude,
+            loc.coords.heading ?? 0,
+            "gps",
+            loc.coords.accuracy ?? null,
+            locationAgeMs,
+          );
         }
       );
       locationSubRef.current = sub;
@@ -416,7 +428,14 @@ export function useNavigateState() {
     }
   }, [route, locale, t, setCurrentStep, setIsRerouting, setMapReady, setPolylinePoints]);
 
-  const handlePositionUpdate = useCallback((lat: number, lng: number, heading: number) => {
+  const handlePositionUpdate = useCallback((
+    lat: number,
+    lng: number,
+    heading: number,
+    positionSource: "gps" | "dead_reckoning" = "gps",
+    accuracyM: number | null = null,
+    locationAgeMs = 0,
+  ) => {
     if (polylinePoints.length === 0) return;
     lastKnownPosRef.current = { lat, lng };
 
@@ -459,7 +478,16 @@ export function useNavigateState() {
       : nearbyWaypointIndex >= 0
         ? "waypoint"
         : (liveStartedRef.current ? "position" : "start");
-    sendLiveEvent(liveEvent, lat, lng, "gps", pct, nearbyWaypointIndex >= 0 ? nearbyWaypointIndex : null);
+    sendLiveEvent(
+      liveEvent,
+      lat,
+      lng,
+      positionSource,
+      pct,
+      nearbyWaypointIndex >= 0 ? nearbyWaypointIndex : null,
+      accuracyM,
+      locationAgeMs,
+    );
 
     if (mapReady && webViewRef.current) {
       webViewRef.current.injectJavaScript(
@@ -503,7 +531,16 @@ export function useNavigateState() {
       if (!isFinished) {
         setIsFinished(true);
         setDistanceToNext(null);
-        sendLiveEvent("arrived", lat, lng, "destination", 100, (route?.waypoints?.length ?? 1) - 1);
+        sendLiveEvent(
+          "arrived",
+          lat,
+          lng,
+          "destination",
+          100,
+          (route?.waypoints?.length ?? 1) - 1,
+          accuracyM,
+          locationAgeMs,
+        );
         Speech.speak(t("nav.announce.arrived"), { language: locale });
       }
     }
