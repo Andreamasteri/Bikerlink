@@ -57,7 +57,7 @@ async function geocodeViaServer(q: string): Promise<GeoCandidate[]> {
     url.searchParams.set("q", q);
     const res = await fetch(url.toString(), { credentials: "include" });
     if (!res.ok) return [];
-    const data = await res.json();
+    const data = await res.json() as Array<{ lat?: string | number; lng?: string | number; lon?: string | number; name?: string }>;
     if (!Array.isArray(data)) return [];
     return data
       .map((item) => ({
