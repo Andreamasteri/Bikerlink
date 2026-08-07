@@ -332,8 +332,8 @@ describe("computeOverallStatus — calcolo colore aggregato", () => {
   });
 
   it("GH conta come singola unità logica: true+false+false+null+true → yellow non red", () => {
-    // 4 servizi singoli (Ollama, Whisper, Photon, Valhalla) + GH unitOk
-    // Scenario: Ollama=true, Whisper=false, Photon=false, Valhalla=null, GH=true
+    // servizi singoli + GH unitOk
+    // Scenario con servizi misti e GH=true
     // Configurati: [true, false, false, true] → 2/4 online → yellow
     expect(computeOverallStatus([true, false, false, null, true])).toBe<OverallStatus>("yellow");
   });
