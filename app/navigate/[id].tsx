@@ -19,7 +19,7 @@ export default function NavigateScreen() {
     isRerouting, isOffline, weatherLoading, currentWeather, aheadWeather,
     mapUri, offline, activeStepsRef,
     minimalMode, handleToggleMinimal,
-    handleMapMessage, handleVoiceCommand, handleClose, triggerWeatherReroute,
+    handleMapMessage, handleClose, triggerWeatherReroute,
   } = useNavigateState();
 
   const s = makeStyles(colors);
