@@ -75,11 +75,11 @@ router.patch("/routes/:id", requireAuth, async (req: Request, res: Response) => 
       if (!isNaN(d.getTime())) updates.stoppedAt = d;
     }
 
-    if (Object.keys(updates).length === 0) {
-      return res.json({ route });
+    let updated = route;
+    if (Object.keys(updates).length > 0) {
+      const [row] = await db.update(routes).set(updates).where(eq(routes.id, id)).returning();
+      if (row) updated = row;
     }
-
-    const [updated] = await db.update(routes).set(updates).where(eq(routes.id, id)).returning();
 
     // ── Telemetria sensori (Routes & Performance) ────────────────────────
     // Il client invia `telemetryData` come stringa JSON di array di campioni
