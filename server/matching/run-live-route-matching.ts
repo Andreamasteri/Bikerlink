@@ -91,6 +91,8 @@ export async function runLiveRouteMatching(): Promise<LiveRouteMatchingResult> {
 
   for (const route of routes) {
     const live = readLive(route.metadata);
+    const metadata = route.metadata && typeof route.metadata === "object" ? route.metadata as Record<string, unknown> : {};
+    const departureAt = typeof metadata.departureAt === "string" ? Date.parse(metadata.departureAt) : NaN;
     const eventAt = live?.eventAt ? Date.parse(live.eventAt) : NaN;
     const liveEvent = live?.event ?? null;
     const liveCandidateEvent = ["start", "position", "waypoint", "off_route"].includes(liveEvent ?? "");
@@ -104,6 +106,9 @@ export async function runLiveRouteMatching(): Promise<LiveRouteMatchingResult> {
     // Un viaggio già concluso, fermato o con telemetria live scaduta non torna
     // statico: la posizione non è sufficientemente affidabile per una proposta.
     if (liveEvent === "arrived" || liveEvent === "stopped" || (liveCandidateEvent && !dynamic)) continue;
+    // Una proposta statica resta valida fino a 30 minuti dopo l’orario previsto;
+    // oltre quel limite il viaggio va aggiornato dal proprietario o marcato live.
+    if (!dynamic && Number.isFinite(departureAt) && Date.now() - departureAt > 30 * 60_000) continue;
     const targets = routeTargets(route, dynamic ? { latitude: live!.latitude!, longitude: live!.longitude! } : null);
     if (targets.length === 0) continue;
 
