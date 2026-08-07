@@ -16,7 +16,7 @@ export default function NavigateScreen() {
     colors, topPad, bottomPad, webViewRef,
     route, isLoading, isFinished,
     currentStep, distanceToNext, progressPct, remainingKm, remainingMin,
-    isRerouting, isOffline, weatherLoading, currentWeather, aheadWeather,
+    isRerouting, isOffRoute, isOffline, weatherLoading, currentWeather, aheadWeather,
     mapUri, offline, activeStepsRef,
     minimalMode, handleToggleMinimal,
     handleMapMessage, handleClose, triggerWeatherReroute,
@@ -74,6 +74,7 @@ export default function NavigateScreen() {
 
       <NavigationOfflineBanners
         isOffline={isOffline}
+        isOffRoute={isOffRoute}
         offline={offline}
         styles={s}
       />
