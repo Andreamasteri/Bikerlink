@@ -6,6 +6,8 @@ import { loadMatchingDisabledSet } from "./filters";
 import { sendPlannedRouteInvitePushNotifications } from "../push-notifications";
 
 const LIVE_MAX_AGE_MS = 5 * 60_000;
+const MAX_LIVE_ACCURACY_M = 250;
+const MAX_EVENT_FUTURE_SKEW_MS = 60_000;
 const PROFILE_MAX_AGE_MS = 10 * 60_000;
 const DYNAMIC_RADIUS_KM = 25;
 const STATIC_RADIUS_KM = 50;
@@ -25,6 +27,8 @@ type LiveState = {
   latitude?: number | null;
   longitude?: number | null;
   positionKnown?: boolean;
+  positionReliable?: boolean;
+  accuracyM?: number | null;
   positionSource?: string;
   locationAgeMs?: number | null;
   eventAt?: string;
@@ -96,13 +100,23 @@ export async function runLiveRouteMatching(): Promise<LiveRouteMatchingResult> {
     const eventAt = live?.eventAt ? Date.parse(live.eventAt) : NaN;
     const liveEvent = live?.event ?? null;
     const liveCandidateEvent = ["start", "position", "waypoint", "off_route"].includes(liveEvent ?? "");
+    const now = Date.now();
+    const eventFresh = Number.isFinite(eventAt)
+      && eventAt <= now + MAX_EVENT_FUTURE_SKEW_MS
+      && now - eventAt <= LIVE_MAX_AGE_MS;
+    const locationFresh = live?.locationAgeMs == null
+      || (Number.isFinite(live.locationAgeMs) && live.locationAgeMs <= LIVE_MAX_AGE_MS);
+    const locationPrecise = live?.accuracyM == null
+      || (Number.isFinite(live.accuracyM) && live.accuracyM <= MAX_LIVE_ACCURACY_M);
     const dynamic = !!live
       && live.positionKnown === true
+      && live.positionReliable !== false
       && Number.isFinite(live.latitude)
       && Number.isFinite(live.longitude)
       && liveCandidateEvent
-      && Number.isFinite(eventAt)
-      && Date.now() - eventAt <= LIVE_MAX_AGE_MS;
+      && eventFresh
+      && locationFresh
+      && locationPrecise;
     // Un viaggio già concluso, fermato o con telemetria live scaduta non torna
     // statico: la posizione non è sufficientemente affidabile per una proposta.
     if (liveEvent === "arrived" || liveEvent === "stopped" || (liveCandidateEvent && !dynamic)) continue;
@@ -142,6 +156,8 @@ export async function runLiveRouteMatching(): Promise<LiveRouteMatchingResult> {
           liveEvent: live?.event ?? null,
           livePositionSource: live?.positionSource ?? null,
           livePositionKnown: dynamic,
+          liveAccuracyM: live?.accuracyM ?? null,
+          liveLocationAgeMs: live?.locationAgeMs ?? null,
         },
         priority: dynamic ? "high" : "normal",
         status: "suggested",
