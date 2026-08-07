@@ -93,7 +93,6 @@ export const useNavigateStates = () => {
     remainingKm, setRemainingKm,
     remainingMin, setRemainingMin,
     isFinished, setIsFinished,
-    isOffRoute, setIsOffRoute,
     polylinePoints, setPolylinePoints,
     hasPermission, setHasPermission,
     isRerouting, setIsRerouting,
