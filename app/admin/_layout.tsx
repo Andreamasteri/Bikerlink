@@ -94,7 +94,6 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "nadir": { title: "Nadir — Ricerca semantica" },
   "horus-scan": { title: "Horus — Scansioni complete" },
   "ares-jobs": { title: "Ares — Job on-demand" },
-  "whisper-config": { title: "Voce & Trascrizione" },
   "telemetry-users": { title: "Sessioni Utenti" },
   "telemetry-user/[userId]": { title: "Dettaglio Sessioni" },
   "boot-log": { title: "Boot Log Avvio" },
@@ -184,7 +183,6 @@ export default function AdminLayout() {
         <Stack.Screen name="nadir" options={ADMIN_OPTS["nadir"]} />
         <Stack.Screen name="horus-scan" options={ADMIN_OPTS["horus-scan"]} />
         <Stack.Screen name="ares-jobs" options={ADMIN_OPTS["ares-jobs"]} />
-        <Stack.Screen name="whisper-config" options={ADMIN_OPTS["whisper-config"]} />
         <Stack.Screen name="telemetry-users" options={ADMIN_OPTS["telemetry-users"]} />
         <Stack.Screen name="telemetry-user/[userId]" options={ADMIN_OPTS["telemetry-user/[userId]"]} />
         <Stack.Screen name="boot-log" options={ADMIN_OPTS["boot-log"]} />
