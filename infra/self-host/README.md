@@ -293,7 +293,7 @@ Il client la invia come header `X-Valhalla-Key`.
 
 - **Admin → Mappe → Test routing**: esegue una richiesta di prova sull'engine attivo.
 - La card **"Server di casa (ThinkCentre)"** mostra ora Valhalla accanto a
-  GraphHopper/Ollama/Whisper/Nominatim, con latenza e versione dei tile. Se
+  GraphHopper/Ollama/Photon, con latenza e versione dei tile. Se
   `VALHALLA_URL` non è impostato, la riga mostra "Non configurato" senza errori.
 
 ### Avvio automatico al boot (ThinkCentre)
