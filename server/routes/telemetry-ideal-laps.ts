@@ -50,8 +50,8 @@ router.get("/ideal-laps", async (req: Request, res: Response) => {
           FROM (
             SELECT
               session_id, lat, lon,
-              LEAD(lat) OVER (PARTITION BY session_id ORDER BY ts) AS next_lat,
-              LEAD(lon) OVER (PARTITION BY session_id ORDER BY ts) AS next_lon
+              LEAD(lat) OVER (PARTITION BY session_id ORDER BY ts, id) AS next_lat,
+              LEAD(lon) OVER (PARTITION BY session_id ORDER BY ts, id) AS next_lon
             FROM ride_telemetry
             WHERE user_id = ${userId}
               AND session_type = 'ideal_lap'
@@ -122,7 +122,7 @@ router.get("/ideal-laps/:sessionId/samples", async (req: Request, res: Response)
       WHERE user_id = ${userId}
         AND session_id = ${sessionId}
         AND session_type = 'ideal_lap'
-      ORDER BY ts ASC
+      ORDER BY ts ASC, id ASC
       LIMIT 2000
     `));
 
