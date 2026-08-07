@@ -91,7 +91,7 @@ bowie-terminal/       # App Expo separata (nested) — build EAS indipendente
 
 ## 5. ThinkCentre — Server di Casa
 
-Mini-PC locale che ospita: GraphHopper multi-area, Valhalla, Ollama (Bowie/Horus/Nadir/Quebracho), Photon, Whisper, DragonflyDB.
+Mini-PC locale che ospita: GraphHopper multi-area, Valhalla, Ollama (Bowie/Horus/Nadir/Quebracho), Photon, DragonflyDB.
 
 **Accesso SSH**: credenziali in env — `TC_SSH_HOST` / `TC_SSH_USER` / `TC_SSH_PASSWORD` / `TC_SSH_PORT`. Il `TC_SSH_HOST` ha prefisso `https://` da strippare. Usare skill `thinkcentre-access` o `tc.py`.
 
