@@ -31,10 +31,20 @@ Analizza la richiesta e restituisci SOLO un oggetto JSON con:
 - maxHoursPerDay: number (default 6)
 - avoidHighways: boolean
 - notes: string
+- schedule: {departureDate: "YYYY-MM-DD"|null, departureTime: "HH:mm"|null, returnDate: "YYYY-MM-DD"|null, returnTime: "HH:mm"|null} oppure null
+Per date relative come "domani", usa la data corrente e il fuso orario forniti nel contesto della richiesta; se un dato non è dichiarato, restituisci null.
 IMPORTANTE: waypoints contiene SOLO luoghi geografici (città, strade, valichi). Ristoranti, hotel, rifugi, officine vanno in poiStops (non in waypoints).`;
 
 const AI_TIMEOUT_MS = parseInt(process.env.GEMINI_TIMEOUT_MS ?? "30000", 10) || 30000;
 const AI_MAX_RETRIES = 2;
+
+function withTemporalContext(prompt: string, clientDate?: string, timezone?: string): string {
+  const context = [
+    clientDate ? "Data corrente del dispositivo: " + clientDate : "",
+    timezone ? "Fuso orario del dispositivo: " + timezone : "",
+  ].filter(Boolean).join("; ");
+  return context ? prompt + "\n\nContesto temporale: " + context : prompt;
+}
 
 export const routeSchema = z.object({
   title: z.string(),
@@ -53,6 +63,12 @@ export const routeSchema = z.object({
   maxHoursPerDay: z.number(),
   avoidHighways: z.boolean(),
   notes: z.string(),
+  schedule: z.object({
+    departureDate: z.string().nullable().optional(),
+    departureTime: z.string().nullable().optional(),
+    returnDate: z.string().nullable().optional(),
+    returnTime: z.string().nullable().optional(),
+  }).nullable().optional(),
 });
 
 type RouteObject = z.infer<typeof routeSchema>;
@@ -117,7 +133,8 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
 
   const parsedAi = aiPromptSchema.safeParse(req.body);
   if (!parsedAi.success) return sendError(res, 400, parsedAi.error.issues[0].message);
-  const { prompt } = parsedAi.data;
+  const { prompt, clientDate, timezone } = parsedAi.data;
+  const promptWithTemporalContext = withTemporalContext(prompt, clientDate, timezone);
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey && !isOllamaConfigured && !isGroqConfigured && !isOpenAiRouteConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama, Groq, Gemini o OpenAI)");
@@ -134,7 +151,7 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
 
   try {
     const { result: object, provider_used } = await generateRouteObject({
-      prompt,
+      prompt: promptWithTemporalContext,
       apiKey,
       system: AI_SYSTEM_PROMPT,
       schema: routeSchema,
@@ -192,7 +209,8 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
 
   const parsedAiStream = aiPromptSchema.safeParse(req.body);
   if (!parsedAiStream.success) return sendError(res, 400, parsedAiStream.error.issues[0].message);
-  const { prompt } = parsedAiStream.data;
+  const { prompt, clientDate, timezone } = parsedAiStream.data;
+  const promptWithTemporalContext = withTemporalContext(prompt, clientDate, timezone);
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey && !isOllamaConfigured && !isGroqConfigured && !isOpenAiRouteConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama, Groq, Gemini o OpenAI)");
@@ -214,7 +232,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
     let fullText = "";
     let aiProvider: string | null = null;
     for await (const chunk of streamRouteText({
-      prompt,
+      prompt: promptWithTemporalContext,
       apiKey,
       system: AI_SYSTEM_PROMPT,
       maxRetries: AI_MAX_RETRIES,
