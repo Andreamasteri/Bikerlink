@@ -43,7 +43,7 @@ void (async () => {
   if (isConfigured) {
     console.log(`[Photon] Self-hosted mode — URL: ${SELF_HOSTED_URL}`);
   } else {
-    console.warn("[Photon] PHOTON_URL non configurato — geocoding disabilitato (nessun fallback pubblico). Impostare PHOTON_URL/PHOTON_TOKEN.");
+    console.warn("[Photon] PHOTON_URL non configurato — geocoding disabilitato: Photon non è configurato. Impostare PHOTON_URL/PHOTON_TOKEN.");
   }
 })();
 
@@ -139,7 +139,7 @@ async function photonFetch(path: string): Promise<Response> {
 
 /**
  * Verifica che Photon sia configurato e che il ThinkCentre non sia offline.
- * Lancia un errore esplicito altrimenti — mai fallback pubblico.
+ * Lancia un errore esplicito altrimenti: Photon è l'unico geocoder autorizzato.
  */
 async function ensureAvailable(op: string): Promise<void> {
   if (!isConfigured) {
@@ -296,7 +296,7 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
  * Le coordinate sono arrotondate a 4 decimali (~11 m) per chiave di cache,
  * con TTL di 10 minuti. Riduce chiamate ripetute per posizioni quasi identiche.
  *
- * Nessun fallback pubblico: lancia eccezione se Photon non è configurato,
+ * Photon unico geocoder: lancia eccezione se Photon non è configurato,
  * il ThinkCentre è offline, o il server risponde con errore HTTP.
  *
  * Nota: Photon non usa il parametro `zoom`; è mantenuto
