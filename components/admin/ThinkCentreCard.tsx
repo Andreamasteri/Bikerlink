@@ -12,7 +12,6 @@ import { ValhallaBlock, PhotonBlock, UfwBlock, AreaResolverBlock } from "./Think
 import type { ValhallaDetailedHealth, PhotonDetailedHealth, UfwDetailedHealth, AreaResolverDetail } from "./ThinkCentreValhallaPhotonBlocks";
 import {
   OllamaBlock,
-  WhisperBlock,
   DragonflyBlock,
   NginxBlock,
   UptimeKumaBlock,
@@ -41,7 +40,6 @@ import { ApkSection } from "./ThinkCentreApkSection";
 type ServiceKey =
   | "valhalla"
   | "ollama"
-  | "whisper"
   | "photon"
   | "dragonfly"
   | "nginx"
@@ -83,7 +81,6 @@ interface ThinkCentreHealth {
     graphhopper: string | null;
     valhalla: string | null;
     ollama: string | null;
-    whisper: string | null;
     photon: string | null;
   };
   /** Non-null only when the area resolver emits a non-info signal (SQL error). */
@@ -191,7 +188,6 @@ const ALL_UNKNOWN: Pick<SystemStatuses, ThinkCentreStatusKeys> = {
   valhalla: "unknown",
   photon: "unknown",
   ollama: "unknown",
-  whisper: "unknown",
   ufw: "unknown",
   dragonfly: "unknown",
   nginx: "unknown",
@@ -328,7 +324,6 @@ export function ThinkCentreCard({
       valhalla: serviceToStatus(findSvc("valhalla")),
       photon: serviceToStatus(findSvc("photon")),
       ollama: serviceToStatus(findSvc("ollama")),
-      whisper: serviceToStatus(findSvc("whisper")),
       ufw: ufwToStatus(data.ufwDetail),
       dragonfly: serviceToStatus(findSvc("dragonfly")),
       nginx: serviceToStatus(findSvc("nginx")),
@@ -536,14 +531,6 @@ export function ThinkCentreCard({
               service={error ? undefined : data?.services?.find((s) => s.key === "ollama")}
               fingerprint={error ? null : (fp?.ollama ?? null)}
               personaModels={error ? null : (data?.personaModels ?? null)}
-              isLoading={isLoading}
-              hasError={!!error}
-            />
-          )}
-          {!poweredOffActive && (
-            <WhisperBlock
-              service={error ? undefined : data?.services?.find((s) => s.key === "whisper")}
-              fingerprint={error ? null : (fp?.whisper ?? null)}
               isLoading={isLoading}
               hasError={!!error}
             />
