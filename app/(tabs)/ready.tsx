@@ -182,7 +182,7 @@ export default function ReadyToRideScreen() {
             isAvailable={isAvailable}
             isGhostMode={isGhostMode}
             hideFromMap={hideFromMap}
-            offlineRandomize={offlineRandomize}
+            positionFuzz={positionFuzz}
           />
 
           <PrivacySettingsGroup
