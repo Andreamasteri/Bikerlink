@@ -333,7 +333,7 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const parsed = privacySettingsSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const { hideFromMap, hideOnlineStatus, hideLastSeen, hideDistance, positionFuzz, positionFuzzKm, gpsPrecision, fakeHomeEnabled, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, fakeWorkEnabled, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius, fakeWhateverEnabled, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius, offlinePositionRandomize, fixedPositionEnabled, fixedPositionLat, fixedPositionLng } = parsed.data;
+    const { hideFromMap, hideOnlineStatus, hideLastSeen, hideDistance, positionFuzz, positionFuzzKm, gpsPrecision, fakeHomeEnabled, homeLatitude, homeLongitude, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, fakeWorkEnabled, workLatitude, workLongitude, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius, fakeWhateverEnabled, whateverLatitude, whateverLongitude, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius, offlinePositionRandomize, fixedPositionEnabled, fixedPositionLat, fixedPositionLng } = parsed.data;
 
     const existing = await storage.getUserProfile(userId);
     const updateData: Partial<InsertUserProfile> = {};
