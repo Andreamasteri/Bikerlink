@@ -54,7 +54,7 @@ jobs:
         run: npx tsc --noEmit -p server/tsconfig.json
 
       - name: Matching regression tests
-        run: npx vitest run server/__tests__/matching/resolveMatchPool.test.ts
+        run: npx vitest run server/__tests__/matching/resolveMatchPool.test.ts server/__tests__/proposals/create-coordinates.test.ts
 
       - name: ESLint
         run: npm run lint
