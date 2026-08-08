@@ -6,8 +6,9 @@ import { createSosSchema } from "@shared/validators";
 import { requireAuth } from "../lib/auth-middleware";
 import { db } from "../db";
 import { users, userProfiles } from "@shared/db";
-import { and, eq, isNotNull, gt, sql } from "drizzle-orm";
+import { and, eq, isNotNull, gt, notInArray, ne, sql } from "drizzle-orm";
 import { sendSosPushNotifications } from "../push-notifications";
+import { PROTECTED_NICKNAMES } from "../constants";
 
 const router = Router();
 
@@ -62,6 +63,10 @@ router.post("/", async (req: Request, res: Response) => {
             isNotNull(userProfiles.longitude),
             gt(userProfiles.coordinatesUpdatedAt, sevenDaysAgo),
             eq(users.status, "active"),
+            eq(users.isFake, false),
+            eq(users.isSystem, false),
+            ne(users.role, "admin"),
+            notInArray(users.nickname, PROTECTED_NICKNAMES),
             sql`${userProfiles.geom} IS NOT NULL`,
             sql`ST_DWithin(${userProfiles.geom}, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography, ${radiusMeters})`,
           )
