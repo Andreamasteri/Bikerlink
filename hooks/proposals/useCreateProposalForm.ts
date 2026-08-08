@@ -225,11 +225,11 @@ export function useCreateProposalForm() {
   useEffect(() => {
     if (selectedSearchTypes.length === 0) return;
     const mapping: Record<string, string[]> = {
-      find_a_friend: ["biker"],
-      find_a_guest:  ["zavorrina"],
-      hitcher:       ["hitchhiker"],
-      hitchhiker:    ["hitcher"],
-      find_a_biker:  ["biker", "hitcher"],
+      find_a_friend: ["biker", "coppia"],
+      find_a_guest:  ["zavorrina", "coppia"],
+      hitcher:       ["zavorrina", "coppia"],
+      hitchhiker:    ["biker", "coppia"],
+      find_a_biker:  ["biker", "coppia"],
     };
     const derived = Array.from(
       new Set(selectedSearchTypes.flatMap((st) => mapping[st] ?? []))
@@ -351,7 +351,24 @@ export function useCreateProposalForm() {
       }
     }
 
-    const stopsData = stops.length > 0 ? stops.map((s) => ({ address: s })) : null;
+    let stopsData: Array<{ address: string; lat: number; lng: number }> | null = null;
+    if (stops.length > 0) {
+      const resolvedStops: Array<{ address: string; lat: number; lng: number }> = [];
+      for (const stop of stops) {
+        const address = stop.trim();
+        if (!address) continue;
+        const geo = await geocodeAddress(address);
+        if (!geo) {
+          Alert.alert(
+            "Tappa non trovata",
+            `Non è stato possibile localizzare "${address}". Correggila o rimuovila prima di continuare.`
+          );
+          return;
+        }
+        resolvedStops.push({ address, lat: geo.lat, lng: geo.lng });
+      }
+      stopsData = resolvedStops.length > 0 ? resolvedStops : null;
+    }
 
     let finalLat = departureLat;
     let finalLng = departureLng;
