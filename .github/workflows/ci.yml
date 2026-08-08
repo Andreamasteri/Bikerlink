@@ -53,6 +53,9 @@ jobs:
       - name: Typecheck server
         run: npx tsc --noEmit -p server/tsconfig.json
 
+      - name: Matching regression tests
+        run: npx vitest run server/__tests__/matching/resolveMatchPool.test.ts
+
       - name: ESLint
         run: npm run lint
 
