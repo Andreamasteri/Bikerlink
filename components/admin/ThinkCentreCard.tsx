@@ -119,7 +119,6 @@ type ThinkCentreStatusKeys =
   | "valhalla"
   | "photon"
   | "ollama"
-  | "whisper"
   | "ufw"
   | "dragonfly"
   | "nginx"
