@@ -40,7 +40,6 @@ export interface RouteResult {
   telemetryCoverage?: TelemetryCoverage | null;
   weatherWarning?: string | null;
   navigationSteps?: Array<{ sign: number; text: string; distance: number; interval: [number, number]; streetName?: string }> | null;
-  rawPoints?: Array<{ lat: number; lng: number }> | null;
   technicalCheckpoints?: Array<{
     id: string; type: "turn_warning"; latitude: number; longitude: number;
     distanceBeforeM: number; sign: number; instruction: string; audioKey: string;
