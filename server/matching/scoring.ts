@@ -242,10 +242,10 @@ export function deriveTargetUserTypes(p: ProposalWithAuthor): string[] {
   if (explicit && explicit.length > 0) return explicit;
   switch (p.searchType) {
     case "find_a_friend":  return ["biker", "coppia"];
-    case "find_a_biker":   return ["zavorrina", "coppia"];
-    case "find_a_guest":   return ["biker", "coppia"];
-    case "hitchhiker":     return ["zavorrina", "coppia"];
-    case "hitcher":        return ["biker", "coppia"];
+    case "find_a_biker":   return ["biker", "coppia"];
+    case "find_a_guest":   return ["zavorrina", "coppia"];
+    case "hitchhiker":     return ["biker", "coppia"];
+    case "hitcher":        return ["zavorrina", "coppia"];
     default:               return ["biker", "zavorrina", "coppia"];
   }
 }
@@ -281,6 +281,15 @@ export function resolveMatchPool(p1: ProposalWithAuthor, p2: ProposalWithAuthor)
 
   const targets1 = deriveTargetUserTypes(p1);
   const targets2 = deriveTargetUserTypes(p2);
+  const intentTargets = new Set(["hitcher", "hitchhiker"]);
+  // Older/client-created proposals stored search intents in targetUserTypes.
+  // Those values are not users.userType values, so resolve them through the
+  // canonical search-type rules instead of comparing them to author roles.
+  if (targets1.some((t) => intentTargets.has(t)) || targets2.some((t) => intentTargets.has(t))) {
+    const types1 = getAllSearchTypes(p1);
+    const types2 = getAllSearchTypes(p2);
+    return types1.some((t1) => types2.some((t2) => areCompatibleByRule(t1, t2)));
+  }
   const type1 = p1.authorUserType ?? "biker";
   const type2 = p2.authorUserType ?? "biker";
   return targets1.includes(type2) && targets2.includes(type1);
