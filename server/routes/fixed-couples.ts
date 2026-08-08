@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { fixedCouples, notifications, users } from "@shared/db";
 import { requireAuth } from "../lib/auth-middleware";
+import { PROTECTED_NICKNAMES } from "../constants";
 
 const router = Router();
 const requestSchema = z.object({ email: z.string().trim().email().max(254) });
@@ -35,7 +36,7 @@ router.post("/request", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ message: "Inserisci un indirizzo email valido" });
   const [sender] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const [target] = await db.select().from(users).where(sql`LOWER(${users.email}) = ${parsed.data.email.toLowerCase()}`).limit(1);
-  if (!sender || !target || target.id === sender.id || target.status !== "active" || target.isFake || target.isSystem || target.role === "admin") return res.status(404).json({ message: "Account non disponibile" });
+  if (!sender || !target || target.id === sender.id || target.status !== "active" || target.isFake || target.isSystem || target.role === "admin" || PROTECTED_NICKNAMES.includes(target.nickname)) return res.status(404).json({ message: "Account non disponibile" });
   const senderType = sender.userType === "coppia" ? "biker" : sender.userType;
   const targetType = target.userType === "coppia" ? "biker" : target.userType;
   if (!((senderType === "biker" && targetType === "zavorrina") || (senderType === "zavorrina" && targetType === "biker"))) return res.status(400).json({ message: "La coppia fissa collega un biker e una zavorrina" });
