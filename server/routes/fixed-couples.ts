@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
 import { fixedCouples, notifications, users } from "@shared/db";
@@ -34,7 +34,7 @@ router.post("/request", async (req, res) => {
   const parsed = requestSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: "Inserisci un indirizzo email valido" });
   const [sender] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  const [target] = await db.select().from(users).where(eq(users.email, parsed.data.email.toLowerCase())).limit(1);
+  const [target] = await db.select().from(users).where(sql`LOWER(${users.email}) = ${parsed.data.email.toLowerCase()}`).limit(1);
   if (!sender || !target || target.id === sender.id || target.status !== "active" || target.isFake || target.isSystem || target.role === "admin") return res.status(404).json({ message: "Account non disponibile" });
   const senderType = sender.userType === "coppia" ? "biker" : sender.userType;
   const targetType = target.userType === "coppia" ? "biker" : target.userType;
