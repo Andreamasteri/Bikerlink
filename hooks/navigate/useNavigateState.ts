@@ -686,7 +686,7 @@ export function useNavigateState() {
     mapReady, currentStep, distanceToNext, progressPct,
     remainingKm, remainingMin, polylinePoints,
     hasPermission, isRerouting, isOffRoute, isOffline,
-    weatherLoading, currentWeather,
+    weatherLoading, currentWeather, aheadWeather,
     mapUri, offline, activeStepsRef,
     minimalMode, handleToggleMinimal,
     handleMapMessage, handleClose, triggerWeatherReroute,
