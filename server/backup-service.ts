@@ -99,6 +99,11 @@ export async function setBackupFrequency(freq: Partial<BackupFrequency>): Promis
     dbHours: freq.dbHours ?? current.dbHours,
     mediaHours: freq.mediaHours ?? current.mediaHours,
   };
+  for (const [name, hours] of Object.entries(next)) {
+    if (!Number.isInteger(hours) || hours < 1 || hours > 8760) {
+      throw new Error(`Frequenza backup ${name} non valida: usare un intero tra 1 e 8760 ore.`);
+    }
+  }
   await Promise.all([
     upsertSetting("backup.freq_db_hours", String(next.dbHours), "Frequenza backup DB (ore)"),
     upsertSetting("backup.freq_media_hours", String(next.mediaHours), "Frequenza backup media (ore)"),
