@@ -10,6 +10,7 @@ import { storage } from "../storage";
 import { requireAuth } from "../lib/auth-middleware";
 import { sendError } from "../lib/api-response";
 import { updateTelemetrySessionStats } from "../lib/telemetry-session-stats";
+import { buildTelemetryIngestKey } from "../lib/telemetry-ingest-key";
 import {
   routes,
   routePoints,
@@ -75,11 +76,12 @@ router.patch("/routes/:id", requireAuth, async (req: Request, res: Response) => 
       if (!isNaN(d.getTime())) updates.stoppedAt = d;
     }
 
-    if (Object.keys(updates).length === 0) {
-      return res.json({ route });
-    }
-
-    const [updated] = await db.update(routes).set(updates).where(eq(routes.id, id)).returning();
+    // A telemetry-only PATCH is valid: the mobile client sends it after the
+    // route has already been stopped. Do not discard telemetry merely because
+    // there are no route summary fields in the same request.
+    const [updated] = Object.keys(updates).length > 0
+      ? await db.update(routes).set(updates).where(eq(routes.id, id)).returning()
+      : [route];
 
     // ── Telemetria sensori (Routes & Performance) ────────────────────────
     // Il client invia `telemetryData` come stringa JSON di array di campioni
@@ -90,59 +92,68 @@ router.patch("/routes/:id", requireAuth, async (req: Request, res: Response) => 
       try {
         const parsed: unknown = JSON.parse(rawTelemetry);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Deduplicazione: se la sessione ha già campioni in DB, saltiamo.
-          const existing = await db.execute(sql`
-            SELECT 1 FROM ride_telemetry
-            WHERE session_id = ${id}
-            LIMIT 1
-          `);
-          if (existing.rows.length === 0) {
-            type ClientSample = {
-              timestamp?: unknown;
-              lat?: unknown;
-              lon?: unknown;
-              leanAngle?: unknown;
-              gForceX?: unknown;
-              speedKmh?: unknown;
+          // Idempotenza per campione: il PATCH può essere ritentato dopo un
+          // timeout HTTP. La chiave deterministica evita duplicati senza
+          // scartare un payload successivo che contiene campioni nuovi.
+          type ClientSample = {
+            timestamp?: unknown;
+            lat?: unknown;
+            lon?: unknown;
+            leanAngle?: unknown;
+            gForceX?: unknown;
+            speedKmh?: unknown;
+          };
+          const rows: typeof rideTelemetry.$inferInsert[] = [];
+          for (const s of parsed as ClientSample[]) {
+            const ts = typeof s.timestamp === "number"
+              ? s.timestamp
+              : typeof s.timestamp === "string"
+                ? new Date(s.timestamp).getTime()
+                : NaN;
+            const lat = typeof s.lat === "number" ? s.lat : Number(s.lat);
+            const lon = typeof s.lon === "number" ? s.lon : Number(s.lon);
+            if (!Number.isFinite(ts) || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            const normalized = {
+              userId,
+              sessionId: id,
+              sessionType: "ride",
+              lapName: null,
+              ts,
+              lat,
+              lon,
+              leanAngle: s.leanAngle != null && Number.isFinite(Number(s.leanAngle)) ? Number(s.leanAngle) : null,
+              gforceX: s.gForceX != null && Number.isFinite(Number(s.gForceX)) ? Number(s.gForceX) : null,
+              speedKmh: s.speedKmh != null && Number.isFinite(Number(s.speedKmh)) ? Number(s.speedKmh) : null,
             };
-            const rows: typeof rideTelemetry.$inferInsert[] = [];
-            for (const s of parsed as ClientSample[]) {
-              const ts = typeof s.timestamp === "number"
-                ? s.timestamp
-                : typeof s.timestamp === "string"
-                  ? new Date(s.timestamp).getTime()
-                  : NaN;
-              const lat = typeof s.lat === "number" ? s.lat : Number(s.lat);
-              const lon = typeof s.lon === "number" ? s.lon : Number(s.lon);
-              if (!Number.isFinite(ts) || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-              rows.push({
-                userId,
-                sessionId: id,
-                sessionType: "ride",
-                ts,
-                lat,
-                lon,
-                leanAngle: s.leanAngle != null && Number.isFinite(Number(s.leanAngle)) ? Number(s.leanAngle) : null,
-                gforceX: s.gForceX != null && Number.isFinite(Number(s.gForceX)) ? Number(s.gForceX) : null,
-                speedKmh: s.speedKmh != null && Number.isFinite(Number(s.speedKmh)) ? Number(s.speedKmh) : null,
-              });
-            }
-            if (rows.length > 0) {
-              const CHUNK = 500;
-              // Task #81 — insert + riepilogo per-sessione (telemetry_session_stats)
-              // atomici: GET /api/telemetry/stats legge SOLO il riepilogo, quindi
-              // anche questo percorso di scrittura (salvataggio route con telemetria
-              // allegata) DEVE aggiornarlo o i totali/progresso divergono.
-              await db.transaction(async (tx) => {
-                for (let i = 0; i < rows.length; i += CHUNK) {
-                  await tx.insert(rideTelemetry).values(rows.slice(i, i + CHUNK));
-                }
-                await updateTelemetrySessionStats(userId, id, "ride", rows, tx);
-              });
-              console.log(`[routes/:id PATCH] telemetria: ${rows.length} campioni inseriti per sessione ${id}`);
-            }
-          } else {
-            console.log(`[routes/:id PATCH] telemetria: sessione ${id} già presente in ride_telemetry, skip`);
+            rows.push({
+              ...normalized,
+              ingestKey: buildTelemetryIngestKey(normalized),
+            });
+          }
+          if (rows.length > 0) {
+            const CHUNK = 500;
+            // Task #81 — insert + riepilogo per-sessione (telemetry_session_stats)
+            // atomici: GET /api/telemetry/stats legge SOLO il riepilogo, quindi
+            // anche questo percorso di scrittura (salvataggio route con telemetria
+            // allegata) DEVE aggiornarlo o i totali/progresso divergono.
+            await db.transaction(async (tx) => {
+              const insertedRows: typeof rows = [];
+              for (let i = 0; i < rows.length; i += CHUNK) {
+                const inserted = await tx
+                  .insert(rideTelemetry)
+                  .values(rows.slice(i, i + CHUNK))
+                  .onConflictDoNothing()
+                  .returning({ ingestKey: rideTelemetry.ingestKey });
+                const insertedKeys = new Set(
+                  inserted.rows
+                    .map((row) => row.ingestKey)
+                    .filter((key): key is string => Boolean(key)),
+                );
+                insertedRows.push(...rows.slice(i, i + CHUNK).filter((row) => insertedKeys.has(row.ingestKey!)));
+              }
+              await updateTelemetrySessionStats(userId, id, "ride", insertedRows, tx);
+              console.log(`[routes/:id PATCH] telemetria: ${insertedRows.length} campioni inseriti per sessione ${id}`);
+            });
           }
         }
       } catch (telErr) {
