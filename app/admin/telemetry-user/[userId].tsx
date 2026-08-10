@@ -15,11 +15,42 @@ import { useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { type Session } from "@/components/admin/telemetry/SessionMapModal";
-import { SessionCard } from "@/components/admin/telemetry-user/SessionCard";
+import { SessionCard, formatDate } from "@/components/admin/telemetry-user/SessionCard";
 import { CalibrationCard, type MountCalibration } from "@/components/admin/telemetry-user/CalibrationCard";
 
 type UserDetail = {
   mountCalibration: MountCalibration;
+};
+
+type LeanSummary = {
+  sampleCount: number;
+  leanSampleCount: number;
+  leanCoveragePct: number;
+  avgAbsLean: number | null;
+  maxAbsLean: number | null;
+  maxLeanLeft: number | null;
+  maxLeanRight: number | null;
+  leanBias: number | null;
+  leftTurnSamples: number;
+  rightTurnSamples: number;
+};
+
+type DrCorrection = {
+  sampleCount: number;
+  distanceScale: number;
+  speedScale: number;
+  speedBiasKmh: number;
+  headingBiasDeg: number;
+  meanPosErrorM: number;
+  meanSpeedErrorKmh: number;
+  updatedAt: string | null;
+};
+
+type TelemetryUserDetailResponse = {
+  sessions: Session[];
+  userId: string;
+  lean: LeanSummary;
+  drCorrection: DrCorrection | null;
 };
 
 async function adminFetch<T>(path: string): Promise<T> {
@@ -37,7 +68,7 @@ export default function TelemetryUserDetailScreen() {
   const [resettingCalibration, setResettingCalibration] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error, refetch } = useQuery<{ sessions: Session[]; userId: number }>({
+  const { data, isLoading, error, refetch } = useQuery<TelemetryUserDetailResponse>({
     queryKey: ["/api/admin/telemetry/users", userId, "sessions"],
     queryFn: () => adminFetch(`/api/admin/telemetry/users/${userId}/sessions`),
     staleTime: 30_000,
@@ -128,6 +159,74 @@ export default function TelemetryUserDetailScreen() {
         </View>
       </View>
 
+      {data?.lean && (
+        <View style={styles.analysisGrid}>
+          <View style={styles.analysisCard}>
+            <View style={styles.analysisHeader}>
+              <MaterialCommunityIcons name="format-rotate-90" size={17} color="#f59e0b" />
+              <Text style={styles.analysisTitle}>Stile di piega</Text>
+            </View>
+            <View style={styles.analysisMetrics}>
+              <View style={styles.analysisMetric}>
+                <Text style={styles.analysisValue}>
+                  {data.lean.maxAbsLean != null ? `${data.lean.maxAbsLean.toFixed(1)}°` : "—"}
+                </Text>
+                <Text style={styles.analysisLabel}>picco massimo</Text>
+              </View>
+              <View style={styles.analysisMetric}>
+                <Text style={styles.analysisValue}>
+                  {data.lean.avgAbsLean != null ? `${data.lean.avgAbsLean.toFixed(1)}°` : "—"}
+                </Text>
+                <Text style={styles.analysisLabel}>media assoluta</Text>
+              </View>
+              <View style={styles.analysisMetric}>
+                <Text style={styles.analysisValue}>
+                  {data.lean.maxLeanLeft != null ? `${data.lean.maxLeanLeft.toFixed(1)}°` : "—"}
+                  {" / "}
+                  {data.lean.maxLeanRight != null ? `${data.lean.maxLeanRight.toFixed(1)}°` : "—"}
+                </Text>
+                <Text style={styles.analysisLabel}>sinistra / destra</Text>
+              </View>
+            </View>
+            <Text style={styles.analysisNote}>
+              {data.lean.leanSampleCount > 0
+                ? `${data.lean.leanCoveragePct}% dei campioni contiene l'angolo di piega · ${data.lean.leftTurnSamples} curve S / ${data.lean.rightTurnSamples} curve D`
+                : "Nessun angolo di piega ricevuto dai sensori"}
+            </Text>
+          </View>
+
+          <View style={styles.analysisCard}>
+            <View style={styles.analysisHeader}>
+              <MaterialCommunityIcons name="compass-outline" size={17} color="#38bdf8" />
+              <Text style={styles.analysisTitle}>Correzione dead reckoning</Text>
+            </View>
+            {data.drCorrection ? (
+              <>
+                <View style={styles.analysisMetrics}>
+                  <View style={styles.analysisMetric}>
+                    <Text style={styles.analysisValue}>{data.drCorrection.sampleCount}</Text>
+                    <Text style={styles.analysisLabel}>campioni DR</Text>
+                  </View>
+                  <View style={styles.analysisMetric}>
+                    <Text style={styles.analysisValue}>×{data.drCorrection.distanceScale.toFixed(3)}</Text>
+                    <Text style={styles.analysisLabel}>scala distanza</Text>
+                  </View>
+                  <View style={styles.analysisMetric}>
+                    <Text style={styles.analysisValue}>{data.drCorrection.meanPosErrorM.toFixed(1)} m</Text>
+                    <Text style={styles.analysisLabel}>errore medio</Text>
+                  </View>
+                </View>
+                <Text style={styles.analysisNote}>
+                  Modello deterministico per utente · compito inviato direttamente a Quebracho · aggiornato {data.drCorrection.updatedAt ? formatDate(data.drCorrection.updatedAt) : "—"}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.analysisNote}>Modello non ancora disponibile: servono campioni GPS + sensori.</Text>
+            )}
+          </View>
+        </View>
+      )}
+
       {isLoading && <ActivityIndicator style={{ marginTop: 48 }} color={Colors.accent} />}
       {error && <Text style={styles.errorText}>Errore caricamento sessioni</Text>}
 
@@ -193,6 +292,15 @@ const styles = StyleSheet.create({
   summaryChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.accent + "18", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   summaryValue: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.accent },
   summaryLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.accent },
+  analysisGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
+  analysisCard: { flexGrow: 1, flexBasis: 320, minWidth: 280, backgroundColor: Colors.surface, borderRadius: 12, padding: 13, borderWidth: 1, borderColor: Colors.border },
+  analysisHeader: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 9 },
+  analysisTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text },
+  analysisMetrics: { flexDirection: "row", gap: 7 },
+  analysisMetric: { flex: 1, backgroundColor: Colors.background, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 5, alignItems: "center" },
+  analysisValue: { fontFamily: "Inter_700Bold", fontSize: 14, color: Colors.text },
+  analysisLabel: { fontFamily: "Inter_400Regular", fontSize: 9, color: Colors.textSecondary, marginTop: 2, textAlign: "center" },
+  analysisNote: { fontFamily: "Inter_400Regular", fontSize: 10, lineHeight: 14, color: Colors.textSecondary, marginTop: 9 },
   sessionsContainer: { gap: 8 },
   errorText: { fontFamily: "Inter_400Regular", fontSize: 14, color: "#ef4444", textAlign: "center", marginTop: 32 },
   emptyState: { alignItems: "center", gap: 12, paddingVertical: 48 },

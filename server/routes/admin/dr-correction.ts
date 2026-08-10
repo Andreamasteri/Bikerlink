@@ -3,7 +3,7 @@ import { db } from "../../db";
 import { sql } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 import { logTelemetryEvent } from "../../lib/telemetry-error-log";
-import { getEffectiveModel, getGlobalModel } from "../../dr-correction/engine";
+import { getEffectiveModel, getGlobalModel, recomputeUserModel } from "../../dr-correction/engine";
 import { blendWithGlobal, type DrCorrectionModel } from "@shared/dr-correction";
 
 const router = Router();
@@ -238,6 +238,48 @@ router.get("/dr-correction/users/:userId/export", async (req: Request, res: Resp
       detail: err instanceof Error ? err.stack : undefined,
     });
     return sendError(res, 500, "Errore export dati correzione DR");
+  }
+});
+
+/**
+ * POST /api/admin/dr-correction/users/:userId/recompute
+ * Quebracho receives the explicit admin re-run directly. The values are
+ * still produced by the deterministic DR engine, never by an LLM.
+ */
+router.post("/dr-correction/users/:userId/recompute", async (req: Request, res: Response) => {
+  try {
+    const userId = String(req.params.userId);
+    if (!userId) return sendError(res, 400, "userId obbligatorio");
+
+    const model = await recomputeUserModel(userId);
+    return res.json({
+      ok: true,
+      userId,
+      recipient: "Quebracho",
+      coordinator: "Quebracho",
+      engine: "deterministic-dr-correction",
+      recomputedAt: new Date().toISOString(),
+      model: {
+        distanceScale: model.distanceScale,
+        speedScale: model.speedScale,
+        speedBiasKmh: model.speedBiasKmh,
+        headingBiasDeg: model.headingBiasDeg,
+        sampleCount: model.sampleCount,
+        meanPosErrorM: model.meanPosErrorM,
+        meanSpeedErrorKmh: model.meanSpeedErrorKmh,
+      },
+    });
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/dr-correction/recompute] error:", err);
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "admin/dr-correction/recompute",
+      message: errMsg,
+      detail: err instanceof Error ? err.stack : undefined,
+    });
+    return sendError(res, 500, "Errore ricalcolo correzione DR");
   }
 });
 
