@@ -33,6 +33,10 @@ function fail(message: string): never {
 }
 
 function main(): void {
+  const deployEnvironment = (process.env.BIKERLINK_DEPLOY_ENV ?? "development").trim().toLowerCase();
+  if (!["development", "staging", "production"].includes(deployEnvironment)) {
+    fail(`BIKERLINK_DEPLOY_ENV non valido: ${deployEnvironment}`);
+  }
   if (process.env.DATABASE_URL?.trim()) {
     fail("DATABASE_URL generica rilevata: usare solo DATABASE_URL_DEV, DATABASE_URL_CANDIDATE e DATABASE_URL_PRODUCTION.");
   }
