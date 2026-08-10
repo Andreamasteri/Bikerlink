@@ -97,11 +97,11 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
           GROUP BY user_id
         )
         SELECT
-          ua.user_id::text,
-          COALESCE(u.nickname, 'utente#' || ua.user_id) AS username,
-          ROUND(ua.km_ride::numeric, 2)::text AS km_ride,
-          ROUND(ua.km_track::numeric, 2)::text AS km_track,
-          ua.session_count::text,
+          u.id::text AS user_id,
+          COALESCE(u.nickname, 'utente#' || u.id) AS username,
+          ROUND(COALESCE(ua.km_ride, 0)::numeric, 2)::text AS km_ride,
+          ROUND(COALESCE(ua.km_track, 0)::numeric, 2)::text AS km_track,
+          COALESCE(ua.session_count, 0)::text AS session_count,
           ua.last_sample::text AS last_sample,
           COALESCE(la.sample_count, 0)::text AS sample_count,
           COALESCE(la.lean_sample_count, 0)::text AS lean_sample_count,
@@ -119,15 +119,15 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
           dr.heading_bias_deg::text AS dr_heading_bias_deg,
           dr.mean_pos_error_m::text AS dr_mean_pos_error_m,
           dr.updated_at::text AS dr_updated_at
-        FROM user_agg ua
-        LEFT JOIN lean_agg la ON la.user_id = ua.user_id
-        LEFT JOIN dr_correction_model dr ON dr.user_id = ua.user_id
-        LEFT JOIN users u ON u.id = ua.user_id
-        ORDER BY ua.km_ride DESC
+        FROM users u
+        LEFT JOIN user_agg ua ON ua.user_id = u.id
+        LEFT JOIN lean_agg la ON la.user_id = u.id
+        LEFT JOIN dr_correction_model dr ON dr.user_id = u.id
+        ORDER BY COALESCE(ua.km_ride, 0) DESC, u.id
         LIMIT ${limit} OFFSET ${offset}
       `),
       db.execute<{ total: string }>(sql`
-        SELECT COUNT(DISTINCT user_id)::text AS total FROM ride_telemetry
+        SELECT COUNT(*)::text AS total FROM users
       `),
     ]);
 
