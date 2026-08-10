@@ -1,6 +1,9 @@
 import { defineConfig } from "drizzle-kit";
 
 const deployEnvironment = (process.env.BIKERLINK_DEPLOY_ENV ?? "development").trim().toLowerCase();
+if (!["development", "staging", "production"].includes(deployEnvironment)) {
+  throw new Error(`BIKERLINK_DEPLOY_ENV non valido: ${deployEnvironment}`);
+}
 const databaseEnvVar =
   deployEnvironment === "production"
     ? "DATABASE_URL_PRODUCTION"
