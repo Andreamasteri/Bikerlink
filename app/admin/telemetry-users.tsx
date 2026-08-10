@@ -238,6 +238,7 @@ export default function TelemetryUsersScreen() {
   const summary = useMemo(() => {
     const totalKm = users.reduce((sum, user) => sum + user.kmRide, 0);
     const totalSessions = users.reduce((sum, user) => sum + user.sessionCount, 0);
+    const usersWithTelemetry = users.filter((user) => user.sessionCount > 0).length;
     const usersWithLean = users.filter((user) => user.leanSampleCount > 0).length;
     const usersWithDr = users.filter((user) => (user.drCorrection?.sampleCount ?? 0) > 0).length;
     const latest = users
@@ -245,7 +246,7 @@ export default function TelemetryUsersScreen() {
       .filter((value): value is string => !!value)
       .sort()
       .at(-1) ?? null;
-    return { totalKm, totalSessions, usersWithLean, usersWithDr, latest };
+    return { totalKm, totalSessions, usersWithTelemetry, usersWithLean, usersWithDr, latest };
   }, [users]);
 
   return (
@@ -290,7 +291,7 @@ export default function TelemetryUsersScreen() {
       {!isLoading && !error && (
         <>
           <View style={styles.metricsGrid}>
-            <MetricCard icon="account-multiple" label="Utenti con telemetria" value={String(users.length)} note={`di ${data?.total ?? users.length} registrati nel flusso`} />
+            <MetricCard icon="account-multiple" label="Utenti BikerLink" value={String(users.length)} note={`${summary.usersWithTelemetry} con campioni telemetrici`} />
             <MetricCard icon="map-marker-distance" label="Km totali" value={`${summary.totalKm.toFixed(1)} km`} note="distanza GPS calcolata" color="#22c55e" />
             <MetricCard icon="layers-outline" label="Sessioni" value={String(summary.totalSessions)} note="giri acquisiti" color="#8b5cf6" />
             <MetricCard icon="format-rotate-90" label="Sensore piega" value={`${summary.usersWithLean}/${users.length}`} note="utenti con campioni lean" color="#f59e0b" />
