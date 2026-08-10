@@ -1,11 +1,16 @@
 import { defineConfig } from "drizzle-kit";
 
-// DATABASE_URL_DEV ha priorità in workspace dev (Neon dev branch).
-// In produzione DATABASE_URL_DEV non è impostata → fallback su DATABASE_URL (Neon prod).
-const dbUrl = process.env.DATABASE_URL_DEV ?? process.env.DATABASE_URL;
+const deployEnvironment = (process.env.BIKERLINK_DEPLOY_ENV ?? "development").trim().toLowerCase();
+const databaseEnvVar =
+  deployEnvironment === "production"
+    ? "DATABASE_URL_PRODUCTION"
+    : deployEnvironment === "staging"
+      ? "DATABASE_URL_CANDIDATE"
+      : "DATABASE_URL_DEV";
+const dbUrl = process.env[databaseEnvVar]?.trim();
 
 if (!dbUrl) {
-  throw new Error("DATABASE_URL, ensure the database is provisioned");
+  throw new Error(`${databaseEnvVar} deve essere configurato; DATABASE_URL generica non è accettata.`);
 }
 
 export default defineConfig({
