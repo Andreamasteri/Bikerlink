@@ -56,6 +56,9 @@ jobs:
       - name: Matching regression tests
         run: npx vitest run server/__tests__/matching/resolveMatchPool.test.ts server/__tests__/proposals/create-coordinates.test.ts
 
+      - name: Database target guard tests
+        run: npx vitest run server/__tests__/database-environment.test.ts
+
       - name: ESLint
         run: npm run lint
 
