@@ -21,15 +21,6 @@ function parseConnectionString(raw: string): ParsedConnection | null {
   }
 }
 
-function redactUrl(raw: string): string {
-  try {
-    const url = new URL(raw);
-    return `${url.protocol}//<redacted>@${url.host}${url.pathname}`;
-  } catch {
-    return "<non-parseable URL>";
-  }
-}
-
 function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) fail(`${name} mancante: target Neon non identificato.`);
