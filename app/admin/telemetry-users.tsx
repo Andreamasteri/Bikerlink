@@ -276,7 +276,7 @@ export default function TelemetryUsersScreen() {
       <View style={styles.dataNotice}>
         <MaterialCommunityIcons name="database-eye-outline" size={18} color={Colors.accent} />
         <Text style={styles.dataNoticeText}>
-          Valori calcolati sui campioni reali nel database. Il DR viene corretto per utente dal motore deterministico; Horus (Quebracho) ne coordina il controllo. Un campo vuoto significa che mancano dati.
+          Valori calcolati sui campioni reali nel database. Il DR viene corretto per utente dal motore deterministico; il compito di ricalcolo viene inviato direttamente a Quebracho. Un campo vuoto significa che mancano dati.
         </Text>
       </View>
 
