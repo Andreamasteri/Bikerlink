@@ -219,7 +219,7 @@ function UserCard({
           <ActivityIndicator size="small" color="#38bdf8" />
         ) : (
           <>
-            <MaterialCommunityIcons name="refresh-circle-outline" size={16} color="#38bdf8" />
+            <MaterialCommunityIcons name="refresh-circle" size={16} color="#38bdf8" />
             <Text style={styles.recomputeBtnText}>Ricalcola con Quebracho</Text>
           </>
         )}
