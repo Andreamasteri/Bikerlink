@@ -243,7 +243,85 @@ router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Respon
       km: Math.round(parseFloat(r.km) * 10) / 10,
     }));
 
-    return res.json({ sessions, userId });
+    const [leanSummaryResult, drResult] = await Promise.all([
+      db.execute<{
+        sample_count: string;
+        lean_sample_count: string;
+        avg_abs_lean: string | null;
+        max_abs_lean: string | null;
+        max_lean_left: string | null;
+        max_lean_right: string | null;
+        avg_lean: string | null;
+        left_turn_samples: string;
+        right_turn_samples: string;
+      }>(sql`
+        SELECT
+          COUNT(*)::text AS sample_count,
+          COUNT(*) FILTER (WHERE lean_angle IS NOT NULL)::text AS lean_sample_count,
+          AVG(ABS(lean_angle))::text AS avg_abs_lean,
+          MAX(ABS(lean_angle))::text AS max_abs_lean,
+          MAX(CASE WHEN lean_angle < 0 THEN ABS(lean_angle) END)::text AS max_lean_left,
+          MAX(CASE WHEN lean_angle > 0 THEN ABS(lean_angle) END)::text AS max_lean_right,
+          AVG(lean_angle)::text AS avg_lean,
+          COUNT(*) FILTER (WHERE lean_angle <= -5)::text AS left_turn_samples,
+          COUNT(*) FILTER (WHERE lean_angle >= 5)::text AS right_turn_samples
+        FROM ride_telemetry
+        WHERE user_id = ${userId}
+      `),
+      db.execute<{
+        sample_count: string;
+        distance_scale: string;
+        speed_scale: string;
+        speed_bias_kmh: string;
+        heading_bias_deg: string;
+        mean_pos_error_m: string;
+        mean_speed_error_kmh: string;
+        updated_at: string | null;
+      }>(sql`
+        SELECT
+          sample_count::text,
+          distance_scale::text,
+          speed_scale::text,
+          speed_bias_kmh::text,
+          heading_bias_deg::text,
+          mean_pos_error_m::text,
+          mean_speed_error_kmh::text,
+          updated_at::text
+        FROM dr_correction_model
+        WHERE user_id = ${userId}
+        LIMIT 1
+      `),
+    ]);
+
+    const leanRow = leanSummaryResult.rows[0];
+    const totalSamples = parseInt(leanRow?.sample_count ?? "0", 10);
+    const leanSamples = parseInt(leanRow?.lean_sample_count ?? "0", 10);
+    const leanSummary = {
+      sampleCount: totalSamples,
+      leanSampleCount: leanSamples,
+      leanCoveragePct: totalSamples > 0 ? Math.round((leanSamples / totalSamples) * 100) : 0,
+      avgAbsLean: leanRow?.avg_abs_lean != null ? Number(leanRow.avg_abs_lean) : null,
+      maxAbsLean: leanRow?.max_abs_lean != null ? Number(leanRow.max_abs_lean) : null,
+      maxLeanLeft: leanRow?.max_lean_left != null ? Number(leanRow.max_lean_left) : null,
+      maxLeanRight: leanRow?.max_lean_right != null ? Number(leanRow.max_lean_right) : null,
+      leanBias: leanRow?.avg_lean != null ? Number(leanRow.avg_lean) : null,
+      leftTurnSamples: parseInt(leanRow?.left_turn_samples ?? "0", 10),
+      rightTurnSamples: parseInt(leanRow?.right_turn_samples ?? "0", 10),
+    };
+
+    const drRow = drResult.rows[0];
+    const drCorrection = drRow ? {
+      sampleCount: parseInt(drRow.sample_count, 10),
+      distanceScale: Number(drRow.distance_scale),
+      speedScale: Number(drRow.speed_scale),
+      speedBiasKmh: Number(drRow.speed_bias_kmh),
+      headingBiasDeg: Number(drRow.heading_bias_deg),
+      meanPosErrorM: Number(drRow.mean_pos_error_m),
+      meanSpeedErrorKmh: Number(drRow.mean_speed_error_kmh),
+      updatedAt: drRow.updated_at ?? null,
+    } : null;
+
+    return res.json({ sessions, userId, lean: leanSummary, drCorrection });
   } catch (err) {
     const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
