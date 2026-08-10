@@ -123,6 +123,10 @@ router.patch("/routes/:id", requireAuth, async (req: Request, res: Response) => 
               lon,
               leanAngle: s.leanAngle != null && Number.isFinite(Number(s.leanAngle)) ? Number(s.leanAngle) : null,
               gforceX: s.gForceX != null && Number.isFinite(Number(s.gForceX)) ? Number(s.gForceX) : null,
+              gforceY: null,
+              gforceZ: null,
+              heading: null,
+              altitudeM: null,
               speedKmh: s.speedKmh != null && Number.isFinite(Number(s.speedKmh)) ? Number(s.speedKmh) : null,
             };
             rows.push({
@@ -145,7 +149,7 @@ router.patch("/routes/:id", requireAuth, async (req: Request, res: Response) => 
                   .onConflictDoNothing()
                   .returning({ ingestKey: rideTelemetry.ingestKey });
                 const insertedKeys = new Set(
-                  inserted.rows
+                  inserted
                     .map((row) => row.ingestKey)
                     .filter((key): key is string => Boolean(key)),
                 );
