@@ -243,7 +243,7 @@ router.get("/dr-correction/users/:userId/export", async (req: Request, res: Resp
 
 /**
  * POST /api/admin/dr-correction/users/:userId/recompute
- * Quebracho acts as the coordinator for an explicit admin re-run. The values are
+ * Quebracho receives the explicit admin re-run directly. The values are
  * still produced by the deterministic DR engine, never by an LLM.
  */
 router.post("/dr-correction/users/:userId/recompute", async (req: Request, res: Response) => {
@@ -255,8 +255,8 @@ router.post("/dr-correction/users/:userId/recompute", async (req: Request, res: 
     return res.json({
       ok: true,
       userId,
-      orchestratedBy: "Horus",
-      orchestratorAlias: "Quebracho",
+      recipient: "Quebracho",
+      coordinator: "Quebracho",
       engine: "deterministic-dr-correction",
       recomputedAt: new Date().toISOString(),
       model: {
