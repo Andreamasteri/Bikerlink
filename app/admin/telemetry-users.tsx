@@ -32,6 +32,15 @@ interface TelemetryUser {
   leftTurnSamples: number;
   rightTurnSamples: number;
   leanBias: number | null;
+  drCorrection: {
+    sampleCount: number;
+    distanceScale: number;
+    speedScale: number;
+    speedBiasKmh: number;
+    headingBiasDeg: number;
+    meanPosErrorM: number;
+    updatedAt: string | null;
+  } | null;
 }
 
 interface TelemetryUsersResponse {
@@ -141,6 +150,7 @@ function LeanCell({ item }: { item: TelemetryUser }) {
 
 function UserRow({ item, onPress }: { item: TelemetryUser; onPress: () => void }) {
   const hasLean = item.leanSampleCount > 0;
+  const dr = item.drCorrection;
   return (
     <TouchableOpacity style={styles.tableRow} onPress={onPress} activeOpacity={0.72}>
       <View style={[styles.cell, styles.userCell]}>
@@ -172,6 +182,22 @@ function UserRow({ item, onPress }: { item: TelemetryUser; onPress: () => void }
       </View>
       <View style={[styles.cell, styles.distributionCell]}>
         <LeanCell item={item} />
+      </View>
+      <View style={[styles.cell, styles.drCell]}>
+        {dr ? (
+          <>
+            <Text style={styles.drActive}>attiva · {dr.sampleCount} camp.</Text>
+            <Text style={styles.subtleText}>
+              dist ×{dr.distanceScale.toFixed(3)} · vel ×{dr.speedScale.toFixed(3)}
+            </Text>
+            <Text style={styles.lastText}>errore pos. {dr.meanPosErrorM.toFixed(1)} m</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.drPending}>in apprendimento</Text>
+            <Text style={styles.subtleText}>nessun modello salvato</Text>
+          </>
+        )}
       </View>
       <View style={[styles.cell, styles.coverageCell]}>
         <Text style={hasLean ? styles.primaryCell : styles.mutedCell}>
@@ -213,12 +239,13 @@ export default function TelemetryUsersScreen() {
     const totalKm = users.reduce((sum, user) => sum + user.kmRide, 0);
     const totalSessions = users.reduce((sum, user) => sum + user.sessionCount, 0);
     const usersWithLean = users.filter((user) => user.leanSampleCount > 0).length;
+    const usersWithDr = users.filter((user) => user.drCorrection?.sampleCount > 0).length;
     const latest = users
       .map((user) => user.lastSample)
       .filter((value): value is string => !!value)
       .sort()
       .at(-1) ?? null;
-    return { totalKm, totalSessions, usersWithLean, latest };
+    return { totalKm, totalSessions, usersWithLean, usersWithDr, latest };
   }, [users]);
 
   return (
@@ -248,7 +275,7 @@ export default function TelemetryUsersScreen() {
       <View style={styles.dataNotice}>
         <MaterialCommunityIcons name="database-eye-outline" size={18} color={Colors.accent} />
         <Text style={styles.dataNoticeText}>
-          I valori sono calcolati sui campioni presenti nel database. Un campo vuoto significa che quel sensore non ha inviato dati.
+          Valori calcolati sui campioni reali nel database. Il DR viene corretto per utente dal motore deterministico; Quebracho ne coordina il controllo. Un campo vuoto significa che mancano dati.
         </Text>
       </View>
 
@@ -267,6 +294,7 @@ export default function TelemetryUsersScreen() {
             <MetricCard icon="map-marker-distance" label="Km totali" value={`${summary.totalKm.toFixed(1)} km`} note="distanza GPS calcolata" color="#22c55e" />
             <MetricCard icon="layers-outline" label="Sessioni" value={String(summary.totalSessions)} note="giri acquisiti" color="#8b5cf6" />
             <MetricCard icon="format-rotate-90" label="Sensore piega" value={`${summary.usersWithLean}/${users.length}`} note="utenti con campioni lean" color="#f59e0b" />
+            <MetricCard icon="compass-outline" label="DR corretto" value={`${summary.usersWithDr}/${users.length}`} note="modelli per-utente attivi" color="#38bdf8" />
           </View>
 
           <View style={styles.toolbar}>
@@ -288,6 +316,14 @@ export default function TelemetryUsersScreen() {
               )}
             </View>
             <Text style={styles.resultCount}>{filteredUsers.length} risultati</Text>
+            <TouchableOpacity
+              style={styles.drCenterButton}
+              onPress={() => router.push("/admin/dr-correction" as never)}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="compass-outline" size={16} color={Colors.accent} />
+              <Text style={styles.drCenterButtonText}>Centro correzione DR</Text>
+            </TouchableOpacity>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator>
@@ -298,6 +334,7 @@ export default function TelemetryUsersScreen() {
                 <Text style={[styles.headerCell, styles.sessionCell]}>SESSIONI</Text>
                 <Text style={[styles.headerCell, styles.leanValueCell]}>PIEGA</Text>
                 <Text style={[styles.headerCell, styles.distributionCell]}>COME PIEGA</Text>
+                <Text style={[styles.headerCell, styles.drCell]}>CORREZIONE DR</Text>
                 <Text style={[styles.headerCell, styles.coverageCell]}>QUALITÀ DATI</Text>
                 <View style={styles.arrowCell} />
               </View>
@@ -346,7 +383,9 @@ const styles = StyleSheet.create({
   searchBox: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1, maxWidth: 420, minHeight: 40, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface, borderRadius: 10, paddingHorizontal: 11 },
   searchInput: { flex: 1, color: Colors.text, fontFamily: "Inter_400Regular", fontSize: 13, paddingVertical: 8, outlineStyle: "none" } as any,
   resultCount: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textSecondary },
-  table: { minWidth: 1110, maxWidth: 1400, width: "100%", alignSelf: "center", borderWidth: 1, borderColor: Colors.border, borderRadius: 12, overflow: "hidden", backgroundColor: Colors.surface },
+  drCenterButton: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: Colors.accent + "55", backgroundColor: Colors.accent + "12", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  drCenterButtonText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.accent },
+  table: { minWidth: 1280, maxWidth: 1400, width: "100%", alignSelf: "center", borderWidth: 1, borderColor: Colors.border, borderRadius: 12, overflow: "hidden", backgroundColor: Colors.surface },
   tableHeader: { backgroundColor: Colors.background, minHeight: 38 },
   tableRow: { flexDirection: "row", alignItems: "center", minHeight: 74, borderBottomWidth: 1, borderBottomColor: Colors.border },
   headerCell: { fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 0.5, color: Colors.textSecondary, paddingHorizontal: 12, paddingVertical: 10 },
@@ -356,7 +395,10 @@ const styles = StyleSheet.create({
   sessionCell: { width: 95 },
   leanValueCell: { width: 120 },
   distributionCell: { width: 215 },
+  drCell: { width: 200 },
   coverageCell: { width: 175 },
+  drActive: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "#38bdf8" },
+  drPending: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "#f59e0b" },
   arrowCell: { width: 42, alignItems: "center", justifyContent: "center" },
   avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.accent + "18", alignItems: "center", justifyContent: "center" },
   userText: { flex: 1, minWidth: 0, gap: 2 },
