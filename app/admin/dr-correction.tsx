@@ -157,7 +157,19 @@ function GlobalCard({ g }: { g: DrGlobal | null }) {
   );
 }
 
-function UserCard({ item, onExport, exporting }: { item: DrUser; onExport: () => void; exporting: boolean }) {
+function UserCard({
+  item,
+  onExport,
+  exporting,
+  onRecompute,
+  recomputing,
+}: {
+  item: DrUser;
+  onExport: () => void;
+  exporting: boolean;
+  onRecompute: () => void;
+  recomputing: boolean;
+}) {
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
@@ -202,6 +214,16 @@ function UserCard({ item, onExport, exporting }: { item: DrUser; onExport: () =>
         <Metric label="err. pos. medio" value={`${item.meanPosErrorM.toFixed(0)} m`} />
         <Metric label="err. vel. medio" value={`${item.meanSpeedErrorKmh.toFixed(1)} km/h`} />
       </View>
+      <TouchableOpacity style={styles.recomputeBtn} onPress={onRecompute} activeOpacity={0.8} disabled={recomputing}>
+        {recomputing ? (
+          <ActivityIndicator size="small" color="#38bdf8" />
+        ) : (
+          <>
+            <MaterialCommunityIcons name="refresh-circle-outline" size={16} color="#38bdf8" />
+            <Text style={styles.recomputeBtnText}>Ricalcola con Quebracho</Text>
+          </>
+        )}
+      </TouchableOpacity>
       <TouchableOpacity style={styles.exportBtn} onPress={onExport} activeOpacity={0.8} disabled={exporting}>
         {exporting ? (
           <ActivityIndicator size="small" color={Colors.accent} />
@@ -220,6 +242,7 @@ export default function DrCorrectionScreen() {
   const insets = useSafeAreaInsets();
   const [page] = useState(0);
   const [exportingId, setExportingId] = useState<string | null>(null);
+  const [recomputingId, setRecomputingId] = useState<string | null>(null);
 
   const usersQuery = useQuery<DrUsersResponse>({
     queryKey: ["/api/admin/dr-correction/users", page],
@@ -233,6 +256,27 @@ export default function DrCorrectionScreen() {
   });
 
   const users = usersQuery.data?.users ?? [];
+
+  const handleRecompute = async (item: DrUser) => {
+    setRecomputingId(item.userId);
+    try {
+      const res = await fetch(
+        new URL(`/api/admin/dr-correction/users/${item.userId}/recompute`, getApiUrl()).toString(),
+        {
+          method: "POST",
+          headers: { ...(await authFetchHeaders()) },
+          credentials: "include",
+        },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await usersQuery.refetch();
+      Alert.alert("Ricalcolo completato", "Quebracho ha coordinato il ricalcolo del modello DR per questo utente.");
+    } catch (e) {
+      Alert.alert("Errore ricalcolo", e instanceof Error ? e.message : "Impossibile ricalcolare il modello DR");
+    } finally {
+      setRecomputingId(null);
+    }
+  };
 
   const handleExport = async (item: DrUser) => {
     setExportingId(item.userId);
@@ -261,7 +305,13 @@ export default function DrCorrectionScreen() {
         keyExtractor={(item) => item.userId}
         ListHeaderComponent={<GlobalCard g={globalQuery.data?.global ?? null} />}
         renderItem={({ item }) => (
-          <UserCard item={item} onExport={() => handleExport(item)} exporting={exportingId === item.userId} />
+          <UserCard
+            item={item}
+            onExport={() => handleExport(item)}
+            exporting={exportingId === item.userId}
+            onRecompute={() => handleRecompute(item)}
+            recomputing={recomputingId === item.userId}
+          />
         )}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24, paddingHorizontal: 16 }}
         showsVerticalScrollIndicator={false}
@@ -329,6 +379,12 @@ const styles = StyleSheet.create({
   },
   metricValue: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text },
   metricLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary, marginTop: 2 },
+  recomputeBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: "#38bdf812", borderWidth: 1, borderColor: "#38bdf833",
+    borderRadius: 8, paddingVertical: 9, marginTop: 12,
+  },
+  recomputeBtnText: { fontFamily: "Inter_500Medium", fontSize: 13, color: "#38bdf8" },
   exportBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
     backgroundColor: Colors.accent + "18", borderRadius: 8, paddingVertical: 9, marginTop: 12,
