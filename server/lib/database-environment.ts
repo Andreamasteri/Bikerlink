@@ -1,4 +1,4 @@
-/**
+/** 
  * Database selection is environment-specific and intentionally fail-closed.
  *
  * The three runtime targets are deliberately explicit:
@@ -41,7 +41,7 @@ export function getDatabaseUrlForRuntime(): string {
 
 export function getProductionDatabaseUrl(): string {
   if (getDeployEnvironment() !== "production") {
-    throw new Error("Operazione consentita esclusivamente in BIKERLINK_DEPLOY_ENV=production.");
+    throw new Error("Operazione consentita esclusivamente in production.");
   }
   return required("DATABASE_URL_PRODUCTION");
 }
