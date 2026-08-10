@@ -20,6 +20,7 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
         km_track: string;
         session_count: string;
         last_sample: string | null;
+        sample_count: string;
         lean_sample_count: string;
         max_lean: string | null;
         avg_lean: string | null;
@@ -35,7 +36,7 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
             session_id,
             session_type,
             created_at,
-            lat, lon,
+            lat, lon, lean_angle,
             LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
             LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
           FROM ride_telemetry
@@ -76,6 +77,7 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
         lean_agg AS (
           SELECT
             user_id,
+            COUNT(*) AS sample_count,
             COUNT(*) FILTER (WHERE lean_angle IS NOT NULL) AS lean_sample_count,
             MAX(ABS(lean_angle)) FILTER (WHERE lean_angle IS NOT NULL) AS max_lean,
             AVG(ABS(lean_angle)) FILTER (WHERE lean_angle IS NOT NULL) AS avg_lean,
@@ -94,6 +96,7 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
           ROUND(ua.km_track::numeric, 2)::text AS km_track,
           ua.session_count::text,
           ua.last_sample::text AS last_sample,
+          COALESCE(la.sample_count, 0)::text AS sample_count,
           COALESCE(la.lean_sample_count, 0)::text AS lean_sample_count,
           ROUND(la.max_lean::numeric, 1)::text AS max_lean,
           ROUND(la.avg_lean::numeric, 1)::text AS avg_lean,
