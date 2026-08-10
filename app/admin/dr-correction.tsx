@@ -220,7 +220,7 @@ function UserCard({
         ) : (
           <>
             <MaterialCommunityIcons name="refresh-circle" size={16} color="#38bdf8" />
-            <Text style={styles.recomputeBtnText}>Ricalcola con Horus · Quebracho</Text>
+            <Text style={styles.recomputeBtnText}>Ricalcola con Quebracho</Text>
           </>
         )}
       </TouchableOpacity>
@@ -270,7 +270,7 @@ export default function DrCorrectionScreen() {
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await usersQuery.refetch();
-      Alert.alert("Ricalcolo completato", "Horus (Quebracho) ha coordinato il ricalcolo del modello DR per questo utente.");
+      Alert.alert("Ricalcolo completato", "Il compito è stato inviato direttamente a Quebracho e il modello DR è stato ricalcolato.");
     } catch (e) {
       Alert.alert("Errore ricalcolo", e instanceof Error ? e.message : "Impossibile ricalcolare il modello DR");
     } finally {
