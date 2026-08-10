@@ -9,18 +9,19 @@ const http = require("http");
 const { URL } = require("url");
 
 const PORT = process.env.PORT || 4405;
-const GATE_TOKEN = process.env.HUB_GATE_TOKEN || "";
+// Canonical name matches the BikerLink client; HUB_GATE_TOKEN remains a\n// backwards-compatible alias for existing ThinkCentre installations.\nfunction getGateToken() {\n  return process.env.AI_HUB_GATE_TOKEN || process.env.HUB_GATE_TOKEN || "";\n}
 const SHARED_ROOT = process.env.SHARED_ROOT || path.join(os.homedir(), "agent-shared");
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));
 
 function requireGateToken(req, res, next) {
-  if (!GATE_TOKEN) {
-    return res.status(500).json({ error: "HUB_GATE_TOKEN not configured on server" });
+  const gateToken = getGateToken();
+  if (!gateToken) {
+    return res.status(500).json({ error: "AI_HUB_GATE_TOKEN (or HUB_GATE_TOKEN) not configured on server" });
   }
   const header = req.header("X-Hub-Gate-Token");
-  if (header !== GATE_TOKEN) {
+  if (header !== gateToken) {
     return res.status(401).json({ error: "unauthorized" });
   }
   next();
