@@ -4,7 +4,7 @@
 // Estratto da wip-stubs.ts per rispettare il limite 600 righe.
 
 import { Router, type Request, type Response } from "express";
-import { eq, asc, sql } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { db, withDbRetry } from "../db";
 import { storage } from "../storage";
 import { requireAuth } from "../lib/auth-middleware";
