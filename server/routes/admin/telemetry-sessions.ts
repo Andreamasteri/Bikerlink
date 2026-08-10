@@ -29,6 +29,13 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
         left_turn_samples: string;
         right_turn_samples: string;
         lean_bias: string | null;
+        dr_sample_count: string | null;
+        dr_distance_scale: string | null;
+        dr_speed_scale: string | null;
+        dr_speed_bias_kmh: string | null;
+        dr_heading_bias_deg: string | null;
+        dr_mean_pos_error_m: string | null;
+        dr_updated_at: string | null;
       }>(sql`
         WITH ordered AS (
           SELECT
@@ -104,9 +111,17 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
           ROUND(la.max_lean_right::numeric, 1)::text AS max_lean_right,
           COALESCE(la.left_turn_samples, 0)::text AS left_turn_samples,
           COALESCE(la.right_turn_samples, 0)::text AS right_turn_samples,
-          ROUND(la.lean_bias::numeric, 1)::text AS lean_bias
+          ROUND(la.lean_bias::numeric, 1)::text AS lean_bias,
+          dr.sample_count::text AS dr_sample_count,
+          dr.distance_scale::text AS dr_distance_scale,
+          dr.speed_scale::text AS dr_speed_scale,
+          dr.speed_bias_kmh::text AS dr_speed_bias_kmh,
+          dr.heading_bias_deg::text AS dr_heading_bias_deg,
+          dr.mean_pos_error_m::text AS dr_mean_pos_error_m,
+          dr.updated_at::text AS dr_updated_at
         FROM user_agg ua
         LEFT JOIN lean_agg la ON la.user_id = ua.user_id
+        LEFT JOIN dr_correction_model dr ON dr.user_id = ua.user_id
         LEFT JOIN users u ON u.id = ua.user_id
         ORDER BY ua.km_ride DESC
         LIMIT ${limit} OFFSET ${offset}
@@ -134,6 +149,15 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
       leanCoveragePct: parseInt(r.sample_count ?? "0", 10) > 0
         ? Math.round((parseInt(r.lean_sample_count ?? "0", 10) / parseInt(r.sample_count ?? "0", 10)) * 100)
         : 0,
+      drCorrection: r.dr_sample_count != null ? {
+        sampleCount: parseInt(r.dr_sample_count, 10),
+        distanceScale: r.dr_distance_scale != null ? Number(r.dr_distance_scale) : 1,
+        speedScale: r.dr_speed_scale != null ? Number(r.dr_speed_scale) : 1,
+        speedBiasKmh: r.dr_speed_bias_kmh != null ? Number(r.dr_speed_bias_kmh) : 0,
+        headingBiasDeg: r.dr_heading_bias_deg != null ? Number(r.dr_heading_bias_deg) : 0,
+        meanPosErrorM: r.dr_mean_pos_error_m != null ? Number(r.dr_mean_pos_error_m) : 0,
+        updatedAt: r.dr_updated_at ?? null,
+      } : null,
     }));
 
     return res.json({
