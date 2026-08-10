@@ -2,7 +2,7 @@
 // The inert loopback endpoint lets modules construct pg/Drizzle clients while
 // guaranteeing that an accidental unmocked query fails locally and cannot
 // reach an external database.
-delete process.env.DATABASE_URL_DEV;
+delete process.env.DATABASE_URL;\ndelete process.env.DATABASE_URL_DEV;
 delete process.env.DATABASE_URL_CANDIDATE;
 delete process.env.DATABASE_URL_PRODUCTION;
 process.env.BIKERLINK_DEPLOY_ENV = "development";
