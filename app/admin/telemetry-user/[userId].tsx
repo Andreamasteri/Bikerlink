@@ -217,7 +217,7 @@ export default function TelemetryUserDetailScreen() {
                   </View>
                 </View>
                 <Text style={styles.analysisNote}>
-                  Modello deterministico per utente · coordinamento Horus · alias Quebracho · aggiornato {formatDate(data.drCorrection.updatedAt)}
+                  Modello deterministico per utente · coordinamento Horus · alias Quebracho · aggiornato {data.drCorrection.updatedAt ? formatDate(data.drCorrection.updatedAt) : "—"}
                 </Text>
               </>
             ) : (
