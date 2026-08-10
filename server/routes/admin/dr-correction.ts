@@ -255,7 +255,7 @@ router.post("/dr-correction/users/:userId/recompute", async (req: Request, res: 
     return res.json({
       ok: true,
       userId,
-      orchestratedBy: "Quebracho",
+      orchestratedBy: "Horus",\n      orchestratorAlias: "Quebracho",
       engine: "deterministic-dr-correction",
       recomputedAt: new Date().toISOString(),
       model: {
