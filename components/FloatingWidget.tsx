@@ -17,6 +17,13 @@ import Colors from "@/constants/colors";
 import { useFloatingWidget } from "@/lib/floating-widget-context";
 import { useAuth } from "@/lib/auth-context";
 
+export const BOWIE_WIDGET_ROUTES = {
+  chat: "/(tabs)/bowie",
+  notifications: "/notifications",
+  matches: "/notifications?section=match-requests",
+  newTrip: "/giri/create",
+} as const;
+
 export const WIDGET_SIZE = 40;
 export const TAP_THRESHOLD = 8; // pixel di movimento oltre cui il gesto è un drag
 const POS_KEY = "floating_widget_position";
@@ -262,39 +269,50 @@ export default function FloatingWidget() {
               </View>
             )}
 
-            <Text style={styles.menuTitle}>Navigazione</Text>
+            <Text style={styles.menuTitle}>Bowie</Text>
 
             <Pressable
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                router.push("/route" as never);
+                router.push(BOWIE_WIDGET_ROUTES.chat as never);
               }}
             >
-              <Ionicons name="navigate-outline" size={22} color={Colors.accent} />
-              <Text style={styles.menuItemText}>Pianifica percorso</Text>
+              <Ionicons name="chatbubbles-outline" size={22} color={Colors.accent} />
+              <Text style={styles.menuItemText}>Chat con Bowie</Text>
             </Pressable>
 
             <Pressable
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                router.push("/(tabs)/tracking" as never);
+                router.push(BOWIE_WIDGET_ROUTES.notifications as never);
               }}
             >
-              <Ionicons name="speedometer-outline" size={22} color={Colors.accent} />
-              <Text style={styles.menuItemText}>Telemetria live</Text>
+              <Ionicons name="notifications-outline" size={22} color={Colors.accent} />
+              <Text style={styles.menuItemText}>Notifiche</Text>
             </Pressable>
 
             <Pressable
               style={styles.menuItem}
               onPress={() => {
                 setMenuOpen(false);
-                router.push("/(tabs)" as never);
+                router.push(BOWIE_WIDGET_ROUTES.matches as never);
+              }}
+            >
+              <Ionicons name="flash-outline" size={22} color={Colors.accent} />
+              <Text style={styles.menuItemText}>Nuovi match</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuOpen(false);
+                router.push(BOWIE_WIDGET_ROUTES.newTrip as never);
               }}
             >
               <Ionicons name="map-outline" size={22} color={Colors.accent} />
-              <Text style={styles.menuItemText}>Torna alla mappa</Text>
+              <Text style={styles.menuItemText}>Nuovo viaggio</Text>
             </Pressable>
 
             <Pressable

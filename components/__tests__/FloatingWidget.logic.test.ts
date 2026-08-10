@@ -75,7 +75,19 @@ import {
   isDragGesture,
   TAP_THRESHOLD,
   WIDGET_SIZE,
+  BOWIE_WIDGET_ROUTES,
 } from "@/components/FloatingWidget";
+
+describe("BOWIE_WIDGET_ROUTES — collegamenti del floating widget", () => {
+  it("espone soltanto i quattro ingressi richiesti", () => {
+    expect(BOWIE_WIDGET_ROUTES).toEqual({
+      chat: "/(tabs)/bowie",
+      notifications: "/notifications",
+      matches: "/notifications?section=match-requests",
+      newTrip: "/giri/create",
+    });
+  });
+});
 
 // ── costanti di supporto ─────────────────────────────────────────────────────
 const SCREEN_W = 400;
