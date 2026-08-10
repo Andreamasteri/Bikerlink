@@ -20,7 +20,7 @@ import { useAuth } from "@/lib/auth-context";
 export const BOWIE_WIDGET_ROUTES = {
   chat: "/(tabs)/bowie",
   notifications: "/notifications",
-  matches: "/(tabs)/match",
+  matches: "/notifications?section=match-requests",
   newTrip: "/giri/create",
 } as const;
 
