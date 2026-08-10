@@ -77,14 +77,19 @@ export interface BackupFrequency {
   mediaHours: number;
 }
 
+function normalizeFrequencyHours(raw: string | null, fallback: number): number {
+  const hours = raw == null ? NaN : Number(raw);
+  return Number.isInteger(hours) && hours >= 1 && hours <= 8760 ? hours : fallback;
+}
+
 export async function getBackupFrequency(): Promise<BackupFrequency> {
   const [dbVal, mediaVal] = await Promise.all([
     readSetting("backup.freq_db_hours"),
     readSetting("backup.freq_media_hours"),
   ]);
   return {
-    dbHours: dbVal ? parseInt(dbVal, 10) || DEFAULT_DB_HOURS : DEFAULT_DB_HOURS,
-    mediaHours: mediaVal ? parseInt(mediaVal, 10) || DEFAULT_MEDIA_HOURS : DEFAULT_MEDIA_HOURS,
+    dbHours: normalizeFrequencyHours(dbVal, DEFAULT_DB_HOURS),
+    mediaHours: normalizeFrequencyHours(mediaVal, DEFAULT_MEDIA_HOURS),
   };
 }
 
