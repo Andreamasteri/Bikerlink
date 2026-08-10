@@ -247,7 +247,7 @@ export function getBgDbLimiterStats(): {
   return {
     active,
     queued: queue.length,
-    max: BG_DB_MAX_CONCURRENCY,
+    max: concurrencyOverride ?? BG_DB_MAX_CONCURRENCY,
     maxQueue: BG_DB_MAX_QUEUE,
     droppedOverflowTotal,
     droppedTimeoutTotal,
