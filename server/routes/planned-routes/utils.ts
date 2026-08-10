@@ -158,9 +158,11 @@ function maxSpeedFromDetails(
     const value = typeof rawValue === "object" && rawValue !== null
       ? (rawValue as Record<string, unknown>).value ?? (rawValue as Record<string, unknown>).speed
       : rawValue;
+    const fromIndex = Number(from);
+    const toIndex = Number(to);
     const speed = Number(value);
-    if (Number.isFinite(from) && Number.isFinite(to) && Number.isFinite(speed)
-      && speed > 0 && intervalStart < to && intervalEnd >= from) {
+    if (Number.isFinite(fromIndex) && Number.isFinite(toIndex) && Number.isFinite(speed)
+      && speed > 0 && intervalStart < toIndex && intervalEnd >= fromIndex) {
       return speed;
     }
   }
