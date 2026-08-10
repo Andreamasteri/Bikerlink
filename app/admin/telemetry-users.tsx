@@ -239,7 +239,7 @@ export default function TelemetryUsersScreen() {
     const totalKm = users.reduce((sum, user) => sum + user.kmRide, 0);
     const totalSessions = users.reduce((sum, user) => sum + user.sessionCount, 0);
     const usersWithLean = users.filter((user) => user.leanSampleCount > 0).length;
-    const usersWithDr = users.filter((user) => user.drCorrection?.sampleCount > 0).length;
+    const usersWithDr = users.filter((user) => (user.drCorrection?.sampleCount ?? 0) > 0).length;
     const latest = users
       .map((user) => user.lastSample)
       .filter((value): value is string => !!value)
