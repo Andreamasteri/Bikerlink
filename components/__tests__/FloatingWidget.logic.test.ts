@@ -83,7 +83,7 @@ describe("BOWIE_WIDGET_ROUTES — collegamenti del floating widget", () => {
     expect(BOWIE_WIDGET_ROUTES).toEqual({
       chat: "/(tabs)/bowie",
       notifications: "/notifications",
-      matches: "/(tabs)/match",
+      matches: "/notifications?section=match-requests",
       newTrip: "/giri/create",
     });
   });
