@@ -8,7 +8,6 @@
 > come contesto storico: `setup-expose.sh` è ancora utile per **generare i token**
 > (`--gen-tokens`), ma il percorso nginx/DuckDNS non va più eseguito in produzione.
 
-Lo stack self-host avvia GraphHopper, Valhalla, Ollama, Whisper e Nominatim
 **solo su `localhost`** del ThinkCentre. L'app BikerLink su Replit gira nel
 cloud e non può raggiungere `localhost`: serve esporre tutti i servizi su un
 dominio pubblico in HTTPS con autenticazione a token.
@@ -44,7 +43,6 @@ Esegui questo **sul ThinkCentre** (o sul tuo PC):
 openssl rand -base64 32   # → GRAPHHOPPER_TOKEN
 openssl rand -base64 32   # → VALHALLA_API_KEY
 openssl rand -base64 32   # → OLLAMA_TOKEN
-openssl rand -base64 32   # → WHISPER_TOKEN
 openssl rand -base64 32   # → NOMINATIM_TOKEN
 ```
 
@@ -82,7 +80,6 @@ Questa sezione ti guida passo passo. Esegui ogni passo nell'ordine indicato.
    - `gh.bikerlink.duckdns.org` — GraphHopper
    - `valhalla.bikerlink.duckdns.org` — Valhalla
    - `ollama.bikerlink.duckdns.org` — Ollama AI
-   - `whisper.bikerlink.duckdns.org` — Whisper ASR
    - `nominatim.bikerlink.duckdns.org` — Nominatim
 
    > DuckDNS gestisce un solo record A per dominio (es. `bikerlink.duckdns.org`).
@@ -180,7 +177,6 @@ sudo certbot certonly --standalone --cert-name bikerlink \
   -d gh.bikerlink.duckdns.org \
   -d valhalla.bikerlink.duckdns.org \
   -d ollama.bikerlink.duckdns.org \
-  -d whisper.bikerlink.duckdns.org \
   -d nominatim.bikerlink.duckdns.org \
   --agree-tos --non-interactive --email tua@email.com
 
@@ -276,7 +272,6 @@ Il giro di test copre 6 sezioni:
 2. **TLS** — certificato Let's Encrypt valido su ogni sottodominio
 3. **Auth** — senza token ogni servizio risponde 401 (token funzionante)
 4. **Connettività** — con token ogni servizio risponde 2xx
-5. **Rate-limit** — header di rate-limiting presenti su ollama e whisper
 6. **Timer DuckDNS** — `duckdns.timer` attivo con la prossima scadenza
 
 Se tutti i check mostrano ✓ l'infrastruttura è operativa e puoi procedere
@@ -296,8 +291,6 @@ VALHALLA_API_KEY=<il valore generato al Passo 0>
 OLLAMA_URL=https://ollama.bikerlink.duckdns.org
 OLLAMA_TOKEN=<il valore generato al Passo 0>
 
-WHISPER_URL=https://whisper.bikerlink.duckdns.org
-WHISPER_TOKEN=<il valore generato al Passo 0>
 
 NOMINATIM_URL=https://nominatim.bikerlink.duckdns.org
 NOMINATIM_TOKEN=<il valore generato al Passo 0>
@@ -319,7 +312,6 @@ Nessuna porta da aprire sul router, funziona anche dietro CG-NAT.
    cloudflared tunnel route dns bikerlink gh.bikerlink.app
    cloudflared tunnel route dns bikerlink valhalla.bikerlink.app
    cloudflared tunnel route dns bikerlink ollama.bikerlink.app
-   cloudflared tunnel route dns bikerlink whisper.bikerlink.app
    cloudflared tunnel route dns bikerlink nominatim.bikerlink.app
    ```
 3. Copia `cloudflared-config.yml` in `/etc/cloudflared/config.yml`, sostituisci
@@ -356,7 +348,6 @@ NONINTERACTIVE=1 BASE_DOMAIN=bikerlink.duckdns.org APP_ORIGIN=https://bikerlink.
 ```
 
 Variabili opzionali: `GRAPHHOPPER_TOKEN`, `VALHALLA_API_KEY`, `OLLAMA_TOKEN`,
-`WHISPER_TOKEN`, `NOMINATIM_TOKEN` (override del `.env.local`),
 `ENV_LOCAL_FILE` (percorso alternativo), `SKIP_TOKEN_VALIDATION=1`.
 
 ---

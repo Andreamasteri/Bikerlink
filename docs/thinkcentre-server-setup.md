@@ -7,7 +7,6 @@
 > `infra/self-host/expose/DEPLOY-LOG.md`). Le parti hardware/OS/servizi/DragonflyDB
 > locale restano valide; ignora i passi DuckDNS+nginx+certbot se non per contesto storico.
 
-> Guida operativa per il mini-PC ThinkCentre (`192.168.1.35`) che ospita i servizi self-hosted di BikerLink: GraphHopper, Ollama, Whisper, Nominatim, Valhalla e DragonflyDB (Redis-compatible).
 >
 > Esposizione esterna **attuale**: Cloudflare Tunnel su `*.biker-link.net`. (Storico: DuckDNS `bikerlink.duckdns.org` + nginx reverse proxy HTTPS, dismesso il 29 Giugno 2026.)
 
@@ -49,7 +48,6 @@
 | GraphHopper (7 aree) | `8990–8996` | HTTPS `/areas/<codice>/*` | Routing moto curvy per area |
 | Valhalla | `8002` | HTTPS `/valhalla/*` | Routing moto nativo |
 | Ollama | `11434` | HTTPS `/ollama/*` | LLM locale (AI) |
-| Whisper ASR | `9000` | HTTPS `/whisper/*` | Trascrizione audio |
 | Nominatim | `8080` | HTTPS `/nominatim/*` | Geocoding OSM |
 | **Redis** | **`6379`** | **Stream TLS `:6380`** | **Cache, BullMQ, pub/sub** |
 | **Open WebUI (Bowie)** | **`3010`** | **Cloudflare Tunnel `ai.biker-link.net`** | **GUI Ollama — solo loopback** |
@@ -68,7 +66,6 @@
 | 8080 | TCP | Nominatim | Solo LAN |
 | 8990–8996 | TCP | GraphHopper (7 aree regionali) | Solo LAN |
 | 11434 | TCP | Ollama | Solo LAN |
-| 9000 | TCP | Whisper ASR | Solo LAN |
 | 9099 | TCP | ufw-status daemon | Solo localhost |
 | 6379 | TCP | Redis plaintext | **Solo localhost** |
 | 5432 | TCP | PostgreSQL | **Solo localhost** |
@@ -232,7 +229,6 @@ Lo script è **idempotente**: può essere rieseguito senza danni in qualsiasi mo
 | Valhalla | 8002 | Solo LAN |
 | Nominatim | 8080 | Solo LAN |
 | Ollama | 11434 | Solo LAN |
-| Whisper | 9000 | Solo LAN |
 | ufw-status daemon | 9099 | Solo localhost |
 | PostgreSQL | 5432 | Solo localhost |
 | Redis TLS (nginx stream) | 6380 | Internet |
@@ -467,7 +463,6 @@ redis-cli -h bikerlink.duckdns.org -p 6380 \
 | Valhalla | 8002 | `docker compose up -d valhalla` in `infra/self-host/` |
 | Nominatim | 8080 | `docker compose up -d` in `infra/self-host/` |
 | Ollama | 11434 | `systemctl start ollama` |
-| Whisper | 9000 | `systemctl start whisper` |
 | ufw-status daemon | 9099 | `systemctl start bikerlink-ufw-status` |
 
 ### Comandi utili
