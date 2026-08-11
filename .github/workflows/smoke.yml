@@ -33,10 +33,11 @@ jobs:
       - name: Verify smoke configuration
         env:
           BASE_URL: ${{ secrets.SMOKE_CANDIDATE_BASE_URL }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL_CANDIDATE }}
+          BIKERLINK_DEPLOY_ENV: staging
+          DATABASE_URL_CANDIDATE: ${{ secrets.DATABASE_URL_CANDIDATE }}
         run: |
           test -n "$BASE_URL" || { echo "::error::Missing secret SMOKE_CANDIDATE_BASE_URL"; exit 2; }
-          test -n "$DATABASE_URL" || { echo "::error::Missing secret DATABASE_URL_CANDIDATE"; exit 2; }
+          test -n "$DATABASE_URL_CANDIDATE" || { echo "::error::Missing secret DATABASE_URL_CANDIDATE"; exit 2; }
           node -e '
             const u = new URL(process.env.BASE_URL);
             if (u.protocol !== "https:") throw new Error("Candidate smoke requires HTTPS");
@@ -51,7 +52,8 @@ jobs:
       - name: Run API smoke
         env:
           BASE_URL: ${{ secrets.SMOKE_CANDIDATE_BASE_URL }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL_CANDIDATE }}
+          BIKERLINK_DEPLOY_ENV: staging
+          DATABASE_URL_CANDIDATE: ${{ secrets.DATABASE_URL_CANDIDATE }}
           SMOKE_ALLOW_PROD: "0"
           SMOKE_CLEANUP_ORPHANS: "1"
           SMOKE_TIMEOUT_MS: "10000"

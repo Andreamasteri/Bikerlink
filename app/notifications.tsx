@@ -46,6 +46,12 @@ function getNotifIcon(type: string): { name: React.ComponentProps<typeof Ionicon
   switch (type) {
     case "direct_match_request":
       return { name: "person-add", color: "#FF6600" };
+    case "fixed_couple_request":
+      return { name: "people", color: "#AF52DE" };
+    case "fixed_couple_accepted":
+      return { name: "checkmark-circle", color: "#34C759" };
+    case "fixed_couple_rejected":
+      return { name: "close-circle", color: "#E63946" };
     case "direct_match_accepted":
       return { name: "checkmark-circle", color: "#34C759" };
     case "match":

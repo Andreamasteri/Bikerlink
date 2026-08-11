@@ -36,7 +36,7 @@ export const TARGET_USER_TYPE_OPTIONS = [
   { key: "hitcher", labelKey: "proposal.targetHitcher", icon: "account-arrow-right", color: Colors.accent },
 ];
 
-async function geocodeDeparture(address: string): Promise<{ lat: number; lng: number } | null> {
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
@@ -85,6 +85,8 @@ export function useCreateProposalForm() {
   const [maxParticipants, setMaxParticipants] = useState("");
   const [departureLat, setDepartureLat] = useState<number | null>(null);
   const [departureLng, setDepartureLng] = useState<number | null>(null);
+  const [destinationLat, setDestinationLat] = useState<number | null>(null);
+  const [destinationLng, setDestinationLng] = useState<number | null>(null);
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
   const [gpsSource, setGpsSource] = useState<"profile" | "live" | "map" | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -143,11 +145,27 @@ export function useCreateProposalForm() {
       setDepartureLng(result.departure.lng);
       setDepartureAddress(result.departure.name);
       setGpsSource("map");
-      if (result.stops.length > 0) {
-        setStops(result.stops);
-      }
+      setStops(result.stops);
       if (result.destination) {
         setDestinationAddress(result.destination.name);
+        setDestinationLat(result.destination.lat);
+        setDestinationLng(result.destination.lng);
+      } else {
+        setDestinationAddress("");
+        setDestinationLat(null);
+        setDestinationLng(null);
+      }
+      if ("schedule" in result && result.schedule) {
+        const schedule = result.schedule;
+        if (schedule.departureDate && /^\d{4}-\d{2}-\d{2}$/.test(schedule.departureDate)) {
+          const [yyyy, mm, dd] = schedule.departureDate.split("-");
+          setDateStr(dd + "/" + mm + "/" + yyyy);
+        }
+        if (schedule.departureTime) setTimeFrom(schedule.departureTime);
+        if (schedule.returnTime) {
+          setReturnDeadlineEnabled(true);
+          setReturnDeadlineTime(schedule.returnTime);
+        }
       }
       Alert.alert(
         "Percorso caricato",
@@ -207,11 +225,11 @@ export function useCreateProposalForm() {
   useEffect(() => {
     if (selectedSearchTypes.length === 0) return;
     const mapping: Record<string, string[]> = {
-      find_a_friend: ["biker"],
-      find_a_guest:  ["zavorrina"],
-      hitcher:       ["hitchhiker"],
-      hitchhiker:    ["hitcher"],
-      find_a_biker:  ["biker", "hitcher"],
+      find_a_friend: ["biker", "coppia"],
+      find_a_guest:  ["zavorrina", "coppia"],
+      hitcher:       ["zavorrina", "coppia"],
+      hitchhiker:    ["biker", "coppia"],
+      find_a_biker:  ["biker", "coppia"],
     };
     const derived = Array.from(
       new Set(selectedSearchTypes.flatMap((st) => mapping[st] ?? []))
@@ -333,15 +351,32 @@ export function useCreateProposalForm() {
       }
     }
 
-    const stopsData = stops.length > 0 ? stops.map((s) => ({ address: s })) : null;
+    let stopsData: Array<{ address: string; lat: number; lng: number }> | null = null;
+    if (stops.length > 0) {
+      const resolvedStops: Array<{ address: string; lat: number; lng: number }> = [];
+      for (const stop of stops) {
+        const address = stop.trim();
+        if (!address) continue;
+        const geo = await geocodeAddress(address);
+        if (!geo) {
+          Alert.alert(
+            "Tappa non trovata",
+            `Non è stato possibile localizzare "${address}". Correggila o rimuovila prima di continuare.`
+          );
+          return;
+        }
+        resolvedStops.push({ address, lat: geo.lat, lng: geo.lng });
+      }
+      stopsData = resolvedStops.length > 0 ? resolvedStops : null;
+    }
 
     let finalLat = departureLat;
     let finalLng = departureLng;
     let geocodingOk = true;
 
-    if (!finalLat || !finalLng) {
+    if (!Number.isFinite(finalLat) || !Number.isFinite(finalLng)) {
       if (departureAddress.trim()) {
-        const geo = await geocodeDeparture(departureAddress.trim());
+        const geo = await geocodeAddress(departureAddress.trim());
         if (geo) {
           finalLat = geo.lat;
           finalLng = geo.lng;
@@ -364,6 +399,29 @@ export function useCreateProposalForm() {
         );
         return;
       }
+    }
+
+    const destinationRequired = needsDestination || (canExtendToDestination && extendToDestination);
+    if (destinationRequired && !destinationAddress.trim()) {
+      Alert.alert(t("common.error"), t("proposals.create.enterDest"));
+      return;
+    }
+
+    let finalDestinationLat = destinationLat;
+    let finalDestinationLng = destinationLng;
+    if (destinationRequired && (!Number.isFinite(finalDestinationLat) || !Number.isFinite(finalDestinationLng))) {
+      const geo = await geocodeAddress(destinationAddress.trim());
+      if (!geo) {
+        Alert.alert(
+          "Destinazione non trovata",
+          "Seleziona una destinazione dalla mappa o inserisci un indirizzo più preciso."
+        );
+        return;
+      }
+      finalDestinationLat = geo.lat;
+      finalDestinationLng = geo.lng;
+      setDestinationLat(finalDestinationLat);
+      setDestinationLng(finalDestinationLng);
     }
 
     const data: Record<string, unknown> = {
@@ -392,15 +450,15 @@ export function useCreateProposalForm() {
     }
     if (needsDestination) {
       data.destinationAddress = destinationAddress.trim();
-      data.destinationLatitude = finalLat;
-      data.destinationLongitude = finalLng;
+      data.destinationLatitude = finalDestinationLat;
+      data.destinationLongitude = finalDestinationLng;
     }
     if (returnDeadline) data.returnDeadline = returnDeadline.toISOString();
     if (selectedClubId) data.clubId = selectedClubId;
     if (canExtendToDestination && extendToDestination) {
       data.extendToDestination = true;
-      data.destinationLatitude = finalLat;
-      data.destinationLongitude = finalLng;
+      data.destinationLatitude = finalDestinationLat;
+      data.destinationLongitude = finalDestinationLng;
       data.destinationSearchRadius = parseInt(destinationExtRadius) || 50;
     }
 
@@ -425,7 +483,7 @@ export function useCreateProposalForm() {
     returnDeadlineTime, setReturnDeadlineTime,
     stops, newStop, setNewStop,
     maxParticipants, setMaxParticipants,
-    departureLat, departureLng,
+    departureLat, departureLng, destinationLat, destinationLng,
     selectedClubId, setSelectedClubId,
     gpsSource, setGpsSource,
     gpsLoading,
@@ -435,7 +493,7 @@ export function useCreateProposalForm() {
     showLoadRouteModal, setShowLoadRouteModal,
     extendToDestination, setExtendToDestination,
     destinationExtRadius, setDestinationExtRadius,
-    setDepartureLat, setDepartureLng,
+    setDepartureLat, setDepartureLng, setDestinationLat, setDestinationLng,
     isBikerOrCoppia, isZavorrina, searchTypes,
     needsMotoSelection, needsWishlistMoto, needsDestination, canExtendToDestination,
     motos, wishlistMotos, myClubs,

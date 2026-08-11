@@ -107,7 +107,8 @@ export async function runMatching(): Promise<number> {
     const matchingDisabledSet = await loadMatchingDisabledSet();
     let matchCount = 0;
 
-    const BB_SEARCH_TYPES = new Set(["find_a_friend", "hitcher", "hitchhiker"]);
+    const isBikerAuthor = (userType: string | null | undefined) =>
+      userType === "biker" || userType === "coppia";
 
     // SQL-side candidate pair generation: pairs already pre-filtered by
     // status/isFake/ghostMode/role/scheduledAt + bbox at BBOX_RADIUS_KM.
@@ -124,7 +125,8 @@ export async function runMatching(): Promise<number> {
       {
         if (!areCompatible(p1, p2)) continue;
 
-        const isBikerBikerProposal = BB_SEARCH_TYPES.has(p1.searchType ?? "") && BB_SEARCH_TYPES.has(p2.searchType ?? "");
+        const isBikerBikerProposal = isBikerAuthor((p1 as { authorUserType?: string | null }).authorUserType)
+          && isBikerAuthor((p2 as { authorUserType?: string | null }).authorUserType);
         if (isBikerBikerProposal) {
           if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerBikerDistance")) continue;
         } else {

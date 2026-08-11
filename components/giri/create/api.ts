@@ -56,7 +56,11 @@ export async function parseAI(prompt: string): Promise<any> {
   const resp = await fetch(url.toString(), {
     method: "POST", credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({
+      prompt,
+      clientDate: new Date().toISOString().slice(0, 10),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Rome",
+    }),
   });
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({}));

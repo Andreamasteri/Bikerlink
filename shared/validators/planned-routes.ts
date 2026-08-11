@@ -64,6 +64,8 @@ export const aiParsePromptSchema = z.object({
   prompt: z.string().min(3, "Prompt troppo corto").max(2000, "Prompt troppo lungo"),
   userLat: z.number().finite().optional(),
   userLng: z.number().finite().optional(),
+  clientDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),
+  timezone: z.string().min(1).max(80).optional(),
 });
 export type AiParsePromptInput = z.infer<typeof aiParsePromptSchema>;
 

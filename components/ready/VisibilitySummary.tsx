@@ -7,7 +7,7 @@ export type VisibilitySummaryProps = {
   isAvailable: boolean;
   isGhostMode: boolean;
   hideFromMap: boolean;
-  offlineRandomize: boolean;
+  positionFuzz: boolean;
 };
 
 function getVisibilitySummary(props: VisibilitySummaryProps): {
@@ -16,7 +16,7 @@ function getVisibilitySummary(props: VisibilitySummaryProps): {
   color: string;
   bg: string;
 } {
-  const { isAvailable, isGhostMode, hideFromMap, offlineRandomize } = props;
+  const { isAvailable, isGhostMode, hideFromMap, positionFuzz } = props;
 
   if (!isAvailable) {
     return {
@@ -42,7 +42,7 @@ function getVisibilitySummary(props: VisibilitySummaryProps): {
       bg: Colors.accentRed,
     };
   }
-  if (offlineRandomize) {
+  if (positionFuzz) {
     return {
       label: "Visibile · Posizione offuscata",
       icon: "shuffle-outline",

@@ -29,6 +29,7 @@ import NotificationsPanel from "@/components/profile/NotificationsPanel";
 import MatchPrefsPanel from "@/components/profile/MatchPrefsPanel";
 import ThemePanel from "@/components/profile/ThemePanel";
 import UnitsPanel from "@/components/profile/UnitsPanel";
+import FixedCouplePanel from "@/components/profile/FixedCouplePanel";
 
 // New sub-components
 import { ProfileHeader } from "@/components/profile/view/ProfileHeader";
@@ -301,6 +302,8 @@ export default function ProfileScreen() {
           onPreferenceChange={(val) => searchPreferenceMutation.mutate(val)}
           currentUserType={currentUserType}
         />
+
+        <FixedCouplePanel />
 
         <NotificationsPanel
           serverPushEnabled={profile?.profile?.pushNotificationsEnabled}

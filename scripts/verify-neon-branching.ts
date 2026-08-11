@@ -1,6 +1,6 @@
 /**
- * Verifies that development and production use distinct Neon branches.
- * Parsing-only: this script never opens a database connection.
+ * Verifies all three explicit Neon targets without opening a database connection.
+ * Generic DATABASE_URL is intentionally rejected to prevent an ambiguous target.
  */
 
 type ParsedConnection = {
@@ -15,20 +15,16 @@ function parseConnectionString(raw: string): ParsedConnection | null {
     const host = url.hostname.toLowerCase();
     const dbname = url.pathname.replace(/^\//, "").split("?")[0] ?? "";
     if (!host) return null;
-    const branchHint = host.split(".")[0] ?? host;
-    return { host, dbname, branchHint };
+    return { host, dbname, branchHint: host.split(".")[0] ?? host };
   } catch {
     return null;
   }
 }
 
-function redactUrl(raw: string): string {
-  try {
-    const url = new URL(raw);
-    return `${url.protocol}//<redacted>@${url.host}${url.pathname}`;
-  } catch {
-    return "<non-parseable URL>";
-  }
+function required(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) fail(`${name} mancante: target Neon non identificato.`);
+  return value;
 }
 
 function fail(message: string): never {
@@ -37,63 +33,47 @@ function fail(message: string): never {
 }
 
 function main(): void {
-  const devUrl = process.env.DATABASE_URL_DEV;
-  const explicitProdUrl = process.env.DATABASE_URL_PROD ?? process.env.PROD_DATABASE_URL;
-  const ambientUrl = process.env.DATABASE_URL;
-  const prodUrl = explicitProdUrl ?? ambientUrl;
-
-  if (!devUrl) {
-    fail("DATABASE_URL_DEV mancante: gli script locali non hanno un branch Neon isolato.");
+  const deployEnvironment = (process.env.BIKERLINK_DEPLOY_ENV ?? "development").trim().toLowerCase();
+  if (!["development", "staging", "production"].includes(deployEnvironment)) {
+    fail(`BIKERLINK_DEPLOY_ENV non valido: ${deployEnvironment}`);
   }
-  if (!prodUrl) {
-    fail("DATABASE_URL_PROD / PROD_DATABASE_URL mancante: impossibile confrontare dev e produzione.");
+  if (process.env.DATABASE_URL?.trim()) {
+    fail("DATABASE_URL generica rilevata: usare solo DATABASE_URL_DEV, DATABASE_URL_CANDIDATE e DATABASE_URL_PRODUCTION.");
   }
 
-  const dev = parseConnectionString(devUrl);
-  const prod = parseConnectionString(prodUrl);
-  if (!dev) fail(`DATABASE_URL_DEV non valido: ${redactUrl(devUrl)}`);
-  if (!prod) fail(`URL produzione non valido: ${redactUrl(prodUrl)}`);
+  const targets = {
+    dev: parseConnectionString(required("DATABASE_URL_DEV")),
+    candidate: parseConnectionString(required("DATABASE_URL_CANDIDATE")),
+    production: parseConnectionString(required("DATABASE_URL_PRODUCTION")),
+  };
 
-  if (!dev.host.endsWith("neon.tech")) {
-    fail(`DATABASE_URL_DEV non punta a Neon: ${dev.host}`);
-  }
-  if (!prod.host.endsWith("neon.tech")) {
-    fail(`Il database di produzione non punta a Neon: ${prod.host}`);
-  }
-  if (dev.host === prod.host) {
-    fail(`CRITICO: sviluppo e produzione condividono lo stesso host Neon (${dev.host}).`);
-  }
-  if (dev.dbname && prod.dbname && dev.dbname !== prod.dbname) {
-    fail(`Dev e prod usano database name differenti (${dev.dbname} / ${prod.dbname}); verificare che siano branch dello stesso progetto.`);
-  }
-
-  // In locale DATABASE_URL è consumata implicitamente da drizzle e da diversi
-  // script. Deve essere presente e puntare allo stesso branch di DATABASE_URL_DEV.
-  if (process.env.NODE_ENV !== "production") {
-    if (!ambientUrl) {
-      fail("DATABASE_URL locale mancante. Impostarla uguale a DATABASE_URL_DEV.");
-    }
-    const ambient = parseConnectionString(ambientUrl);
-    if (!ambient) fail(`DATABASE_URL locale non valido: ${redactUrl(ambientUrl)}`);
-    if (ambient.host === prod.host) {
-      fail("DATABASE_URL locale punta al branch di produzione. Impostarla uguale a DATABASE_URL_DEV.");
-    }
-    if (ambient.host !== dev.host) {
-      fail(`DATABASE_URL locale (${ambient.host}) non coincide con DATABASE_URL_DEV (${dev.host}).`);
+  for (const [name, target] of Object.entries(targets)) {
+    if (!target) fail(`DATABASE_URL_${name.toUpperCase()} non valida.`);
+    if (!target.host.endsWith("neon.tech")) {
+      fail(`Il target ${name} non punta a Neon: ${target.host}`);
     }
   }
 
-  // Destructive scripts must opt in explicitly even on a dev branch.
-  const destructiveIntent = process.env.BIKERLINK_DESTRUCTIVE_DB_OPERATION === "1";
-  const productionOverride = process.env.BIKERLINK_ALLOW_PRODUCTION_DB === "I_UNDERSTAND_DATA_LOSS";
-  if (destructiveIntent && productionOverride) {
-    fail("Configurazione contraddittoria: un'operazione distruttiva non può essere autorizzata verso produzione.");
+  const parsed = targets as {
+    dev: ParsedConnection;
+    candidate: ParsedConnection;
+    production: ParsedConnection;
+  };
+
+  const hosts = Object.values(parsed).map((target) => target.host);
+  if (new Set(hosts).size !== hosts.length) {
+    fail(`I tre target condividono un host Neon: ${hosts.join(" / ")}`);
   }
 
-  console.log("✅ NEON BRANCHING OK");
-  console.log(`   dev : ${dev.host} (${dev.branchHint})`);
-  console.log(`   prod: ${prod.host} (${prod.branchHint})`);
-  console.log("   DATABASE_URL locale isolata dalla produzione");
+  const dbnames = Object.values(parsed).map((target) => target.dbname).filter(Boolean);
+  if (new Set(dbnames).size > 1) {
+    fail(`I tre target usano database name diversi: ${dbnames.join(" / ")}`);
+  }
+
+  console.log("✅ NEON TARGETS OK");
+  for (const [name, target] of Object.entries(parsed)) {
+    console.log(`   ${name.padEnd(10)}: ${target.host} (${target.branchHint})`);
+  }
 }
 
 main();

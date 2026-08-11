@@ -23,6 +23,7 @@ import { loadMatchPreferencesMap, prefEnabled } from "./filters";
 import { classifyMatch } from "./notifications/classify";
 import { dispatchMatchNotification } from "./notifications/dispatcher";
 import { protectedNicknamesSqlArray } from "./protection-filter";
+import { systemAccountConditions } from "../lib/system-account-filter";
 import {
   loadNegativePreferencesMap,
   loadCandidateProfiles,
@@ -47,8 +48,10 @@ export async function runBikerZavorrinaBase(): Promise<number> {
       .where(and(
         inArray(users.userType, ["biker", "coppia"]),
         eq(users.isFake, false),
+        eq(users.ghostMode, false),
         eq(users.matchingDisabled, false),
         eq(users.status, "active"),
+        ...systemAccountConditions(users),
         inArray(userProfiles.searchPreference, ["zavorrina", "both"]),
         sql`${users.nickname} <> ALL(${sql.raw(protectedNicknamesSqlArray())})`,
       ));
@@ -60,8 +63,10 @@ export async function runBikerZavorrinaBase(): Promise<number> {
       .where(and(
         eq(users.userType, "zavorrina"),
         eq(users.isFake, false),
+        eq(users.ghostMode, false),
         eq(users.matchingDisabled, false),
         eq(users.status, "active"),
+        ...systemAccountConditions(users),
         inArray(userProfiles.searchPreference, ["biker", "both"]),
         sql`${users.nickname} <> ALL(${sql.raw(protectedNicknamesSqlArray())})`,
       ));

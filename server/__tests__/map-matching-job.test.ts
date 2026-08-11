@@ -359,17 +359,23 @@ describe("runMapMatchingJob — cap tentativi e backoff", () => {
     process.env.MAP_MATCHING_MAX_ATTEMPTS = "5";
     dbExecute.mockReset();
     dbExecute.mockResolvedValueOnce({
-      rows: [{ session_id: "a" }, { session_id: "a" }, { session_id: "b" }],
+      rows: [
+        { user_id: "u1", session_id: "a" },
+        { user_id: "u2", session_id: "a" },
+        { user_id: "u1", session_id: "a" },
+        { user_id: "u1", session_id: "b" },
+      ],
     } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await requeueUnmatchable();
 
     expect(res.requeuedSamples).toBe(3);
-    expect(res.requeuedSessions).toBe(2);
+    expect(res.requeuedSessions).toBe(3);
 
     const { sql, params } = render(dbExecute.mock.calls[0]?.[0]);
     const lower = sql.toLowerCase();
     expect(lower).toContain("update ride_telemetry");
+    expect(lower).toContain("returning user_id, session_id");
     expect(lower).toContain("match_status = 'pending'");
     expect(lower).toContain("match_attempts = 0");
     expect(lower).toContain("matched = false");

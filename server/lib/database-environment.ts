@@ -1,10 +1,23 @@
-/**
+/** 
  * Database selection is environment-specific and intentionally fail-closed.
- * Staging must never inherit DATABASE_URL from production.
+ *
+ * The three runtime targets are deliberately explicit:
+ * - development -> DATABASE_URL_DEV
+ * - staging     -> DATABASE_URL_CANDIDATE
+ * - production  -> DATABASE_URL_PRODUCTION
+ *
+ * Generic DATABASE_URL is not accepted here. A missing or ambiguous target must
+ * stop the process before a pool can be created.
  */
 export type BikerLinkDeployEnvironment = "development" | "staging" | "production";
 
-function resolveDeployEnvironment(): BikerLinkDeployEnvironment {
+const URL_ENV_BY_DEPLOY_ENV: Record<BikerLinkDeployEnvironment, string> = {
+  development: "DATABASE_URL_DEV",
+  staging: "DATABASE_URL_CANDIDATE",
+  production: "DATABASE_URL_PRODUCTION",
+};
+
+export function getDeployEnvironment(): BikerLinkDeployEnvironment {
   const value = process.env.BIKERLINK_DEPLOY_ENV?.trim().toLowerCase();
   if (!value) return "development";
   if (value === "development" || value === "staging" || value === "production") {
@@ -22,14 +35,13 @@ function required(name: string): string {
 }
 
 export function getDatabaseUrlForRuntime(): string {
-  switch (resolveDeployEnvironment()) {
-    case "staging":
-      // No fallback: a missing candidate URL must stop the staging backend rather
-      // than silently connecting to a generic/production DATABASE_URL.
-      return required("DATABASE_URL_CANDIDATE");
-    case "production":
-      return required("DATABASE_URL");
-    case "development":
-      return process.env.DATABASE_URL_DEV?.trim() || required("DATABASE_URL");
+  const environment = getDeployEnvironment();
+  return required(URL_ENV_BY_DEPLOY_ENV[environment]);
+}
+
+export function getProductionDatabaseUrl(): string {
+  if (getDeployEnvironment() !== "production") {
+    throw new Error("Operazione consentita esclusivamente in production.");
   }
+  return required("DATABASE_URL_PRODUCTION");
 }

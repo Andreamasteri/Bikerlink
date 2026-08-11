@@ -14,6 +14,8 @@ interface ProposalLocationProps {
   fetchLiveLocation: () => Promise<void>;
   setDepartureLat: (val: number | null) => void;
   setDepartureLng: (val: number | null) => void;
+  setDestinationLat: (val: number | null) => void;
+  setDestinationLng: (val: number | null) => void;
   setShowMapPicker: (val: boolean) => void;
   setMapPickerMode: (val: "departure" | "destination") => void;
   needsDestination: boolean;
@@ -37,6 +39,8 @@ export const ProposalLocation = ({
   fetchLiveLocation,
   setDepartureLat,
   setDepartureLng,
+  setDestinationLat,
+  setDestinationLng,
   setShowMapPicker,
   setMapPickerMode,
   needsDestination,
@@ -55,7 +59,12 @@ export const ProposalLocation = ({
       <TextInput
         style={styles.input}
         value={departureAddress}
-        onChangeText={setDepartureAddress}
+        onChangeText={(value) => {
+          setDepartureAddress(value);
+          setDepartureLat(null);
+          setDepartureLng(null);
+          setGpsSource(null);
+        }}
         placeholder="da qui...."
         placeholderTextColor={Colors.textSecondary}
       />
@@ -125,7 +134,11 @@ export const ProposalLocation = ({
           <TextInput
             style={styles.input}
             value={destinationAddress}
-            onChangeText={setDestinationAddress}
+            onChangeText={(value) => {
+              setDestinationAddress(value);
+              setDestinationLat(null);
+              setDestinationLng(null);
+            }}
             placeholder="Dove sei diretto?"
             placeholderTextColor={Colors.textSecondary}
           />

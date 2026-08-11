@@ -109,11 +109,30 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const isFiniteCoordinate = (value: unknown): value is number =>
+      typeof value === "number" && Number.isFinite(value);
+    const searchTypes = Array.isArray(body.searchTypes) ? body.searchTypes : [];
+    const requiresDestination =
+      body.extendToDestination === true ||
+      body.searchType === "hitchhiker" ||
+      searchTypes.includes("hitchhiker");
+
+    if (!isFiniteCoordinate(body.departureLatitude) || !isFiniteCoordinate(body.departureLongitude)) {
+      return sendError(res, 400, "Coordinate di partenza mancanti o non valide");
+    }
+    if (
+      requiresDestination &&
+      (!isFiniteCoordinate(body.destinationLatitude) || !isFiniteCoordinate(body.destinationLongitude))
+    ) {
+      return sendError(res, 400, "Coordinate di destinazione mancanti o non valide");
+    }
+
     const proposalData = {
-      ...req.body,
+      ...body,
       userId,
       status: "open",
-    };
+    } as Parameters<typeof storage.createProposal>[0];
 
     if (proposalData.clubId) {
       const [membership] = await db

@@ -25,8 +25,8 @@ import { getDatabaseUrlForRuntime } from "./database-environment";
 
 const { Pool } = pg;
 
-// Staging is fail-closed on DATABASE_URL_CANDIDATE; production requires
-// DATABASE_URL. Development retains the explicit dev URL preference.
+// Runtime target selection is fail-closed: staging uses DATABASE_URL_CANDIDATE,
+// production uses DATABASE_URL_PRODUCTION, and development uses DATABASE_URL_DEV.
 const dbUrl = getDatabaseUrlForRuntime();
 
 // ── Pool principale ──────────────────────────────────────────────────────────

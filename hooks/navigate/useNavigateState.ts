@@ -70,7 +70,13 @@ export const useVoiceCommandInternal = (
       const geocodeUrl = new URL("/api/planned-routes/geocode", getApiUrl());
       geocodeUrl.searchParams.set("q", text);
       const geocodeRes = await apiRequest("GET", geocodeUrl.pathname + geocodeUrl.search);
-      const results = await geocodeRes.json() as Array<{ lat: number; lon: number; display_name?: string }>;
+      const results = await geocodeRes.json() as Array<{
+        lat: number;
+        lng?: number;
+        lon?: number;
+        name?: string;
+        display_name?: string;
+      }>;
 
       if (!Array.isArray(results) || results.length === 0) {
         setVoiceCmdToast("Destinazione non trovata");
@@ -78,9 +84,15 @@ export const useVoiceCommandInternal = (
         return;
       }
 
-      const { lat, lon } = results[0];
-      setVoiceCmdToast(`Ricalcolo verso ${results[0].display_name ?? text}...`);
-      await triggerRerouteToDestination(lat, lon);
+      const result = results[0];
+      const lng = result.lng ?? result.lon;
+      if (!Number.isFinite(result.lat) || typeof lng !== "number" || !Number.isFinite(lng)) {
+        setVoiceCmdToast("Destinazione non valida");
+        setTimeout(() => setVoiceCmdToast(null), 3000);
+        return;
+      }
+      setVoiceCmdToast(`Ricalcolo verso ${result.name ?? result.display_name ?? text}...`);
+      await triggerRerouteToDestination(result.lat, lng);
       setTimeout(() => setVoiceCmdToast(null), 4000);
     } catch {
       setVoiceCmdToast("Errore geocodifica");

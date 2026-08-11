@@ -36,6 +36,7 @@ export default function CreateProposalScreen() {
     stops, newStop, setNewStop,
     maxParticipants, setMaxParticipants,
     departureLat, departureLng, setDepartureLat, setDepartureLng,
+    destinationLat, destinationLng, setDestinationLat, setDestinationLng,
     selectedClubId, setSelectedClubId,
     gpsSource, setGpsSource, gpsLoading,
     showMapPicker, setShowMapPicker,
@@ -175,6 +176,8 @@ export default function CreateProposalScreen() {
               fetchLiveLocation={fetchLiveLocation}
               setDepartureLat={setDepartureLat}
               setDepartureLng={setDepartureLng}
+              setDestinationLat={setDestinationLat}
+              setDestinationLng={setDestinationLng}
               setShowMapPicker={setShowMapPicker}
               setMapPickerMode={setMapPickerMode}
               needsDestination={needsDestination}
@@ -238,14 +241,18 @@ export default function CreateProposalScreen() {
               setDepartureLng(coord.longitude);
               setGpsSource("map");
             } else {
+              setDestinationLat(coord.latitude);
+              setDestinationLng(coord.longitude);
               setDestinationAddress(`${coord.latitude.toFixed(4)}, ${coord.longitude.toFixed(4)}`);
             }
             setShowMapPicker(false);
           }}
           initialCoord={
-            departureLat && departureLng
+            mapPickerMode === "departure" && departureLat !== null && departureLng !== null
               ? { latitude: departureLat, longitude: departureLng }
-              : undefined
+              : mapPickerMode === "destination" && destinationLat !== null && destinationLng !== null
+                ? { latitude: destinationLat, longitude: destinationLng }
+                : undefined
           }
         />
       )}

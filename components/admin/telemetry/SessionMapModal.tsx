@@ -20,6 +20,7 @@ const DEFAULT_TILE_URL = "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.p
 const DEFAULT_TILE_MAXZOOM = 19;
 
 export interface Session {
+  userId: string;
   sessionId: string;
   sessionType: string;
   lapName: string | null;
@@ -62,8 +63,8 @@ export function SessionMapModal({
   const [colorMode, setColorMode] = useState<"speed" | "lean" | "flat">("speed");
 
   const { data, isLoading, error } = useQuery<{ samples: GpsSample[]; total: number }>({
-    queryKey: ["/api/admin/telemetry/sessions", session.sessionId, "samples"],
-    queryFn: () => adminFetch(`/api/admin/telemetry/sessions/${session.sessionId}/samples`),
+    queryKey: ["/api/admin/telemetry/sessions", session.userId, session.sessionId, "samples"],
+    queryFn: () => adminFetch(`/api/admin/telemetry/sessions/${session.sessionId}/samples?userId=${encodeURIComponent(session.userId)}`),
     staleTime: 60_000,
     enabled: visible,
   });

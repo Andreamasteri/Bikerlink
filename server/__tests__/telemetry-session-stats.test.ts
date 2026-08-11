@@ -8,7 +8,10 @@ vi.mock("../db", () => ({
   withDbRetry: (fn: () => unknown) => fn(),
 }));
 
-import { computeSessionStatsDelta } from "../lib/telemetry-session-stats";
+import {
+  computeSessionStatsDelta,
+  isOutOfOrderBatch,
+} from "../lib/telemetry-session-stats";
 import type { InsertRideTelemetry } from "@shared/db";
 
 function sample(ts: number, lat: number | null, lon: number | null, speedKmh: number | null): InsertRideTelemetry {
@@ -73,6 +76,24 @@ describe("computeSessionStatsDelta — incremental telemetry distance core", () 
       expect(d2.lastLat).toBe(full.lastLat);
       expect(d2.lastTs).toBe(full.lastTs);
     }
+  });
+
+  it("rileva un batch arrivato dopo l'ultima ancora", () => {
+    expect(isOutOfOrderBatch(2000, [
+      sample(1000, 45.0, 9.0, 100),
+      sample(1500, 45.05, 9.0, 100),
+    ])).toBe(true);
+    expect(isOutOfOrderBatch(2000, [
+      sample(2000, 45.0, 9.0, 100),
+      sample(3000, 45.05, 9.0, 100),
+    ])).toBe(true);
+    expect(isOutOfOrderBatch(2000, [
+      sample(2001, 45.0, 9.0, 100),
+      sample(3000, 45.05, 9.0, 100),
+    ])).toBe(false);
+    expect(isOutOfOrderBatch(null, [
+      sample(1000, 45.0, 9.0, 100),
+    ])).toBe(false);
   });
 
   it("ordina per ts anche se il batch arriva fuori ordine", () => {
