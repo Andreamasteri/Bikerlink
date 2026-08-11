@@ -141,6 +141,9 @@ export function useCreateProposalForm() {
 
   const applyRouteToForm = useCallback(
     (result: AiRouteResult | LoadedRouteResult) => {
+      if ("title" in result && typeof result.title === "string" && result.title.trim()) {
+        setTitle(result.title.trim());
+      }
       setDepartureLat(result.departure.lat);
       setDepartureLng(result.departure.lng);
       setDepartureAddress(result.departure.name);
@@ -155,6 +158,14 @@ export function useCreateProposalForm() {
         setDestinationLat(null);
         setDestinationLng(null);
       }
+      // Un nuovo percorso deve sostituire completamente gli orari precedenti:
+      // evita di riutilizzare date/ore rimaste da una pianificazione precedente.
+      setDateStr("");
+      setTimeFrom("");
+      setTimeTo("");
+      setReturnDeadlineEnabled(false);
+      setReturnDeadlineTime("");
+
       if ("schedule" in result && result.schedule) {
         const schedule = result.schedule;
         if (schedule.departureDate && /^\d{4}-\d{2}-\d{2}$/.test(schedule.departureDate)) {
@@ -225,11 +236,11 @@ export function useCreateProposalForm() {
   useEffect(() => {
     if (selectedSearchTypes.length === 0) return;
     const mapping: Record<string, string[]> = {
-      find_a_friend: ["biker", "coppia"],
-      find_a_guest:  ["zavorrina", "coppia"],
-      hitcher:       ["zavorrina", "coppia"],
-      hitchhiker:    ["biker", "coppia"],
-      find_a_biker:  ["biker", "coppia"],
+      find_a_friend: ["biker"],
+      find_a_guest:  ["zavorrina"],
+      hitcher:       ["hitchhiker"],
+      hitchhiker:    ["hitcher"],
+      find_a_biker:  ["biker", "hitcher"],
     };
     const derived = Array.from(
       new Set(selectedSearchTypes.flatMap((st) => mapping[st] ?? []))
@@ -351,24 +362,7 @@ export function useCreateProposalForm() {
       }
     }
 
-    let stopsData: Array<{ address: string; lat: number; lng: number }> | null = null;
-    if (stops.length > 0) {
-      const resolvedStops: Array<{ address: string; lat: number; lng: number }> = [];
-      for (const stop of stops) {
-        const address = stop.trim();
-        if (!address) continue;
-        const geo = await geocodeAddress(address);
-        if (!geo) {
-          Alert.alert(
-            "Tappa non trovata",
-            `Non è stato possibile localizzare "${address}". Correggila o rimuovila prima di continuare.`
-          );
-          return;
-        }
-        resolvedStops.push({ address, lat: geo.lat, lng: geo.lng });
-      }
-      stopsData = resolvedStops.length > 0 ? resolvedStops : null;
-    }
+    const stopsData = stops.length > 0 ? stops.map((s) => ({ address: s })) : null;
 
     let finalLat = departureLat;
     let finalLng = departureLng;
@@ -409,7 +403,10 @@ export function useCreateProposalForm() {
 
     let finalDestinationLat = destinationLat;
     let finalDestinationLng = destinationLng;
-    if (destinationRequired && (!Number.isFinite(finalDestinationLat) || !Number.isFinite(finalDestinationLng))) {
+    // Se l'AI o l'utente ha fornito una destinazione, la risolviamo sempre:
+    // la destinazione del viaggio non deve sparire solo perché il matching
+    // alla destinazione non è stato attivato.
+    if (destinationAddress.trim() && (!Number.isFinite(finalDestinationLat) || !Number.isFinite(finalDestinationLng))) {
       const geo = await geocodeAddress(destinationAddress.trim());
       if (!geo) {
         Alert.alert(
@@ -448,7 +445,9 @@ export function useCreateProposalForm() {
       data.wishlistMotoId = anyMotoOk ? null : selectedWishlistMotoId;
       data.anyMotoOk = anyMotoOk;
     }
-    if (needsDestination) {
+    const hasDestinationCoordinates =
+      Number.isFinite(finalDestinationLat) && Number.isFinite(finalDestinationLng);
+    if (destinationAddress.trim() && hasDestinationCoordinates) {
       data.destinationAddress = destinationAddress.trim();
       data.destinationLatitude = finalDestinationLat;
       data.destinationLongitude = finalDestinationLng;
