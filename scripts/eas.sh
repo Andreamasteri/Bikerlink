@@ -63,6 +63,8 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 #  PRE-FLIGHT: preview deve puntare a Candidate, mai a Production/Replit
 # ─────────────────────────────────────────────────────────────────────────────
+# Preserve the original CLI arguments while inspecting --profile for pre-flight checks.
+EAS_ARGS=("$@")
 PROFILE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -164,7 +166,7 @@ if [[ "$FIRST_ARG" == "build" ]]; then
 fi
 
 if [[ "$_USE_NPX" == "true" ]]; then
-  exec "$EAS_BIN" --yes "eas-cli@^21.0.0" "$@"
+  exec "$EAS_BIN" --yes "eas-cli@^21.0.0" "${EAS_ARGS[@]}"
 else
-  exec "$EAS_BIN" "$@"
+  exec "$EAS_BIN" "${EAS_ARGS[@]}"
 fi
