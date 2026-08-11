@@ -48,9 +48,10 @@ credentials-file: /etc/cloudflared/__TUNNEL_UUID__.json
 # combacia con l'hostname vince. L'ultima (service: http_status:404) è il
 # catch-all obbligatorio.
 ingress:
-  # GraphHopper -> localhost:8989
+  # GraphHopper multi-area -> nginx :80, which routes /areas/<code> to
+  # the per-area host ports 8990-8997. There is no monolithic :8989 listener.
   - hostname: gh.__BASE_DOMAIN__
-    service: http://localhost:8989
+    service: http://localhost:80
     originRequest:
       connectTimeout: 5s
       # GraphHopper risponde su /health senza token
