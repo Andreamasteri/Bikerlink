@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
+import { DeviceMotion } from "expo-sensors";
 import * as Speech from "expo-speech";
 import { useColors } from "@/hooks/useColors";
 import { useOfflineTiles } from "@/hooks/useOfflineTiles";
@@ -15,15 +16,16 @@ import { haversineM, closestPointIndexOnPolyline } from "@/lib/geo";
 import { useMapConfig } from "@/lib/map-context";
 import { useLocale, useT } from "@/lib/language-context";
 import { decodePolylineTuples as decodePolyline } from "@/lib/polyline";
-import type { NavigationStep, PlannedRoute } from "@/components/navigate/navigate-types";
+import type { NavigationStep, PlannedRoute, TechnicalCheckpoint } from "@/components/navigate/navigate-types";
 import {
   saveRouteToCache,
   loadRouteFromCache,
   activeStepIndex,
 } from "@/components/navigate/navigate-helpers";
-import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
 import { useLocationGate } from "@/lib/location-context";
+import { usePlayer } from "@/lib/player-context";
 import type { NavWeatherZone } from "@/components/navigate/NavigationWeather";
+import { deadReckonStep } from "@shared/tracking-fusion";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function announceStep(distM: number, stepIdx: number, nextStep: any, announcedFar: Set<number>, announcedNear: Set<number>, t: any, locale: string) {
@@ -42,6 +44,23 @@ export function announceStep(distM: number, stepIdx: number, nextStep: any, anno
   }
 }
 
+const LOCAL_TURN_PHRASES: Record<string, string> = {
+  "navigation.turn.left": "Svoltare a sinistra",
+  "navigation.turn.right": "Svoltare a destra",
+  "navigation.turn.u_turn": "Fare inversione a U",
+};
+
+export function announceTechnicalCheckpoint(
+  checkpoint: TechnicalCheckpoint,
+  announced: Set<string>,
+  locale: string,
+): void {
+  if (announced.has(checkpoint.id)) return;
+  announced.add(checkpoint.id);
+  const phrase = LOCAL_TURN_PHRASES[checkpoint.audioKey] ?? checkpoint.instruction;
+  Speech.speak(phrase, { language: locale });
+}
+
 export function calculateRemainingDist(polylinePoints: Array<[number, number]>, closestIdx: number): number {
   const remainingPts = polylinePoints.slice(closestIdx);
   let remDist = 0;
@@ -51,46 +70,6 @@ export function calculateRemainingDist(polylinePoints: Array<[number, number]>, 
   return remDist;
 }
 
-export const useVoiceCommandInternal = (
-  whisper: any,
-  setVoiceCmdToast: (val: string | null) => void,
-  triggerRerouteToDestination: (lat: number, lon: number) => Promise<void>,
-) => {
-  const handleVoiceCommand = async () => {
-    const text = await whisper.stopAndTranscribe();
-    if (!text) {
-      setVoiceCmdToast(whisper.error ?? "Trascrizione fallita");
-      setTimeout(() => setVoiceCmdToast(null), 3000);
-      return;
-    }
-
-    setVoiceCmdToast(`🎤 "${text}" — geocodifica...`);
-
-    try {
-      const geocodeUrl = new URL("/api/planned-routes/geocode", getApiUrl());
-      geocodeUrl.searchParams.set("q", text);
-      const geocodeRes = await apiRequest("GET", geocodeUrl.pathname + geocodeUrl.search);
-      const results = await geocodeRes.json() as Array<{ lat: number; lon: number; display_name?: string }>;
-
-      if (!Array.isArray(results) || results.length === 0) {
-        setVoiceCmdToast("Destinazione non trovata");
-        setTimeout(() => setVoiceCmdToast(null), 3000);
-        return;
-      }
-
-      const { lat, lon } = results[0];
-      setVoiceCmdToast(`Ricalcolo verso ${results[0].display_name ?? text}...`);
-      await triggerRerouteToDestination(lat, lon);
-      setTimeout(() => setVoiceCmdToast(null), 4000);
-    } catch {
-      setVoiceCmdToast("Errore geocodifica");
-      setTimeout(() => setVoiceCmdToast(null), 3000);
-    }
-  };
-
-  return { handleVoiceCommand };
-};
-
 export const useNavigateStates = () => {
   const [mapReady, setMapReady] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -99,6 +78,7 @@ export const useNavigateStates = () => {
   const [remainingKm, setRemainingKm] = useState<number | null>(null);
   const [remainingMin, setRemainingMin] = useState<number | null>(null);
   const [isFinished, setIsFinished] = useState(false);
+  const [isOffRoute, setIsOffRoute] = useState(false);
   const [polylinePoints, setPolylinePoints] = useState<Array<[number, number]>>([]);
   const [hasPermission, setHasPermission] = useState(false);
   const [isRerouting, setIsRerouting] = useState(false);
@@ -118,6 +98,7 @@ export const useNavigateStates = () => {
     polylinePoints, setPolylinePoints,
     hasPermission, setHasPermission,
     isRerouting, setIsRerouting,
+    isOffRoute, setIsOffRoute,
     isOffline, setIsOffline,
     weatherLoading, setWeatherLoading,
     currentWeather, setCurrentWeather,
@@ -189,6 +170,8 @@ const _ANNOUNCE_DISTANCE_FAR = 200;
 const _ANNOUNCE_DISTANCE_NEAR = 50;
 const REROUTE_DISTANCE_M = 200;
 const REROUTE_DELAY_MS = 5000;
+const GPS_STALE_MS = 6000;
+const DR_MAX_DURATION_MS = 90_000;
 const WEATHER_AHEAD_KM = 15;
 const WEATHER_THROTTLE_MS = 10 * 60 * 1000;
 const WEATHER_AHEAD_REFETCH_M = 15000;
@@ -203,8 +186,8 @@ export function useNavigateState() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const locale = useLocale();
   const t = useT();
-  const whisper = useWhisperRecorder();
   const { suspendSharedWatch, resumeSharedWatch } = useLocationGate();
+  const { stop: stopMusic } = usePlayer();
 
   const topPad = insets.top;
   const bottomPad = insets.bottom;
@@ -215,11 +198,22 @@ export function useNavigateState() {
   const announcedNearRef = useRef<Set<number>>(new Set());
 
   const offRouteStartRef = useRef<number | null>(null);
+  const isOffRouteRef = useRef(false);
   const isReroutingRef = useRef(false);
   const lastKnownPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const activeStepsRef = useRef<NavigationStep[] | null>(null);
+  const activeTechnicalCheckpointsRef = useRef<TechnicalCheckpoint[]>([]);
+  const announcedCheckpointRef = useRef<Set<string>>(new Set());
   const activeTotalKmRef = useRef<number | null>(null);
   const activeTotalMinRef = useRef<number | null>(null);
+  const liveLastSentAtRef = useRef(0);
+  const liveStartedRef = useRef(false);
+  const lastGpsFixAtRef = useRef(0);
+  const lastRoutePositionRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lastHeadingRef = useRef<number | null>(null);
+  const speedKmhRef = useRef(0);
+  const drStartedAtRef = useRef<number | null>(null);
+  const lastDrTickAtRef = useRef(0);
 
   const {
     mapReady, setMapReady,
@@ -232,6 +226,7 @@ export function useNavigateState() {
     polylinePoints, setPolylinePoints,
     hasPermission, setHasPermission,
     isRerouting, setIsRerouting,
+    isOffRoute, setIsOffRoute,
     isOffline, setIsOffline,
     weatherLoading, setWeatherLoading,
     currentWeather, setCurrentWeather,
@@ -264,6 +259,34 @@ export function useNavigateState() {
     retry: false,
   });
 
+  const sendLiveEvent = useCallback((
+    event: "start" | "position" | "waypoint" | "arrived" | "off_route" | "stopped",
+    latitude: number | null,
+    longitude: number | null,
+    positionSource: "gps" | "waypoint" | "destination" | "dead_reckoning" | "unknown",
+    progressPct: number | null,
+    waypointIndex: number | null,
+    accuracyM: number | null = null,
+    locationAgeMs = 0,
+  ) => {
+    if (!route?.id) return;
+    const now = Date.now();
+    if ((event === "position" || event === "off_route") && now - liveLastSentAtRef.current < 15_000) return;
+    liveLastSentAtRef.current = now;
+    if (event === "start") liveStartedRef.current = true;
+    void apiRequest("POST", "/api/planned-routes/" + route.id + "/live", {
+      event,
+      latitude,
+      longitude,
+      positionSource,
+      progressPct,
+      waypointIndex,
+      accuracyM,
+      locationAgeMs,
+      eventAt: new Date(now).toISOString(),
+    }).catch(() => {});
+  }, [route?.id]);
+
   const offlineRoutePoints = React.useMemo(
     () => polylinePoints.map(([lat, lng]) => ({ lat, lng })),
     [polylinePoints]
@@ -290,6 +313,17 @@ export function useNavigateState() {
       activeTotalMinRef.current = route.durationMinutes;
     }
     activeStepsRef.current = route.navigationSteps ?? null;
+    activeTechnicalCheckpointsRef.current = route.metadata?.technicalCheckpoints ?? [];
+    announcedCheckpointRef.current.clear();
+    offRouteStartRef.current = null;
+    isOffRouteRef.current = false;
+    setIsOffRoute(false);
+    lastGpsFixAtRef.current = 0;
+    lastRoutePositionRef.current = null;
+    lastHeadingRef.current = null;
+    speedKmhRef.current = 0;
+    drStartedAtRef.current = null;
+    lastDrTickAtRef.current = 0;
   }, [route, setPolylinePoints, setRemainingKm, setRemainingMin]);
 
   useEffect(() => {
@@ -315,122 +349,96 @@ export function useNavigateState() {
     suspendSharedWatch();
 
     let sub: Location.LocationSubscription | null = null;
-    (async () => {
-      sub = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 1000, distanceInterval: 5 },
-        (loc) => {
-          handlePositionUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.heading ?? 0);
+    let motionSub: { remove: () => void } | null = null;
+    let drTimer: ReturnType<typeof setInterval> | null = null;
+
+    try {
+      DeviceMotion.setUpdateInterval(500);
+      motionSub = DeviceMotion.addListener((data) => {
+        const alpha = (data.rotation as { alpha?: number } | undefined)?.alpha;
+        if (typeof alpha === "number" && Number.isFinite(alpha)) {
+          lastHeadingRef.current = (((alpha * 180) / Math.PI) % 360 + 360) % 360;
         }
-      );
-      locationSubRef.current = sub;
+      });
+    } catch (err) {
+      console.warn("[NavigationDR] DeviceMotion non disponibile:", err);
+    }
+
+    (async () => {
+      try {
+        sub = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, timeInterval: 1000, distanceInterval: 5 },
+          (loc) => {
+            const now = Date.now();
+            const fixTimestamp = Number.isFinite(loc.timestamp) ? loc.timestamp : now;
+            const locationAgeMs = Math.max(0, now - fixTimestamp);
+            const gpsSpeedKmh = loc.coords.speed != null && loc.coords.speed >= 0
+              ? loc.coords.speed * 3.6
+              : speedKmhRef.current;
+            const gpsHeading = loc.coords.heading != null && loc.coords.heading >= 0
+              ? loc.coords.heading
+              : (lastHeadingRef.current ?? 0);
+            handlePositionUpdate(
+              loc.coords.latitude,
+              loc.coords.longitude,
+              gpsHeading,
+              "gps",
+              loc.coords.accuracy ?? null,
+              locationAgeMs,
+              gpsSpeedKmh,
+            );
+          }
+        );
+        locationSubRef.current = sub;
+      } catch (err) {
+        console.warn("[NavigationGPS] watch non disponibile:", err);
+      }
     })();
+
+    drTimer = setInterval(() => {
+      const now = Date.now();
+      const gpsAgeMs = lastGpsFixAtRef.current > 0 ? now - lastGpsFixAtRef.current : Infinity;
+      if (gpsAgeMs <= GPS_STALE_MS || gpsAgeMs > DR_MAX_DURATION_MS) {
+        if (gpsAgeMs > DR_MAX_DURATION_MS) drStartedAtRef.current = null;
+        return;
+      }
+
+      const anchor = lastRoutePositionRef.current;
+      const heading = lastHeadingRef.current;
+      if (!anchor || heading == null || speedKmhRef.current <= 0.5) return;
+      if (drStartedAtRef.current == null) drStartedAtRef.current = now;
+      if (now - drStartedAtRef.current > DR_MAX_DURATION_MS) return;
+
+      const elapsedMs = Math.min(2000, Math.max(500, now - (lastDrTickAtRef.current || now - 1000)));
+      const estimated = deadReckonStep(
+        { lat: anchor.lat, lon: anchor.lng },
+        heading,
+        speedKmhRef.current,
+        elapsedMs,
+      );
+      lastDrTickAtRef.current = now;
+      if (estimated) {
+        handlePositionUpdate(
+          estimated.lat,
+          estimated.lon,
+          heading,
+          "dead_reckoning",
+          null,
+          gpsAgeMs,
+          speedKmhRef.current,
+        );
+      }
+    }, 1000);
 
     return () => {
       sub?.remove();
+      motionSub?.remove();
+      if (drTimer) clearInterval(drTimer);
       locationSubRef.current = null;
       resumeSharedWatch();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPermission, route?.id, polylinePoints.length]);
-
-  const triggerReroute = useCallback(async (lat: number, lng: number) => {
-    if (isReroutingRef.current || !route) return;
-    isReroutingRef.current = true;
-    offRouteStartRef.current = null;
-    setIsRerouting(true);
-
-    try {
-      const wps = (route.waypoints ?? []).filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-      const destination = wps.length > 0 ? wps[wps.length - 1] : null;
-      if (!destination) return;
-
-      const resp = await apiRequest("POST", "/api/planned-routes/calculate", {
-        waypoints: [{ lat, lng }, { lat: destination.lat, lng: destination.lng }],
-        style: "curvy",
-      });
-      const newRoute = await resp.json();
-
-      let newPts: Array<[number, number]> = [];
-      if (newRoute.polyline) {
-        newPts = decodePolyline(newRoute.polyline);
-      } else if (newRoute.waypoints?.length) {
-        newPts = (newRoute.waypoints as Array<{ lat: number; lng: number }>)
-          .filter((wp) => wp.lat !== 0 || wp.lng !== 0)
-          .map((wp) => [wp.lat, wp.lng]);
-      }
-
-      if (newPts.length > 1) {
-        activeStepsRef.current = newRoute.navigationSteps ?? null;
-        if (newRoute.distanceKm) activeTotalKmRef.current = newRoute.distanceKm;
-        if (newRoute.durationMinutes) activeTotalMinRef.current = newRoute.durationMinutes;
-        announcedFarRef.current.clear();
-        announcedNearRef.current.clear();
-        setCurrentStep(0);
-        setMapReady(false);
-        setPolylinePoints(newPts);
-        Speech.speak(t("nav.rerouted"), { language: locale });
-      }
-    } catch (e) {
-      console.warn("[Rerouting] failed:", e);
-    } finally {
-      isReroutingRef.current = false;
-      setIsRerouting(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route]);
-
-  const triggerRerouteRef = useRef(triggerReroute);
-  useEffect(() => { triggerRerouteRef.current = triggerReroute; }, [triggerReroute]);
-
-  const triggerRerouteToDestination = useCallback(async (destLat: number, destLng: number) => {
-    if (isReroutingRef.current || !route) return;
-    isReroutingRef.current = true;
-    offRouteStartRef.current = null;
-    setIsRerouting(true);
-
-    try {
-      const origin = lastKnownPosRef.current;
-      if (!origin) {
-        const wps = (route.waypoints ?? []).filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-        if (wps.length === 0) return;
-        lastKnownPosRef.current = { lat: wps[0].lat, lng: wps[0].lng };
-      }
-      const { lat: oLat, lng: oLng } = lastKnownPosRef.current!;
-
-      const resp = await apiRequest("POST", "/api/planned-routes/calculate", {
-        waypoints: [{ lat: oLat, lng: oLng }, { lat: destLat, lng: destLng }],
-        style: "curvy",
-      });
-      const newRoute = await resp.json();
-
-      let newPts: Array<[number, number]> = [];
-      if (newRoute.polyline) {
-        newPts = decodePolyline(newRoute.polyline);
-      } else if (newRoute.waypoints?.length) {
-        newPts = (newRoute.waypoints as Array<{ lat: number; lng: number }>)
-          .filter((wp) => wp.lat !== 0 || wp.lng !== 0)
-          .map((wp) => [wp.lat, wp.lng]);
-      }
-
-      if (newPts.length > 1) {
-        activeStepsRef.current = newRoute.navigationSteps ?? null;
-        if (newRoute.distanceKm) activeTotalKmRef.current = newRoute.distanceKm;
-        if (newRoute.durationMinutes) activeTotalMinRef.current = newRoute.durationMinutes;
-        announcedFarRef.current.clear();
-        announcedNearRef.current.clear();
-        setCurrentStep(0);
-        setMapReady(false);
-        setPolylinePoints(newPts);
-        Speech.speak(t("nav.rerouted"), { language: locale });
-      }
-    } catch (e) {
-      console.warn("[VoiceReroute] failed:", e);
-    } finally {
-      isReroutingRef.current = false;
-      setIsRerouting(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route]);
 
   const { fetchNavWeather } = useWeatherHandlers(
     isFetchingWeatherRef,
@@ -477,6 +485,10 @@ export function useNavigateState() {
 
       if (newPts.length > 1) {
         activeStepsRef.current = newRoute.navigationSteps ?? null;
+        activeTechnicalCheckpointsRef.current = newRoute.technicalCheckpoints ?? [];
+        announcedCheckpointRef.current.clear();
+        isOffRouteRef.current = false;
+        setIsOffRoute(false);
         if (newRoute.distanceKm) activeTotalKmRef.current = newRoute.distanceKm;
         if (newRoute.durationMinutes) activeTotalMinRef.current = newRoute.durationMinutes;
         announcedFarRef.current.clear();
@@ -496,9 +508,33 @@ export function useNavigateState() {
     }
   }, [route, locale, t, setCurrentStep, setIsRerouting, setMapReady, setPolylinePoints]);
 
-  const handlePositionUpdate = useCallback((lat: number, lng: number, heading: number) => {
+  const handlePositionUpdate = useCallback((
+    lat: number,
+    lng: number,
+    heading: number,
+    positionSource: "gps" | "dead_reckoning" = "gps",
+    accuracyM: number | null = null,
+    locationAgeMs = 0,
+    speedKmh = 0,
+  ) => {
     if (polylinePoints.length === 0) return;
+    if (positionSource === "gps") {
+      lastGpsFixAtRef.current = Date.now() - Math.max(0, locationAgeMs);
+      speedKmhRef.current = Math.max(0, speedKmh);
+      if (Number.isFinite(heading)) lastHeadingRef.current = heading;
+      drStartedAtRef.current = null;
+      lastDrTickAtRef.current = 0;
+    }
+    lastRoutePositionRef.current = { lat, lng };
     lastKnownPosRef.current = { lat, lng };
+
+    for (const checkpoint of activeTechnicalCheckpointsRef.current) {
+      const distanceToCheckpoint = haversineM(lat, lng, checkpoint.latitude, checkpoint.longitude);
+      const triggerRadius = Math.max(35, Math.min(75, checkpoint.distanceBeforeM * 0.35));
+      if (distanceToCheckpoint <= triggerRadius) {
+        announceTechnicalCheckpoint(checkpoint, announcedCheckpointRef.current, locale);
+      }
+    }
 
     const closestIdx = closestPointIndexOnPolyline(lat, lng, polylinePoints);
     const closestDist = haversineM(lat, lng, polylinePoints[closestIdx][0], polylinePoints[closestIdx][1]);
@@ -508,23 +544,52 @@ export function useNavigateState() {
         if (offRouteStartRef.current === null) {
           offRouteStartRef.current = Date.now();
         } else if (Date.now() - offRouteStartRef.current >= REROUTE_DELAY_MS) {
-          triggerRerouteRef.current(lat, lng);
+          isOffRouteRef.current = true;
+          setIsOffRoute(true);
+          // La musica, se attiva, non deve continuare mentre il tracciato è perso.
+          stopMusic();
         }
       } else {
         offRouteStartRef.current = null;
+        if (isOffRouteRef.current) {
+          isOffRouteRef.current = false;
+          setIsOffRoute(false);
+        }
       }
     }
 
     const pct = Math.min(100, Math.round((closestIdx / Math.max(1, polylinePoints.length - 1)) * 100));
-    setProgressPct(pct);
-
-    fetchNavWeatherRef.current(lat, lng, closestIdx);
+    const nearbyWaypointIndex = (route?.waypoints ?? []).findIndex((wp) =>
+      haversineM(lat, lng, wp.lat, wp.lng) <= 100
+    );
+    const liveEvent = isOffRouteRef.current
+      ? "off_route"
+      : nearbyWaypointIndex >= 0
+        ? "waypoint"
+        : (liveStartedRef.current ? "position" : "start");
+    sendLiveEvent(
+      liveEvent,
+      lat,
+      lng,
+      positionSource,
+      pct,
+      nearbyWaypointIndex >= 0 ? nearbyWaypointIndex : null,
+      accuracyM,
+      locationAgeMs,
+    );
 
     if (mapReady && webViewRef.current) {
       webViewRef.current.injectJavaScript(
         `window.navBridge && window.navBridge.updatePosition(${lat}, ${lng}, ${heading}, ${closestIdx}); true;`
       );
     }
+
+    // Fuori percorso: mantieni la mappa e la rotta programmata visibili, ma
+    // congela progressione e contatori finché l’utente non rientra sul tracciato.
+    if (isOffRouteRef.current) return;
+
+    setProgressPct(pct);
+    fetchNavWeatherRef.current(lat, lng, closestIdx);
 
     const steps = activeStepsRef.current ?? route?.navigationSteps;
     if (!steps || steps.length === 0) return;
@@ -555,10 +620,20 @@ export function useNavigateState() {
       if (!isFinished) {
         setIsFinished(true);
         setDistanceToNext(null);
+        sendLiveEvent(
+          "arrived",
+          lat,
+          lng,
+          "destination",
+          100,
+          (route?.waypoints?.length ?? 1) - 1,
+          accuracyM,
+          locationAgeMs,
+        );
         Speech.speak(t("nav.announce.arrived"), { language: locale });
       }
     }
-  }, [polylinePoints, route, mapReady, isFinished, locale, t, setCurrentStep, setDistanceToNext, setIsFinished, setProgressPct, setRemainingKm, setRemainingMin]);
+  }, [polylinePoints, route, mapReady, isFinished, locale, t, sendLiveEvent, stopMusic, setCurrentStep, setDistanceToNext, setIsFinished, setIsOffRoute, setProgressPct, setRemainingKm, setRemainingMin]);
 
   const [minimalMode, setMinimalMode] = useState(false);
   const minimalManualRef = useRef(false);
@@ -582,9 +657,6 @@ export function useNavigateState() {
     }
   }, [setMapReady]);
 
-  const [voiceCmdToast, setVoiceCmdToast] = useState<string | null>(null);
-
-  const { handleVoiceCommand } = useVoiceCommandInternal(whisper, setVoiceCmdToast, triggerRerouteToDestination);
 
   const handleClose = useCallback(() => {
     Speech.stop();
@@ -613,10 +685,10 @@ export function useNavigateState() {
     webViewRef, route, isLoading, isFinished,
     mapReady, currentStep, distanceToNext, progressPct,
     remainingKm, remainingMin, polylinePoints,
-    hasPermission, isRerouting, isOffline,
-    weatherLoading, currentWeather, aheadWeather, voiceCmdToast,
-    mapUri, offline, whisper, activeStepsRef,
+    hasPermission, isRerouting, isOffRoute, isOffline,
+    weatherLoading, currentWeather, aheadWeather,
+    mapUri, offline, activeStepsRef,
     minimalMode, handleToggleMinimal,
-    handleMapMessage, handleVoiceCommand, handleClose, triggerWeatherReroute,
+    handleMapMessage, handleClose, triggerWeatherReroute,
   };
 }

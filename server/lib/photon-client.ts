@@ -9,8 +9,8 @@
  * formato GeoJSON: features[].geometry.coordinates = [lon, lat] e
  * features[].properties con i campi indirizzo.
  *
- * SOLO self-hosted: nessun fallback a server pubblici (né photon.komoot.io né
- * nominatim.openstreetmap.org). Se PHOTON_URL/PHOTON_TOKEN non sono configurati
+ * SOLO self-hosted: le richieste usano esclusivamente il server Photon configurato.
+ * Non vengono contattati servizi pubblici o provider esterni. Se PHOTON_URL/PHOTON_TOKEN non sono configurati
  * o il ThinkCentre è offline, le chiamate falliscono in modo esplicito.
  *
  * Variabili d'ambiente (secret Replit):
@@ -43,7 +43,7 @@ void (async () => {
   if (isConfigured) {
     console.log(`[Photon] Self-hosted mode — URL: ${SELF_HOSTED_URL}`);
   } else {
-    console.warn("[Photon] PHOTON_URL non configurato — geocoding disabilitato (nessun fallback pubblico). Impostare PHOTON_URL/PHOTON_TOKEN.");
+    console.warn("[Photon] PHOTON_URL non configurato — geocoding disabilitato: Photon non è configurato. Impostare PHOTON_URL/PHOTON_TOKEN.");
   }
 })();
 
@@ -139,7 +139,7 @@ async function photonFetch(path: string): Promise<Response> {
 
 /**
  * Verifica che Photon sia configurato e che il ThinkCentre non sia offline.
- * Lancia un errore esplicito altrimenti — mai fallback pubblico.
+ * Lancia un errore esplicito altrimenti: Photon è l'unico geocoder autorizzato.
  */
 async function ensureAvailable(op: string): Promise<void> {
   if (!isConfigured) {
@@ -259,7 +259,7 @@ function composeName(p: PhotonProperties): string {
  * Geocodifica una stringa di query testuale in coordinate geografiche via
  * Photon self-hosted. I risultati sono cachati per 5 minuti.
  *
- * Nessun fallback pubblico: lancia eccezione se Photon non è configurato,
+ * Photon self-hosted: lancia eccezione se Photon non è configurato,
  * il ThinkCentre è offline, o il server risponde con errore HTTP.
  *
  * @param query   Stringa di ricerca (es: "Milano", "Via Roma, Roma")
@@ -296,10 +296,10 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
  * Le coordinate sono arrotondate a 4 decimali (~11 m) per chiave di cache,
  * con TTL di 10 minuti. Riduce chiamate ripetute per posizioni quasi identiche.
  *
- * Nessun fallback pubblico: lancia eccezione se Photon non è configurato,
+ * Photon unico geocoder: lancia eccezione se Photon non è configurato,
  * il ThinkCentre è offline, o il server risponde con errore HTTP.
  *
- * Nota: Photon non usa il parametro `zoom` (proprio di Nominatim); è mantenuto
+ * Nota: Photon non usa il parametro `zoom`; è mantenuto
  * nella firma per compatibilità con i chiamanti ma non viene inviato.
  *
  * @param lat   Latitudine

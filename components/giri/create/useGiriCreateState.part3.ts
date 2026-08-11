@@ -21,6 +21,8 @@ export const handleAiParseHelper = async (
   setIsMultiDay: (v: boolean) => void,
   setDaysCount: (v: number) => void,
   setAvoidHighways: (v: boolean) => void,
+  setDepartureAt: (v: string | null) => void,
+  setReturnAt: (v: string | null) => void,
   setAiBannerReason: (v: "key_missing" | "generic") => void,
   setAiFallbackBanner: (v: boolean) => void
 ) => {
@@ -57,7 +59,7 @@ export const handleAiParseHelper = async (
 
     const initialItems: AiPreviewItem[] = rawLocations.map((loc) => ({
       role: loc.role, name: loc.name, editedName: loc.name,
-      lat: 0, lng: 0, geocoding: !!loc.name, resolved: false
+      lat: 0, lng: 0, candidates: [], geocoding: !!loc.name, resolved: false
     }));
 
     const preview: AiPreviewState = {
@@ -68,6 +70,8 @@ export const handleAiParseHelper = async (
       isMultiDay: result.isMultiDay ?? false,
       daysEstimate: result.daysEstimate ?? 2,
       avoidHighways: result.avoidHighways ?? false,
+      departureAt: result.departureAt ?? null,
+      returnAt: result.returnAt ?? null,
       items: initialItems,
       poiStops: Array.isArray(result.poiStops) ? result.poiStops : null,
     };
@@ -85,11 +89,12 @@ export const handleAiParseHelper = async (
         () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", item.name); return fetch(url.toString(), { credentials: "include" }); },
         async (resp: Response) => { if (!resp.ok) return []; return resp.json(); }
       ).then((results: any[]) => {
-        const best = results[0];
+        const candidates = Array.isArray(results) ? results : [];
+        const best = candidates.length === 1 ? candidates[0] : undefined;
         setAiPreview((prev) => {
           if (!prev) return prev;
           const updatedItems = [...prev.items];
-          updatedItems[idx] = { ...updatedItems[idx], lat: best ? best.lat : 0, lng: best ? best.lng : 0, geocoding: false, resolved: !!best };
+          updatedItems[idx] = { ...updatedItems[idx], lat: best ? best.lat : 0, lng: best ? best.lng : 0, candidates, geocoding: false, resolved: candidates.length === 1 };
           return { ...prev, items: updatedItems };
         });
       }).catch(() => {
@@ -103,6 +108,9 @@ export const handleAiParseHelper = async (
     });
   } catch (err: unknown) {
     console.warn("[AI parse] fallback attivato:", (err instanceof Error ? err.message : null));
+    // Evita di riutilizzare data/ora di una pianificazione AI precedente.
+    setDepartureAt(null);
+    setReturnAt(null);
     setAiProviderUsed(null);
     const fallback = clientFallbackAiParse(aiPrompt);
     setTitle(fallback.title);
@@ -137,11 +145,12 @@ export const regeocodePillItemHelper = (
     () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", name); return fetch(url.toString(), { credentials: "include" }); },
     async (resp: Response) => { if (!resp.ok) return []; return resp.json(); }
   ).then((results: any[]) => {
-    const best = results[0];
+    const candidates = Array.isArray(results) ? results : [];
+    const best = candidates.length === 1 ? candidates[0] : undefined;
     setAiPreview((prev) => {
       if (!prev) return prev;
       const updatedItems = [...prev.items];
-      updatedItems[idx] = { ...updatedItems[idx], lat: best ? best.lat : 0, lng: best ? best.lng : 0, geocoding: false, resolved: !!best };
+      updatedItems[idx] = { ...updatedItems[idx], lat: best ? best.lat : 0, lng: best ? best.lng : 0, candidates, geocoding: false, resolved: candidates.length === 1 };
       return { ...prev, items: updatedItems };
     });
   }).catch(() => {
@@ -164,6 +173,8 @@ export const handleConfirmPreviewHelper = async (
   setIsMultiDay: (v: boolean) => void,
   setDaysCount: (v: number) => void,
   setAvoidHighways: (v: boolean) => void,
+  setDepartureAt: (v: string | null) => void,
+  setReturnAt: (v: string | null) => void,
   setWaypoints: (v: Waypoint[]) => void,
   setWpInputs: (v: string[]) => void,
   setMode: (v: any) => void,
@@ -179,6 +190,12 @@ export const handleConfirmPreviewHelper = async (
   autoLoadWeather: (wps: Waypoint[]) => void
 ) => {
   if (!aiPreview) return;
+  if (aiPreview.items.some((item) => !item.resolved || !Number.isFinite(item.lat) || !Number.isFinite(item.lng))) {
+    Alert.alert("Indirizzi da confermare", "Seleziona un risultato Photon per ogni punto del viaggio.");
+    return;
+  }
+  setDepartureAt(aiPreview.departureAt ?? null);
+  setReturnAt(aiPreview.returnAt ?? null);
   const geoWps: Waypoint[] = aiPreview.items.map((item) => ({
     lat: item.lat, lng: item.lng, name: item.editedName || item.name
   }));

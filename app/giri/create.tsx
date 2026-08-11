@@ -73,7 +73,7 @@ export default function GiriCreateScreen() {
     dismissedWarnings, setDismissedWarnings,
     weatherPreview, weatherLoading,
     lastFittedWaypointSig, bikerScoreAnim,
-    updatePreviewItemName, regeocodePillItem, handleConfirmPreview,
+    updatePreviewItemName, selectPreviewCandidate, regeocodePillItem, handleConfirmPreview,
     handleWpInput, selectSuggestion, addWaypoint, removeWaypoint,
     handleCalculate, handleSave, saveMutationPending,
     handleMapTap,
@@ -230,7 +230,7 @@ export default function GiriCreateScreen() {
             <AiPreviewSection
               aiPreview={aiPreview} setAiPreview={setAiPreview} aiSuccessBanner={false}
               setAiSuccessBanner={setAiSuccessBanner} aiSuccessTimer={aiSuccessTimer}
-              updatePreviewItemName={updatePreviewItemName} regeocodePillItem={regeocodePillItem}
+              updatePreviewItemName={updatePreviewItemName} selectPreviewCandidate={selectPreviewCandidate} regeocodePillItem={regeocodePillItem}
               handleConfirmPreview={handleConfirmPreview} setMode={setMode}
               hasUnresolvedPois={resolvedPoiStops.some((s) => s.options.length > 0 && s.selectedOption === null)}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pill role helpers cast for prop compatibility

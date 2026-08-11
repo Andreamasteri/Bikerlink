@@ -579,16 +579,13 @@ Variabili d'ambiente per-persona (tutte **opzionali** — segue il pattern URL/t
 - `HORUS_OLLAMA_MODEL` — model id per l'AI routing (usa lo stesso host/token di Bowie via client condiviso).
 - `ARES_OLLAMA_URL` / `ARES_OLLAMA_TOKEN` / `ARES_OLLAMA_MODEL` — istanza Ares (PC fisso) per diagnosi/studio; CF Access via `DIAG_OLLAMA_CF_CLIENT_ID`/`DIAG_OLLAMA_CF_CLIENT_SECRET` (invariati).
 
-### Nominatim self-hosted (geocoding)
+### Photon self-hosted (geocoding)
 
-Client: `server/lib/nominatim-client.ts` — `geocode(query)` (forward) e `reverseGeocode(lat, lon)` (reverse). Stesso pattern URL/token di GraphHopper e Ollama.
-
-- Endpoint forward: `GET /api/planned-routes/geocode?q=…` — usato dal form waypoint e dall'AI preview.
-- Endpoint reverse: `GET /api/geocode/reverse?lat=…&lon=…` — usato da `handleMapTap` in `useGiriCreateState.ts` (nessuna chiamata diretta da client a Nominatim pubblico).
-
-Variabili d'ambiente (entrambe **opzionali**):
-- `NOMINATIM_URL` — URL base del server Nominatim self-hosted (es. `https://nominatim.bikerlink.app`). **Se non impostata, fallback automatico a `nominatim.openstreetmap.org` (pubblico, rate-limited, nessun token).**
-- `NOMINATIM_TOKEN` — Token inviato come header `X-Nominatim-Token` al server self-hosted. Ignorato se `NOMINATIM_URL` non è impostata.
+Photon è l'unico geocoder autorizzato per forward e reverse geocoding.
+Gli endpoint applicativi sono `/api/planned-routes/geocode` e
+`/api/geocode/reverse`; GraphHopper e Valhalla forniscono solo routing e
+metadati della strada. Se Photon non è configurato, il geocoding fallisce in
+modo esplicito e il flusso richiede una nuova selezione del punto.
 
 **Nota deviazione streaming**: il fallback su `/ai-stream` copre solo il caso "Ollama irraggiungibile" (probe sul primo chunk → fallback a Gemini). Un JSON invalido a metà stream **non** fa fallback (i chunk già emessi non sono ri-inviabili). Documentato nei commenti di `waypoints.next.ts`.
 

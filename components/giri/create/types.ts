@@ -40,6 +40,10 @@ export interface RouteResult {
   telemetryCoverage?: TelemetryCoverage | null;
   weatherWarning?: string | null;
   navigationSteps?: Array<{ sign: number; text: string; distance: number; interval: [number, number]; streetName?: string }> | null;
+  technicalCheckpoints?: Array<{
+    id: string; type: "turn_warning"; latitude: number; longitude: number;
+    distanceBeforeM: number; sign: number; instruction: string; audioKey: string;
+  }> | null;
   elevationProfile?: Array<{ distanceKm: number; altitudeM: number }> | null;
   elevationGainM?: number | null;
   altitudeMinM?: number | null;
@@ -62,6 +66,7 @@ export interface AiPreviewItem {
   lng: number;
   geocoding: boolean;
   resolved: boolean;
+  candidates: GeoResult[];
 }
 
 export interface AiPoiStop {
@@ -78,6 +83,8 @@ export interface AiPreviewState {
   isMultiDay: boolean;
   daysEstimate: number;
   avoidHighways: boolean;
+  departureAt?: string | null;
+  returnAt?: string | null;
   items: AiPreviewItem[];
   poiStops?: AiPoiStop[] | null;
 }

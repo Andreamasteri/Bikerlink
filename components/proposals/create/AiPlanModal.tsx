@@ -7,7 +7,6 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
-  Platform,
   StyleSheet,
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -15,8 +14,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
-import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
-import { t } from "@/lib/i18n";
 
 type RouteStyle = "curvy" | "balanced" | "fast";
 
@@ -65,35 +62,6 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
   const [selectedStyle, setSelectedStyle] = useState<RouteStyle>("curvy");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState("");
-
-  const whisper = useWhisperRecorder();
-  // Il microfono è disponibile solo su piattaforme native (non web).
-  const micAvailable = Platform.OS !== "web" && whisper.error !== "Permesso microfono negato";
-
-  const handleMicPress = async () => {
-    if (whisper.recording) {
-      // Ferma e trascrivi
-      const text = await whisper.stopAndTranscribe();
-      if (text === null) {
-        if (whisper.error) {
-          Alert.alert(t("aiPlan.mic.errorMic"), whisper.error);
-        } else {
-          Alert.alert(t("aiPlan.mic.noAudio"), "");
-        }
-      } else if (text.trim().length === 0) {
-        Alert.alert(t("aiPlan.mic.noAudio"), "");
-      } else {
-        // Appende al testo esistente (non sovrascrive)
-        setPrompt((prev) => (prev.trim() ? `${prev.trim()} ${text.trim()}` : text.trim()));
-      }
-    } else {
-      await whisper.startRecording();
-      // Se il permesso è stato negato, aggiorna lo stato mic
-      if (whisper.error === "Permesso microfono negato") {
-        Alert.alert(t("aiPlan.mic.errorMic"), whisper.error);
-      }
-    }
-  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -194,37 +162,9 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
               multiline
               numberOfLines={4}
               textAlignVertical="top"
-              editable={!loading && !whisper.transcribing}
+              editable={!loading}
             />
-            {micAvailable && (
-              <TouchableOpacity
-                style={[
-                  styles.micBtn,
-                  whisper.recording && styles.micBtnActive,
-                ]}
-                onPress={handleMicPress}
-                disabled={loading || whisper.transcribing}
-                hitSlop={8}
-              >
-                {whisper.transcribing ? (
-                  <ActivityIndicator size="small" color={Colors.accent} />
-                ) : (
-                  <MaterialCommunityIcons
-                    name={whisper.recording ? "microphone" : "microphone-outline"}
-                    size={24}
-                    color={whisper.recording ? Colors.accent : Colors.textSecondary}
-                  />
-                )}
-              </TouchableOpacity>
-            )}
           </View>
-          {whisper.recording && (
-            <Text style={styles.micStatus}>{t("aiPlan.mic.recording")}</Text>
-          )}
-          {whisper.transcribing && (
-            <Text style={styles.micStatus}>{t("aiPlan.mic.transcribing")}</Text>
-          )}
-
           <Text style={styles.label}>Stile di guida</Text>
           <View style={styles.styleRow}>
             {STYLES.map((s) => (
@@ -257,9 +197,9 @@ export const AiPlanModal = ({ visible, onClose, onRouteReady }: Props) => {
           )}
 
           <TouchableOpacity
-            style={[styles.generateBtn, (loading || whisper.recording || whisper.transcribing) && styles.generateBtnDisabled]}
+            style={[styles.generateBtn, loading && styles.generateBtnDisabled]}
             onPress={handleGenerate}
-            disabled={loading || whisper.recording || whisper.transcribing}
+            disabled={loading}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#000" />

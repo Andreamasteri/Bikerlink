@@ -16,10 +16,10 @@ export default function NavigateScreen() {
     colors, topPad, bottomPad, webViewRef,
     route, isLoading, isFinished,
     currentStep, distanceToNext, progressPct, remainingKm, remainingMin,
-    isRerouting, isOffline, weatherLoading, currentWeather, aheadWeather,
-    voiceCmdToast, mapUri, offline, whisper, activeStepsRef,
+    isRerouting, isOffRoute, isOffline, weatherLoading, currentWeather, aheadWeather,
+    mapUri, offline, activeStepsRef,
     minimalMode, handleToggleMinimal,
-    handleMapMessage, handleVoiceCommand, handleClose, triggerWeatherReroute,
+    handleMapMessage, handleClose, triggerWeatherReroute,
   } = useNavigateState();
 
   const s = makeStyles(colors);
@@ -74,10 +74,8 @@ export default function NavigateScreen() {
 
       <NavigationOfflineBanners
         isOffline={isOffline}
+        isOffRoute={isOffRoute}
         offline={offline}
-        whisper={whisper}
-        voiceCmdToast={voiceCmdToast}
-        onVoiceCommandRelease={handleVoiceCommand}
         styles={s}
       />
 

@@ -37,6 +37,8 @@ export function useGiriCreateState(language?: string) {
   const [aiBannerReason, setAiBannerReason] = useState<"key_missing" | "generic">("generic");
   const [aiSuccessBanner, setAiSuccessBanner] = useState(false);
   const aiSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [departureAt, setDepartureAt] = useState<string | null>(null);
+  const [returnAt, setReturnAt] = useState<string | null>(null);
 
   const [title, setTitle] = useState("Giro in moto");
   const [style, setStyle] = useState<Style>("curvy");
@@ -110,7 +112,7 @@ export function useGiriCreateState(language?: string) {
   const handleAiParse = () => handleAiParseHelper(
     aiPrompt, setAiLoading, setResolvedPoiStops, setAiProviderUsed, setAiPreview,
     setMode, setAiSuccessBanner, aiSuccessTimer, logFetch, setTitle, setStyle,
-    setIsRoundTrip, setIsMultiDay, setDaysCount, setAvoidHighways, setAiBannerReason,
+    setIsRoundTrip, setIsMultiDay, setDaysCount, setAvoidHighways, setDepartureAt, setReturnAt, setAiBannerReason,
     setAiFallbackBanner
   );
 
@@ -118,7 +120,16 @@ export function useGiriCreateState(language?: string) {
     setAiPreview((prev) => {
       if (!prev) return prev;
       const items = [...prev.items];
-      items[idx] = { ...items[idx], editedName: newName, lat: 0, lng: 0, resolved: false };
+      items[idx] = { ...items[idx], editedName: newName, lat: 0, lng: 0, candidates: [], resolved: false };
+      return { ...prev, items };
+    });
+  }, []);
+
+  const selectPreviewCandidate = useCallback((idx: number, candidate: GeoResult) => {
+    setAiPreview((prev) => {
+      if (!prev) return prev;
+      const items = [...prev.items];
+      items[idx] = { ...items[idx], editedName: candidate.name, lat: candidate.lat, lng: candidate.lng, candidates: [candidate], resolved: true, geocoding: false };
       return { ...prev, items };
     });
   }, []);
@@ -143,7 +154,7 @@ export function useGiriCreateState(language?: string) {
 
   const handleConfirmPreview = () => handleConfirmPreviewHelper(
     aiPreview, resolvedPoiStops, setTitle, setStyle, setIsRoundTrip, setHeadingDeg,
-    setIsMultiDay, setDaysCount, setAvoidHighways, setWaypoints, setWpInputs,
+    setIsMultiDay, setDaysCount, setAvoidHighways, setDepartureAt, setReturnAt, setWaypoints, setWpInputs,
     setMode, setCalculating, setRouteResult, setWeatherPreview, setDismissedWarnings,
     logFetch, drivingProfile, language, vehicleProfile, maxHoursPerDay, autoLoadWeather
   );
@@ -255,8 +266,8 @@ export function useGiriCreateState(language?: string) {
 
   const handleSave = () => {
     if (!title.trim()) { Alert.alert("Errore", "Inserisci un titolo."); return; }
-    const resolved = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-    if (resolved.length < 2) { Alert.alert("Errore", "Seleziona almeno 2 luoghi."); return; }
+    const resolved = waypoints.filter((wp) => Number.isFinite(wp.lat) && Number.isFinite(wp.lng) && (wp.lat !== 0 || wp.lng !== 0));
+    if (resolved.length !== waypoints.length || resolved.length < 2) { Alert.alert("Errore", "Seleziona un risultato Photon per ogni punto del viaggio."); return; }
 
     const avgKmPerLiter = 18;
     const tankEstimateL = 15;
@@ -266,7 +277,7 @@ export function useGiriCreateState(language?: string) {
     saveMutation.mutate({
       title,
       waypoints: resolved,
-      polyline: null,
+      polyline: routeResult?.encoded ?? null,
       distanceKm: routeResult?.distanceKm ?? 0,
       durationMinutes: routeResult?.durationMinutes ?? 0,
       bikerScore: routeResult?.bikerScore ?? 0,
@@ -278,7 +289,8 @@ export function useGiriCreateState(language?: string) {
       elevationProfile: routeResult?.elevationProfile ?? null,
       metadata: {
         avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, daysCount, maxHoursPerDay,
-        isRoundTrip, roundTripHours, headingDeg,
+        isRoundTrip, roundTripHours, headingDeg, departureAt, returnAt,
+        technicalCheckpoints: routeResult?.technicalCheckpoints ?? [],
         motorcycleId: selectedMotoId, fuelStopsNeeded,
         ...(aiProviderUsed ? { provider_used: aiProviderUsed } : {}),
       }
@@ -347,10 +359,11 @@ export function useGiriCreateState(language?: string) {
     visibility, setVisibility, waypoints, setWaypoints, wpInputs, setWpInputs,
     wpSuggestions, setWpSuggestions, wpLoading, routeResult, calculating,
     routeError, weatherPreview, weatherLoading, handleAiParse,
-    updatePreviewItemName, regeocodePillItem, handleConfirmPreview, handleWpInput,
+    updatePreviewItemName, selectPreviewCandidate, regeocodePillItem, handleConfirmPreview, handleWpInput,
     selectSuggestion, addWaypoint, removeWaypoint, handleCalculate, handleSave,
     handleImportGpx, isImportingGpx, debugVisible, debugLogs, handleTitleTap,
     clearDebugLogs, fuelLevel, setFuelLevel, selectedMotoId, setSelectedMotoId,
+    departureAt, setDepartureAt, returnAt, setReturnAt,
     pendingMapTap, mapTapGeocoding, handleMapTap, confirmMapTap, dismissMapTap,
     resolvedPoiStops, selectPoiOption, clearPoiOption, aiProviderUsed,
     aiFallbackBanner, setAiFallbackBanner, aiBannerReason, aiSuccessBanner,

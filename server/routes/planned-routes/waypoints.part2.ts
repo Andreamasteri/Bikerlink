@@ -4,6 +4,7 @@ import { requireAuth } from "./utils";
 import { sendError } from "../../lib/api-response";
 import { calculateRouteRequestSchema } from "@shared/validators";
 import { extractElevationProfile } from "./waypoints-helpers";
+import { encodePolyline, buildTechnicalCheckpoints } from "./utils";
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
 import {
   getActiveRouter,
@@ -58,7 +59,7 @@ export async function handleCalculateRoute(req: Request, res: Response) {
   const normProfile = normalizeDrivingProfile(drivingProfile);
   // "auto panoramica": profilo veicolo Valhalla (costing auto curvy). È un asse
   // distinto dallo stile/telemetria moto — quando attivo, il router-selector
-  // instrada SEMPRE a Valhalla senza fallback a GraphHopper.
+  // instrada SEMPRE a Valhalla, senza passare da GraphHopper.
   const isAutoCurvy = routingProfile === "auto_curvy";
   // Profilo GH self-hosted da usare: se l'utente ha scelto esplicitamente
   // "motorcycle_fast" o "car", usiamo quel profilo; altrimenti il default
@@ -133,7 +134,7 @@ export async function handleCalculateRoute(req: Request, res: Response) {
     ) => {
       // Richiediamo i details osm_way_id per poter valutare la copertura
       // telemetrica sui segmenti effettivi del percorso.
-      const reqBody: Record<string, unknown> = { ...body, details: ["osm_way_id"] };
+      const reqBody: Record<string, unknown> = { ...body, details: ["osm_way_id", "max_speed"] };
       const customModel: Record<string, unknown> = {};
       if (priorityRules.length > 0) customModel.priority = priorityRules;
       if (geo.distanceInfluence !== undefined) customModel.distance_influence = geo.distanceInfluence;
@@ -167,7 +168,7 @@ export async function handleCalculateRoute(req: Request, res: Response) {
           effectivePriority = [...basePriority, ...telemetry.priority];
         } catch (telemetryErr: unknown) {
           // Lo strato telemetrico (regole su osm_way_id) può non essere supportato
-          // dal motore di routing: mantieni il geometrico (fallback stabile) e
+          // dal motore di routing: mantieni il percorso geometrico di base e
           // segnala lo stato strutturato all'utente.
           console.warn("[routing] telemetry layer failed, keep geometric:", (telemetryErr as Error)?.message ?? telemetryErr);
           myStyleWarning = "insufficient_data";
@@ -224,8 +225,21 @@ export async function handleCalculateRoute(req: Request, res: Response) {
       }
     }
 
+    const coordinates = (path.points as { coordinates?: number[][] })?.coordinates ?? [];
+    const rawPoints = coordinates
+      .filter((point): point is [number, number] => Array.isArray(point) && point.length >= 2 && Number.isFinite(point[0]) && Number.isFinite(point[1]))
+      .map(([lng, lat]) => ({ lat, lng }));
+    const encodedPolyline = encodePolyline(rawPoints);
+    const technicalCheckpoints = buildTechnicalCheckpoints(
+      coordinates,
+      (path.instructions ?? []) as Array<{ sign?: number; interval?: number[]; text?: string; maxSpeedKmh?: number; max_speed?: number }>,
+      (path as { details?: Record<string, unknown> }).details,
+    );
+
     return res.json({
-      encoded: path.points,
+      encoded: encodedPolyline,
+      rawPoints,
+      technicalCheckpoints,
       distanceKm: Math.round(path.distance / 100) / 10,
       durationMinutes: Math.round(path.time / 60000),
       instructions: path.instructions ?? [],

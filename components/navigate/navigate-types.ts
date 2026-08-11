@@ -15,4 +15,24 @@ export interface PlannedRoute {
   waypoints: Array<{ lat: number; lng: number; name?: string }>;
   polyline?: string | null;
   navigationSteps?: NavigationStep[] | null;
+  metadata?: PlannedRouteMetadata | null;
+}
+
+export interface TechnicalCheckpoint {
+  id: string;
+  type: "turn_warning";
+  latitude: number;
+  longitude: number;
+  distanceBeforeM: number;
+  maxSpeedKmh: number;
+  sign: number;
+  instruction: string;
+  audioKey: string;
+}
+
+export interface PlannedRouteMetadata {
+  technicalCheckpoints?: TechnicalCheckpoint[];
+  departureAt?: string | null;
+  returnAt?: string | null;
+  [key: string]: unknown;
 }

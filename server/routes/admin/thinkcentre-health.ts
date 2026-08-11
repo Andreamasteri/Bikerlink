@@ -3,7 +3,7 @@
  *
  * GET /api/admin/thinkcentre-health
  * Probe parallelo dei servizi self-hosted sul ThinkCentre:
- * GraphHopper (routing), Ollama (AI), Whisper (ASR), Photon (geocoding),
+ * GraphHopper (routing), Ollama (AI), Photon (geocoding),
  * Valhalla (routing), DragonflyDB (cache), nginx, Uptime Kuma.
  */
 
@@ -39,7 +39,6 @@ import {
 import {
   probeGraphHopperAreas,
   probeOllama,
-  probeWhisper,
   type ServiceHealth,
   type AreaServiceHealth,
   type GraphHopperHealth,
@@ -319,7 +318,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
         valhallaDetail: null,
         photonDetail: null,
         ufwDetail: null,
-        tokenFingerprints: { graphhopper: null, valhalla: null, ollama: null, whisper: null, photon: null },
+        tokenFingerprints: { graphhopper: null, valhalla: null, ollama: null, photon: null },
         aresDetail: null,
         personaModels: null,
         nginxSymlinksWarning: null,
@@ -336,7 +335,6 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       valhallaDetail,
       photonDetail,
       ollama,
-      whisper,
       ufwDetail,
       dragonflyInfra,
       nginxInfra,
@@ -351,7 +349,6 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       probeValhallaDetailed(),
       probePhotonDetailed(),
       probeOllama(),
-      probeWhisper(),
       probeUfwDetailed(),
       probeDragonflyInfra(),
       probeNginxInfra(),
@@ -442,7 +439,6 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
     const services: ServiceHealth[] = [
       valhallaService,
       ollama,
-      whisper,
       photonService,
       dragonflyService,
       nginxService,
@@ -470,7 +466,6 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       graphhopper: tokenFingerprint(process.env.GRAPHHOPPER_TOKEN),
       valhalla:    tokenFingerprint(process.env.VALHALLA_API_KEY),
       ollama:      tokenFingerprint(process.env.BOWIE_OLLAMA_TOKEN),
-      whisper:     tokenFingerprint(process.env.WHISPER_TOKEN),
       photon:      tokenFingerprint(process.env.PHOTON_TOKEN),
     };
 

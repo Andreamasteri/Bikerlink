@@ -103,12 +103,10 @@ else
 fi
 echo ""
 
-# ── 5. Container Docker (Valhalla e Nominatim) ───────────────────────────────
-echo "--- Container Docker (Valhalla / Nominatim) ---"
+# ── 5. Container Docker (Valhalla) ─────────────────────────────────────────
+echo "--- Container Docker (Valhalla) ---"
 if docker info &>/dev/null 2>&1; then
   VALHALLA_OUT=$(docker ps -a --filter "name=valhalla" \
-    --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}" 2>/dev/null)
-  NOMINATIM_OUT=$(docker ps -a --filter "name=nominatim" \
     --format "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}" 2>/dev/null)
 
   if [ -n "$VALHALLA_OUT" ] && [ "$(echo "$VALHALLA_OUT" | wc -l)" -gt 1 ]; then
@@ -133,12 +131,6 @@ if docker info &>/dev/null 2>&1; then
   fi
   echo ""
 
-  if [ -n "$NOMINATIM_OUT" ] && [ "$(echo "$NOMINATIM_OUT" | wc -l)" -gt 1 ]; then
-    echo "Nominatim:"
-    echo "$NOMINATIM_OUT"
-  else
-    info "Nessun container 'nominatim' trovato (normale se non ancora configurato)"
-  fi
 else
   warn "Docker non raggiungibile — impossibile interrogare i container"
 fi

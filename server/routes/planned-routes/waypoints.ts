@@ -30,6 +30,8 @@ Analizza la richiesta e restituisci SOLO un oggetto JSON con:
 - daysEstimate: number
 - maxHoursPerDay: number (default 6)
 - avoidHighways: boolean
+- departureAt: string ISO 8601 o null — data e ora locale di partenza
+- returnAt: string ISO 8601 o null — data e ora locale di rientro/arrivo finale
 - notes: string
 IMPORTANTE: waypoints contiene SOLO luoghi geografici (città, strade, valichi). Ristoranti, hotel, rifugi, officine vanno in poiStops (non in waypoints).`;
 
@@ -52,6 +54,8 @@ export const routeSchema = z.object({
   daysEstimate: z.number(),
   maxHoursPerDay: z.number(),
   avoidHighways: z.boolean(),
+  departureAt: z.string().datetime({ offset: true }).nullable(),
+  returnAt: z.string().datetime({ offset: true }).nullable(),
   notes: z.string(),
 });
 

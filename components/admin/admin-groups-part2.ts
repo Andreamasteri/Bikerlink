@@ -43,15 +43,6 @@ export const adminGroupsPart2: AdminGroup[] = [
         keywords: ["ai", "watchdog", "sistema", "system", "health", "salute", "anomalia", "alert", "allerta", "monitor ai", "errore ai", "ai error", "fallback", "quota", "rate limit", "rilevamento anomalie", "anomaly detection"],
       },
       {
-        key: "whisper-config",
-        label: "Voce & Trascrizione",
-        icon: "microphone-settings",
-        iconSet: "MaterialCommunityIcons",
-        route: "/admin/whisper-config",
-        accentColor: "#8B5CF6",
-        keywords: ["whisper", "voce", "voice", "trascrizione", "transcription", "audio", "microfono", "speech", "stt", "riconoscimento vocale", "speech recognition", "nota vocale", "vocal note", "lingua audio", "modello audio"],
-      },
-      {
         key: "settings",
         label: "Impostazioni",
         icon: "settings",

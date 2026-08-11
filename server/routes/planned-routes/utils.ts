@@ -70,3 +70,148 @@ export function escapeXml(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
+
+
+export function encodePolyline(points: Array<{ lat: number; lng: number }>): string {
+  let lastLat = 0;
+  let lastLng = 0;
+  let encoded = "";
+  const encodeValue = (value: number) => {
+    let v = value < 0 ? ~(value << 1) : value << 1;
+    while (v >= 0x20) {
+      encoded += String.fromCharCode((0x20 | (v & 0x1f)) + 63);
+      v >>= 5;
+    }
+    encoded += String.fromCharCode(v + 63);
+  };
+  for (const point of points) {
+    const lat = Math.round(point.lat * 1e5);
+    const lng = Math.round(point.lng * 1e5);
+    encodeValue(lat - lastLat);
+    encodeValue(lng - lastLng);
+    lastLat = lat;
+    lastLng = lng;
+  }
+  return encoded;
+}
+
+export interface TechnicalCheckpoint {
+  id: string;
+  type: "turn_warning";
+  latitude: number;
+  longitude: number;
+  distanceBeforeM: number;
+  maxSpeedKmh: number;
+  sign: number;
+  instruction: string;
+  audioKey: string;
+}
+
+type RouteInstructionForCheckpoint = {
+  sign?: number;
+  interval?: number[];
+  text?: string;
+  streetName?: string;
+  street_name?: string;
+  maxSpeedKmh?: number;
+  max_speed?: number;
+};
+
+function haversineMeters(a: [number, number], b: [number, number]): number {
+  const lat1 = a[1] * Math.PI / 180;
+  const lat2 = b[1] * Math.PI / 180;
+  const dLat = lat2 - lat1;
+  const dLng = (b[0] - a[0]) * Math.PI / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h)));
+}
+
+function turnLabel(sign: number): string | null {
+  if (sign === 4) return "u_turn";
+  if (sign > 0) return "right";
+  if (sign < 0) return "left";
+  return null;
+}
+
+function maxSpeedFromDetails(
+  details: Record<string, unknown> | undefined,
+  intervalStart: number,
+  intervalEnd: number,
+): number | undefined {
+  const ranges = details?.max_speed;
+  if (!Array.isArray(ranges)) return undefined;
+
+  for (const range of ranges) {
+    let from: number | undefined;
+    let to: number | undefined;
+    let rawValue: unknown;
+    if (Array.isArray(range)) {
+      from = Number(range[0]);
+      to = Number(range[1]);
+      rawValue = range[2];
+    } else if (range && typeof range === "object") {
+      const item = range as Record<string, unknown>;
+      from = Number(item.from ?? item.start ?? item.fromIndex);
+      to = Number(item.to ?? item.end ?? item.toIndex);
+      rawValue = item.value ?? item.speed ?? item.max_speed;
+    }
+    const value = typeof rawValue === "object" && rawValue !== null
+      ? (rawValue as Record<string, unknown>).value ?? (rawValue as Record<string, unknown>).speed
+      : rawValue;
+    const fromIndex = Number(from);
+    const toIndex = Number(to);
+    const speed = Number(value);
+    if (Number.isFinite(fromIndex) && Number.isFinite(toIndex) && Number.isFinite(speed)
+      && speed > 0 && intervalStart < toIndex && intervalEnd >= fromIndex) {
+      return speed;
+    }
+  }
+  return undefined;
+}
+
+export function buildTechnicalCheckpoints(
+  coordinates: number[][],
+  instructions: RouteInstructionForCheckpoint[],
+  details?: Record<string, unknown>,
+): TechnicalCheckpoint[] {
+  if (coordinates.length < 2) return [];
+  const checkpoints: TechnicalCheckpoint[] = [];
+  let sequence = 0;
+  for (const instruction of instructions) {
+    const sign = Number(instruction.sign ?? 0);
+    const direction = turnLabel(sign);
+    if (!direction) continue;
+    const intervalStart = Math.max(0, Math.min(coordinates.length - 1, Number(instruction.interval?.[0] ?? 0)));
+    const intervalEnd = Math.max(intervalStart, Math.min(coordinates.length - 1, Number(instruction.interval?.[1] ?? intervalStart)));
+    const detailSpeed = maxSpeedFromDetails(details, intervalStart, intervalEnd);
+    const rawSpeed = Number(instruction.maxSpeedKmh ?? instruction.max_speed ?? detailSpeed ?? 50);
+    const maxSpeedKmh = Number.isFinite(rawSpeed) && rawSpeed > 0 ? Math.min(rawSpeed, 130) : 50;
+    // Tre secondi di preavviso, con un limite operativo per evitare punti troppo lontani.
+    const distanceBeforeM = Math.round(Math.max(25, Math.min(150, (maxSpeedKmh / 3.6) * 3 + 10)));
+    let distance = 0;
+    let checkpointIndex = intervalStart;
+    for (let i = intervalStart; i > 0 && distance < distanceBeforeM; i -= 1) {
+      const a = coordinates[i] ?? coordinates[i - 1];
+      const b = coordinates[i - 1] ?? coordinates[i];
+      if (a && b && a.length >= 2 && b.length >= 2) {
+        distance += haversineMeters([a[0], a[1]], [b[0], b[1]]);
+      }
+      checkpointIndex = i - 1;
+    }
+    const point = coordinates[checkpointIndex];
+    if (!point || point.length < 2) continue;
+    const text = instruction.text?.trim() || `Svoltare a ${direction === "u_turn" ? "U" : direction}`;
+    checkpoints.push({
+      id: `turn-warning-${sequence++}`,
+      type: "turn_warning",
+      latitude: point[1],
+      longitude: point[0],
+      distanceBeforeM,
+      maxSpeedKmh,
+      sign,
+      instruction: text,
+      audioKey: `navigation.turn.${direction}`,
+    });
+  }
+  return checkpoints;
+}
