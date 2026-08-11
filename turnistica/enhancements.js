@@ -2,7 +2,7 @@ var suggestions=JSON.parse(localStorage.getItem("turnistica-suggestions")||"[]")
 var monthOptions=[["01","Gennaio"],["02","Febbraio"],["03","Marzo"],["04","Aprile"],["05","Maggio"],["06","Giugno"],["07","Luglio"],["08","Agosto"],["09","Settembre"],["10","Ottobre"],["11","Novembre"],["12","Dicembre"]];
 
 function escapeHtml(value){return String(value==null?"":value).replace(/[&<>"']/g,function(ch){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]})}
-function isGranara(){return person==="GRAN"||person==="GRANARA"}
+function isGranara(){return person==="GRAN"}
 function canSuggest(){return roleOf(person)==="sottocapo"}
 function suggestionsSave(){localStorage.setItem("turnistica-suggestions",JSON.stringify(suggestions))}
 function sortedWheel(list){var order={R1:1,R2:2,R:3,"11":4,"22":5};return list.sort(function(a,b){return(order[a.code]||9)-(order[b.code]||9)||a.person.localeCompare(b.person)})}
