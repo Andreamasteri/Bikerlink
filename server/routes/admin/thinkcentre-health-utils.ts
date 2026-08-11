@@ -142,7 +142,6 @@ export function sanitizeError(msg: string): string {
   let out = msg.replace(/https?:\/\/[^\s"'`)]+/gi, (m) => maskUrl(m));
   for (const tok of [
     process.env.BOWIE_OLLAMA_TOKEN,
-    process.env.WHISPER_TOKEN,
     process.env.GRAPHHOPPER_TOKEN,
     process.env.PHOTON_TOKEN,
     process.env.VALHALLA_API_KEY,

@@ -40,7 +40,6 @@ export interface HealthEvent {
 const SERVICE_LABELS: Record<string, string> = {
   valhalla: "Valhalla",
   ollama: "Ollama AI",
-  whisper: "Whisper ASR",
   photon: "Photon",
   ufw: "UFW",
   dragonfly: "DragonflyDB",

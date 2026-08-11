@@ -15,7 +15,6 @@ import { ThinkCentreCard } from "@/components/admin/ThinkCentreCard";
 import { ThinkCentreEfficiencyCard } from "@/components/admin/ThinkCentreEfficiencyCard";
 import { RoutingCoordinationCard } from "@/components/admin/RoutingCoordinationCard";
 import { RoutingCloudBanner } from "@/components/admin/RoutingCloudBanner";
-import { WhisperChainCard } from "@/components/admin/WhisperChainCard";
 import { MatchingMonitorCard } from "@/components/admin/MatchingMonitorCard";
 import { DbPoolCard } from "@/components/admin/DbPoolCard";
 import { SystemHealthContainer } from "@/components/admin/SystemHealthContainer";
@@ -100,7 +99,6 @@ const UNKNOWN_STATUSES: SystemStatuses = {
   valhalla: "unknown",
   photon: "unknown",
   ollama: "unknown",
-  whisper: "unknown",
   ufw: "unknown",
   dragonfly: "unknown",
   nginx: "unknown",
@@ -134,7 +132,6 @@ export default function AdminDashboard() {
   const graphhopperRef = useRef<View>(null);
   const valhallaRef = useRef<View>(null);
   const photonRef = useRef<View>(null);
-  const whisperRef = useRef<View>(null);
   const routingRef = useRef<View>(null);
   const matchingRef = useRef<View>(null);
 
@@ -170,7 +167,7 @@ export default function AdminDashboard() {
   const bowieSecurityBlocks = bowieBadge?.securityBlocks24h ?? 0;
 
   const handleThinkCentreStatuses = useCallback(
-    (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "photon" | "ollama" | "whisper" | "ufw" | "dragonfly" | "nginx" | "uptimeKuma">) => {
+    (s: Pick<SystemStatuses, "thinkcentre" | "graphhopper" | "valhalla" | "photon" | "ollama" | "ufw" | "dragonfly" | "nginx" | "uptimeKuma">) => {
       setSystemStatuses((prev) => ({ ...prev, ...s }));
     },
     []
@@ -202,7 +199,6 @@ export default function AdminDashboard() {
       graphhopper: graphhopperRef,
       valhalla:    valhallaRef,
       photon:   photonRef,
-      whisper:     whisperRef,
       routing:     routingRef,
       matching:    matchingRef,
     };
@@ -241,13 +237,6 @@ export default function AdminDashboard() {
         keywords: ["photon", "geocoding", "geocodifica", "indirizzo", "address", "osm address", "reverse geo"],
         ref: photonRef,
         icon: "map-search",
-      },
-      {
-        key: "whisper",
-        label: "Whisper AI",
-        keywords: ["whisper", "speech", "voce", "audio", "riconoscimento vocale", "stt", "speech to text"],
-        ref: whisperRef,
-        icon: "microphone-outline",
       },
       {
         key: "routing",
@@ -390,9 +379,6 @@ export default function AdminDashboard() {
                 <TelemetryCard />
               </View>
             )}
-            <View ref={whisperRef}>
-              <WhisperChainCard />
-            </View>
             <View ref={matchingRef}>
               <MatchingMonitorCard onStatus={(s) => setSystemStatuses((prev) => ({ ...prev, matching: s as DotStatus }))} />
             </View>
