@@ -73,6 +73,7 @@ let droppedOverflowTotal = 0;
 let droppedTimeoutTotal = 0;
 let droppedSlowKillSwitchTotal = 0;
 let dbSlowPingsConsecutive = 0;
+let concurrencyOverride: number | null = null;
 
 interface Waiter {
   resolve: () => void;
@@ -99,6 +100,11 @@ function isHoldingBgSlot(): boolean {
 
 // ── Meccanica acquire/release ────────────────────────────────────────────────
 
+/** Override temporaneo del budget bg; null ripristina la configurazione. */
+export function setConcurrencyOverride(n: number | null): void {
+  concurrencyOverride = n === null ? null : Math.max(1, Math.floor(n));
+}
+
 function acquire(critical?: boolean): Promise<void> {
   // Kill-switch adattivo: rifiuta i job non critici quando il DB è lento.
   if (!critical && dbSlowPingsConsecutive >= BG_DB_SLOW_THRESHOLD) {
@@ -106,7 +112,8 @@ function acquire(critical?: boolean): Promise<void> {
     return Promise.reject(new BgDbSlowKillSwitchError(dbSlowPingsConsecutive, BG_DB_SLOW_THRESHOLD));
   }
 
-  if (active < BG_DB_MAX_CONCURRENCY) {
+  const effectiveMax = concurrencyOverride ?? BG_DB_MAX_CONCURRENCY;
+  if (active < effectiveMax) {
     active++;
     return Promise.resolve();
   }
@@ -137,14 +144,21 @@ function acquire(critical?: boolean): Promise<void> {
 }
 
 function release(): void {
+  const effectiveMax = concurrencyOverride ?? BG_DB_MAX_CONCURRENCY;
   while (queue.length > 0) {
     const next = queue.shift()!;
     if (next.settled) continue; // già scaduto: salta
-    next.settled = true;
-    clearTimeout(next.timer);
-    // Passa lo slot direttamente al prossimo in coda: active resta invariato.
-    next.resolve();
-    return;
+    if (active - 1 < effectiveMax) {
+      next.settled = true;
+      clearTimeout(next.timer);
+      // Passa lo slot direttamente al prossimo in coda: active resta invariato.
+      next.resolve();
+      return;
+    }
+    // Un override può avere abbassato il tetto mentre gli slot erano occupati.
+    // Dreniamo il backlog solo quando il numero attivo rientra nel nuovo limite.
+    queue.unshift(next);
+    break;
   }
   active = Math.max(0, active - 1);
 }
@@ -233,7 +247,7 @@ export function getBgDbLimiterStats(): {
   return {
     active,
     queued: queue.length,
-    max: BG_DB_MAX_CONCURRENCY,
+    max: concurrencyOverride ?? BG_DB_MAX_CONCURRENCY,
     maxQueue: BG_DB_MAX_QUEUE,
     droppedOverflowTotal,
     droppedTimeoutTotal,
