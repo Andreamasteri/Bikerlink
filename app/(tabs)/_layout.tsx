@@ -64,12 +64,7 @@ type TabScreenOptions = React.ComponentProps<typeof Tabs.Screen>["options"];
 type GpsTabHref = Href | null | undefined;
 type TFn = (key: string) => string;
 
-// Statiche (href fisso, nessuna traduzione)
-const TAB_OPTIONS_RIDE: TabScreenOptions = {
-  title: "Privacy & GPS",
-  headerTitle: "Privacy & GPS",
-  href: null,
-};
+// Factory (dipendono da t() e/o config runtime)
 const TAB_OPTIONS_GIRI: TabScreenOptions = {
   title: "Giri",
   href: null,
@@ -167,7 +162,6 @@ function getTabScreens(
     <Tabs.Screen key="contest" name="contest" options={TAB_OPTIONS_CONTEST(gpsTabHref)} />,
     <Tabs.Screen key="arcade" name="arcade" options={TAB_OPTIONS_ARCADE(gpsTabHref)} />,
     <Tabs.Screen key="bowie" name="bowie" options={TAB_OPTIONS_BOWIE} />,
-    <Tabs.Screen key="ride" name="ride" options={TAB_OPTIONS_RIDE} />,
     <Tabs.Screen key="giri" name="giri" options={TAB_OPTIONS_GIRI} />,
     <Tabs.Screen key="tracking" name="tracking" options={TAB_OPTIONS_TRACKING(t)} />,
     <Tabs.Screen key="garage" name="garage" options={TAB_OPTIONS_GARAGE(t, isBikerOrCoppia)} />,
