@@ -28,8 +28,9 @@
  */
 
 function genericPair(): { id: string; secret: string } {
-  // Resolve at request time so a rotated secret is picked up without requiring
-  // a process restart. Values are never logged or returned to callers.
+  // Resolve at request time to avoid module-level caching. A provider-side
+  // rotation still requires a process restart/redeploy so Node receives the
+  // new environment. Values are never logged or returned to callers.
   return {
     id: process.env.CF_ACCESS_CLIENT_ID?.trim() ?? "",
     secret: process.env.CF_ACCESS_CLIENT_SECRET?.trim() ?? "",
@@ -42,7 +43,8 @@ function genericPair(): { id: string; secret: string } {
  * / <AGENT>_CF_ACCESS_CLIENT_SECRET. Se una delle due manca, si ricade sulla
  * coppia generica CF_ACCESS_CLIENT_ID/SECRET (comportamento storico invariato per
  * GraphHopper/Valhalla/Nominatim, che chiamano senza argomento).
- * Letto a request-time così un secret aggiunto in futuro è raccolto senza refactor.
+ * Letto per richiesta per evitare cache a livello modulo; una rotazione nel
+ * provider richiede comunque restart/redeploy per ricaricare process.env.
  */
 function resolvePair(agent?: string): { id: string; secret: string } {
   if (agent) {
