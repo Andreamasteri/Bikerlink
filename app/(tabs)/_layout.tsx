@@ -132,6 +132,11 @@ const TAB_OPTIONS_TRACKING = (t: TFn): TabScreenOptions => ({
   headerTitle: t("tracking.recordRide"),
   href: null,
 });
+const TAB_OPTIONS_RIDE2: TabScreenOptions = {
+  title: "Ride2",
+  headerTitle: "Ride2",
+  headerShown: false,
+};
 const TAB_OPTIONS_GARAGE = (t: TFn, isBikerOrCoppia: boolean): TabScreenOptions => ({
   title: isBikerOrCoppia ? t("garage.tabTitle") : t("garage.tabWishlist"),
   headerTitle: isBikerOrCoppia ? t("garage.myGarage") : t("garage.myWishlist"),
@@ -164,6 +169,7 @@ function getTabScreens(
     <Tabs.Screen key="bowie" name="bowie" options={TAB_OPTIONS_BOWIE} />,
     <Tabs.Screen key="giri" name="giri" options={TAB_OPTIONS_GIRI} />,
     <Tabs.Screen key="tracking" name="tracking" options={TAB_OPTIONS_TRACKING(t)} />,
+    <Tabs.Screen key="ride2" name="ride2" options={TAB_OPTIONS_RIDE2} />,
     <Tabs.Screen key="garage" name="garage" options={TAB_OPTIONS_GARAGE(t, isBikerOrCoppia)} />,
     <Tabs.Screen key="profile" name="profile" options={TAB_OPTIONS_PROFILE(t)} />,
   ];
