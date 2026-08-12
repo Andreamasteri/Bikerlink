@@ -184,6 +184,8 @@ export function TabIcon({
 
     case "tracking":
       return <Ionicons name="navigate" size={size} color={color} />;
+    case "ride2":
+      return <Ionicons name="navigate" size={size} color={color} />;
 
     case "garage":
       return isBikerOrCoppia ? (
