@@ -27,8 +27,14 @@
  * (tile CDN, API cloud pubbliche).
  */
 
-const CF_ACCESS_CLIENT_ID = process.env.CF_ACCESS_CLIENT_ID?.trim() ?? "";
-const CF_ACCESS_CLIENT_SECRET = process.env.CF_ACCESS_CLIENT_SECRET?.trim() ?? "";
+function genericPair(): { id: string; secret: string } {
+  // Resolve at request time so a rotated secret is picked up without requiring
+  // a process restart. Values are never logged or returned to callers.
+  return {
+    id: process.env.CF_ACCESS_CLIENT_ID?.trim() ?? "",
+    secret: process.env.CF_ACCESS_CLIENT_SECRET?.trim() ?? "",
+  };
+}
 
 /**
  * Task #4 — Override opzionale per-agente. Un agente AI (bowie/horus/ares/
@@ -45,7 +51,7 @@ function resolvePair(agent?: string): { id: string; secret: string } {
     const secret = process.env[`${p}_CF_ACCESS_CLIENT_SECRET`]?.trim();
     if (id && secret) return { id, secret };
   }
-  return { id: CF_ACCESS_CLIENT_ID, secret: CF_ACCESS_CLIENT_SECRET };
+  return genericPair();
 }
 
 /** true se entrambe le credenziali del Service Token CF Access sono configurate. */
