@@ -9,14 +9,29 @@ import { withJobGate } from "./ai/coordinator/gated-job";
 let _samplerTimer: ReturnType<typeof setInterval> | null = null;
 let _purgeTimer: ReturnType<typeof setInterval> | null = null;
 let _samplerEnabled = false;
-const SAMPLE_INTERVAL_MS = 10_000;
+// Il grafico non richiede campioni sub-secondo: un default di 60s evita che
+// ogni processo generi migliaia di INSERT al giorno. In dev/candidate si può
+// abbassare fino a 30s per una prova mirata, senza tornare al flood da 10s.
+const configuredSampleInterval = Number.parseInt(process.env.RESOURCE_GRAPH_SAMPLE_INTERVAL_MS ?? "", 10);
+const SAMPLE_INTERVAL_MS = Number.isFinite(configuredSampleInterval)
+  ? Math.min(5 * 60_000, Math.max(30_000, configuredSampleInterval))
+  : 60_000;
 const RETENTION_HOURS = 24;
+const GRAPH_SETTING_CACHE_MS = 60_000;
+let graphSettingCache: { enabled: boolean; expiresAt: number } | null = null;
 
 async function isGraphEnabled(): Promise<boolean> {
+  const now = Date.now();
+  if (graphSettingCache && graphSettingCache.expiresAt > now) return graphSettingCache.enabled;
   try {
     const setting = await storage.getAppSetting("resource_graph_enabled");
-    return setting?.valueJson === true || setting?.value === "true";
+    const enabled = setting?.valueJson === true || setting?.value === "true";
+    graphSettingCache = { enabled, expiresAt: now + GRAPH_SETTING_CACHE_MS };
+    return enabled;
   } catch {
+    // Cache the disabled result briefly so a DB outage does not become a
+    // read-amplification loop on app_settings.
+    graphSettingCache = { enabled: false, expiresAt: now + GRAPH_SETTING_CACHE_MS };
     return false;
   }
 }
