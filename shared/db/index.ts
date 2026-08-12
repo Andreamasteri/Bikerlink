@@ -35,3 +35,5 @@ export * from "./diagnostic";
 export * from "./pipeline-monitor";
 export * from "./tc-metrics-history";
 export * from "./fixed-couples";
+
+export * from "./notifications";

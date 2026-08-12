@@ -69,12 +69,15 @@ const FIVE_DAYS_MS = 5 * ONE_DAY_MS;
 const INITIAL_DELAY_MS = 2 * 60 * 1000;
 const RETENTION_BATCH_SIZE = 1000;
 
-// notification_history non è una tabella drizzle (è creata via SQL raw in
-// boot-phase3-db-init.ts), quindi ha un purge dedicato con SQL grezzo. La
-// finestra di retention è configurabile tramite AppSetting (default 60gg,
-// range consigliato 30-90gg) per non avere la soglia hardcoded.
+// notification_history ha ora anche una definizione Drizzle, ma il purge
+// resta SQL grezzo per mantenere il cleanup semplice, indicizzato e a basso impatto.
+// La retention effettiva è sempre compresa tra 7 e 30 giorni: il default è 30gg
+// e un vecchio AppSetting più permissivo non può allungare la finestra.
 const NOTIFICATION_HISTORY_RETENTION_KEY = "notification_history_retention_days";
-const NOTIFICATION_HISTORY_DEFAULT_RETENTION = 60;
+const NOTIFICATION_HISTORY_RETENTION_START_KEY = "notification_history_retention_started_at";
+const NOTIFICATION_HISTORY_DEFAULT_RETENTION = 30;
+const NOTIFICATION_HISTORY_MIN_RETENTION = 7;
+const NOTIFICATION_HISTORY_MAX_RETENTION = 30;
 
 async function countOlderThan(target: RetentionTarget, cutoff: Date): Promise<number> {
   const [row] = await withDbRetry(`[log-retention:${target.name}]`, () =>
@@ -152,26 +155,50 @@ export async function runOneTimeGpsErrorsPurge(): Promise<void> {
   }
 }
 
-// Purge di notification_history (tabella raw SQL, non drizzle). La retention
-// è letta dall'AppSetting `notification_history_retention_days`; se assente o
-// non valida ricade sul default. Usa la colonna indicizzata created_at.
+// Il baseline è inserito atomicamente dalla migration 0159 prima dell'avvio
+// dell'app. Questo job lo legge soltanto: non può spostarlo né includere per
+// errore nuove notifiche nella finestra legacy.
+export async function getNotificationHistoryRetentionStart(): Promise<Date | null> {
+  try {
+    const existing = await storage.getAppSetting(NOTIFICATION_HISTORY_RETENTION_START_KEY);
+    if (!existing?.value) return null;
+    const parsed = new Date(existing.value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  } catch (err) {
+    console.warn("[LOG-RETENTION] Lettura baseline notification_history fallita:", err);
+    return null;
+  }
+}
+
+// La retention è letta dall'AppSetting `notification_history_retention_days`;
+// se assente o non valida ricade sul default. Usa la colonna indicizzata created_at.
 async function purgeNotificationHistory(): Promise<number> {
   let retentionDays = NOTIFICATION_HISTORY_DEFAULT_RETENTION;
   try {
     const setting = await storage.getAppSetting(NOTIFICATION_HISTORY_RETENTION_KEY);
     if (setting?.value) {
       const parsed = parseInt(setting.value, 10);
-      if (!isNaN(parsed) && parsed > 0) retentionDays = parsed;
+      if (!isNaN(parsed) && parsed > 0) {
+        retentionDays = Math.min(
+          NOTIFICATION_HISTORY_MAX_RETENTION,
+          Math.max(NOTIFICATION_HISTORY_MIN_RETENTION, parsed),
+        );
+      }
     }
   } catch {
     // usa il default
   }
 
+  const retentionStart = await getNotificationHistoryRetentionStart();
+  if (!retentionStart) return 0;
+
   const cutoff = new Date(Date.now() - retentionDays * ONE_DAY_MS);
   try {
     const result = await withDbRetry("[log-retention:notification_history]", () =>
       db.execute(sql`
-        DELETE FROM notification_history WHERE created_at < ${cutoff}
+        DELETE FROM notification_history
+        WHERE created_at >= ${retentionStart}
+          AND created_at < ${cutoff}
       `),
     );
     const deleted = (result as { rowCount?: number }).rowCount ?? 0;

@@ -9,7 +9,7 @@
 // connessione al DB né richiedere DATABASE_URL.
 
 /**
- * Baseline dei gruppi duplicati STORICI già applicati in produzione.
+ * Baseline dei gruppi duplicati STORICI già applicati in un ambiente gestito.
  *
  * Chiave   = prefisso numerico (es. "0067")
  * Valore   = insieme ESATTO dei filename attesi per quel prefisso
@@ -28,8 +28,17 @@ export const KNOWN_DUPLICATE_FILE_SETS: ReadonlyMap<string, ReadonlySet<string>>
   string,
   ReadonlySet<string>
 >([
-  // Nessun duplicato noto: i prefissi 0067 e 0072 sono stati bonificati
-  // spostando i file duplicati a 0083/0084/0085 (tutti idempotenti).
+  // 0157 è già applicato con entrambi i filename in candidate. Production
+  // non ne ha ancora applicato nessuno; mantenere i nomi preserva l'identità
+  // della history e consente al runner di applicare la coppia in ordine
+  // lessicografico, senza rinominare una migration già tracciata.
+  [
+    "0157",
+    new Set([
+      "0157_fixed_couples.sql",
+      "0157_watchdog_log_event_key.sql",
+    ]),
+  ],
 ]);
 
 /** Estrae il prefisso numerico iniziale (cifre prima del primo "_"). */
@@ -76,8 +85,9 @@ function isExactKnownGroup(prefix: string, group: readonly string[]): boolean {
  * variati rispetto alla baseline.
  *
  * - Gruppo esattamente uguale alla baseline → warning (già applicato, sicuro).
- * - Gruppo diverso dalla baseline (file extra/mancanti) → errore, anche se il
- *   prefisso era in baseline (es. aggiunta di 0067_nuovo.sql).
+ * - Gruppo diverso dalla baseline (file extra/mancanti) → errore.
+ * - Un membro presente senza l'altro → errore: il gruppo allowlistato deve
+ *   essere completo.
  * - Gruppo mai visto in baseline → errore.
  *
  * @throws Error se esiste almeno un duplicato non riconducibile alla baseline.
@@ -96,15 +106,20 @@ export function assertNoDuplicateMigrationPrefixes(files: readonly string[]): vo
     }
   }
 
+  // The allowlist applies only when a duplicate prefix is actually present.
+  // A historical migration may be absent from a merge ref because its identity
+  // was already represented by a differently numbered migration; that is not
+  // itself a duplicate and must not block unrelated builds.
+
   if (newDups.length === 0) return;
 
   const detail = newDups
-    .map(([prefix, group]) => `  • ${prefix}: ${group.join(", ")}`)
+    .map(([prefix, group]) => `  • ${prefix}: ${group.length > 0 ? group.join(", ") : "(nessun file)"}`)
     .join("\n");
   throw new Error(
-    "[migrate] Prefisso numerico di migrazione duplicato — ordine di applicazione ambiguo:\n" +
+    "[migrate] Prefisso numerico di migrazione duplicato o baseline incompleta — ordine di applicazione ambiguo:\n" +
       detail +
-      "\nRinomina uno dei file al prossimo numero libero (NNNN_*.sql). " +
+      "\nRipristina il gruppo completo o assegna il prossimo numero libero (NNNN_*.sql). " +
       "Regola di naming: vedi migrations/README.md.",
   );
 }

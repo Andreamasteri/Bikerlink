@@ -15,18 +15,12 @@
 // Regola di naming: vedi migrations/README.md.
 import { readdirSync } from "fs";
 import { join } from "path";
-import {
-  KNOWN_DUPLICATE_FILE_SETS,
-  findDuplicateMigrationPrefixes,
-} from "../migration-prefix-guard";
+import { assertNoDuplicateMigrationPrefixes } from "../migration-prefix-guard";
 
 const MIGRATIONS_DIR = join(process.cwd(), "migrations");
 
-function isExactKnownGroup(prefix: string, group: readonly string[]): boolean {
-  const known = KNOWN_DUPLICATE_FILE_SETS.get(prefix);
-  if (!known) return false;
-  if (group.length !== known.size) return false;
-  return group.every((f) => known.has(f));
+export function validateMigrationFiles(files: readonly string[]): void {
+  assertNoDuplicateMigrationPrefixes(files);
 }
 
 function main(): void {
@@ -43,63 +37,20 @@ function main(): void {
     process.exit(2);
   }
 
-  const dups = findDuplicateMigrationPrefixes(files);
-
-  const known: Array<[string, string[]]> = [];
-  const newDups: Array<[string, string[]]> = [];
-  for (const [prefix, group] of dups) {
-    if (isExactKnownGroup(prefix, group)) {
-      known.push([prefix, group]);
-    } else {
-      newDups.push([prefix, group]);
-    }
-  }
-
-  if (known.length) {
-    console.log(
-      `[prefix-dup] duplicati noti (baseline esatta, non bloccanti): ${known.length}`,
-    );
-    for (const [prefix, group] of known) {
-      console.log(`  • ${prefix}: ${group.join(", ")}`);
-    }
-  }
-
-  if (newDups.length === 0) {
+  try {
+    validateMigrationFiles(files);
     console.log(
       `[prefix-dup] OK — ${files.length} file di migrazione, nessun prefisso numerico duplicato NUOVO.`,
     );
     process.exit(0);
+  } catch (e) {
+    console.error("[prefix-dup] PREFISSO NUMERICO DUPLICATO O BASELINE INCOMPLETA");
+    console.error((e as Error).message);
+    console.error("Regola di naming: vedi migrations/README.md.");
+    process.exit(1);
   }
-
-  console.error("──────────────────────────────────────────────────────────────");
-  console.error("[prefix-dup] PREFISSO NUMERICO DUPLICATO RILEVATO");
-  console.error("Due o più file in migrations/ condividono lo stesso numero,");
-  console.error("oppure un gruppo storico noto è cambiato (file aggiunti/rimossi).");
-  console.error("L'ordine di applicazione è ambiguo e soggetto a errori futuri.");
-  console.error("──────────────────────────────────────────────────────────────");
-  for (const [prefix, group] of newDups) {
-    console.error(`\n  Prefisso ${prefix}:`);
-    for (const f of group) console.error(`    • ${f}`);
-    const known = KNOWN_DUPLICATE_FILE_SETS.get(prefix);
-    if (known) {
-      console.error(`  (baseline attesa per ${prefix}:)`);
-      for (const f of known) console.error(`    ○ ${f}`);
-    }
-  }
-  console.error(
-    "\nAzione: rinomina uno dei file al prossimo numero libero (NNNN_*.sql).",
-  );
-  console.error("Regola di naming: vedi migrations/README.md.");
-  console.error(
-    "(Se il duplicato è già applicato in prod e non può essere rinominato,",
-  );
-  console.error(
-    " aggiungilo a KNOWN_DUPLICATE_FILE_SETS in server/migration-prefix-guard.ts",
-  );
-  console.error(
-    " con l'insieme ESATTO dei filename attesi per quel prefisso.)",
-  );
-  process.exit(1);
 }
 
-main();
+if (process.argv[1]?.endsWith("check-migration-prefix-duplicates.ts")) {
+  main();
+}

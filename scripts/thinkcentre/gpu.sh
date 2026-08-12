@@ -30,6 +30,23 @@ format_vram() {
   local json="$1"
   local used total pct gpu_util nvme_temp nvme_spare nvme_used nvme_unsafe nvme_media
   local aer_count aer_warn breakdown confidence
+  local available reason
+
+  available=$(echo "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('available', True) else 'no')" 2>/dev/null || echo "yes")
+  reason=$(echo "$json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('reason','unknown'))" 2>/dev/null || echo "unknown")
+  if [ "$available" = "no" ]; then
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  🖥  ThinkCentre GPU Monitor  —  $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  VRAM:     offline (GPU metrics unavailable: $reason)"
+    echo "  GPU Util: unavailable"
+    echo ""
+    echo "  Agents loaded: unavailable"
+    echo "  NVMe: unavailable while GPU metrics endpoint is offline"
+    echo "  PCIe AER: unavailable while GPU metrics endpoint is offline"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    return
+  fi
 
   used=$(echo "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['current']['usedMiB'])" 2>/dev/null || echo "?")
   total=$(echo "$json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['current']['totalMiB'])" 2>/dev/null || echo "?")

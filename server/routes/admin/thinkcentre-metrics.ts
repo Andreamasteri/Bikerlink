@@ -111,6 +111,7 @@ router.get("/thinkcentre-metrics", async (_req: Request, res: Response) => {
 interface AgentPeak { usedMiB: number; pct: number; at: string }
 interface VramResponse {
   ok: boolean;
+  available?: boolean;
   agentPeaks24h?: Record<string, AgentPeak>;
 }
 
@@ -144,7 +145,9 @@ router.get("/tc-gpu-peaks", async (_req: Request, res: Response) => {
     let agentPeaks24h: Record<string, AgentPeak> | null = null;
     try {
       const result = await hubGet<VramResponse>("/vram", undefined, HUB_VRAM_TIMEOUT_MS);
-      if (result.ok && result.data?.agentPeaks24h) {
+      // An offline /vram response is a successful transport response, but
+      // it must not be treated as a valid empty peak set.
+      if (result.ok && result.data?.available !== false && result.data?.agentPeaks24h) {
         agentPeaks24h = result.data.agentPeaks24h;
       }
     } catch (err) {
