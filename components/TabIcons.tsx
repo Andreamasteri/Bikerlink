@@ -178,8 +178,6 @@ export function TabIcon({
     case "bowie":
       return <MaterialCommunityIcons name="cat" size={size} color={color} />;
 
-    case "ride":
-      return null;
 
     case "giri":
       return <MaterialCommunityIcons name="map-marker-path" size={size} color={color} />;
