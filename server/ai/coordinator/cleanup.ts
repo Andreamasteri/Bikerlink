@@ -3,11 +3,12 @@
 // Tutti e tre i tipi seguono la stessa finestra (nessun floor separato).
 import { Cron } from "croner";
 import { withJobGate } from "./gated-job";
-import { lt, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { aiConflicts, aiDecisions, aiEvents } from "@shared/db";
 
 const TZ = "Europe/Rome";
+const RETENTION_DELETE_BATCH = 500;
 let cron: Cron | null = null;
 let lastRunAt: string | null = null;
 let lastError: { at: string; message: string } | null = null;
@@ -20,19 +21,39 @@ function getRetentionDays(): number {
   return Math.min(3650, n);
 }
 
+async function deleteOldRowsInBatches(tableName: "ai_events" | "ai_decisions" | "ai_conflicts", cutoff: Date): Promise<number> {
+  let deleted = 0;
+  for (;;) {
+    const result = await db.execute(sql`
+      WITH doomed AS (
+        SELECT id
+        FROM ${sql.raw(tableName)}
+        WHERE created_at < ${cutoff}
+        ORDER BY created_at, id
+        LIMIT ${RETENTION_DELETE_BATCH}
+      )
+      DELETE FROM ${sql.raw(tableName)} target
+      USING doomed
+      WHERE target.id = doomed.id
+      RETURNING target.id
+    `);
+    const batch = result.rows?.length ?? 0;
+    deleted += batch;
+    if (batch < RETENTION_DELETE_BATCH) return deleted;
+  }
+}
+
 export async function runCoordinatorCleanup(): Promise<{ events: number; decisions: number; conflicts: number }> {
   const retainDays = getRetentionDays();
-  const cutoffEvents = new Date(Date.now() - retainDays * 86_400_000);
-  const cutoffConflicts = new Date(Date.now() - retainDays * 86_400_000);
+  const cutoff = new Date(Date.now() - retainDays * 86_400_000);
 
-  const evDel = await db.delete(aiEvents).where(lt(aiEvents.createdAt, cutoffEvents))
-    .returning({ id: aiEvents.id });
-  const dcDel = await db.delete(aiDecisions).where(lt(aiDecisions.createdAt, cutoffEvents))
-    .returning({ id: aiDecisions.id });
-  const cfDel = await db.delete(aiConflicts).where(lt(aiConflicts.createdAt, cutoffConflicts))
-    .returning({ id: aiConflicts.id });
+  // Batch piccoli: evitano un'unica DELETE + RETURNING che prende lock e
+  // trattiene la connessione per tutta la retention notturna.
+  const events = await deleteOldRowsInBatches("ai_events", cutoff);
+  const decisions = await deleteOldRowsInBatches("ai_decisions", cutoff);
+  const conflicts = await deleteOldRowsInBatches("ai_conflicts", cutoff);
 
-  const summary = { events: evDel.length, decisions: dcDel.length, conflicts: cfDel.length };
+  const summary = { events, decisions, conflicts };
   lastDeleted = summary;
   lastRunAt = new Date().toISOString();
   return summary;
@@ -68,5 +89,3 @@ export function getCleanupStatus() {
   };
 }
 
-// keep sql referenced (unused-helper safeguard).
-void sql;
