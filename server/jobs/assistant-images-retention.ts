@@ -39,7 +39,12 @@ export async function purgeOldAssistantImages(): Promise<number> {
   try {
     files = await listObjects(PREFIX);
   } catch (err) {
-    console.warn("[ASSISTANT-IMAGES-RETENTION] Errore listObjects:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    if (/R2_ENDPOINT|R2_PUBLIC_BASE_URL|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY/.test(message)) {
+      console.info("[ASSISTANT-IMAGES-RETENTION] R2 non configurato — retention immagini disabilitata in questo ambiente");
+    } else {
+      console.warn("[ASSISTANT-IMAGES-RETENTION] Errore listObjects:", err);
+    }
     return 0;
   }
 
