@@ -95,6 +95,10 @@ vi.mock("../lib/thinkcentre-powered-off", () => ({
   isThinkCentrePoweredOff: vi.fn(async () => false),
 }));
 
+vi.mock("../lib/thinkcentre-offline", () => ({
+  isThinkCentreOffline: vi.fn(async () => false),
+}));
+
 vi.mock("../storage", () => ({
   storage: {
     upsertAppSetting: vi.fn(async () => undefined),
@@ -105,13 +109,15 @@ vi.mock("../storage", () => ({
 import { db } from "../db";
 import { mapMatch } from "../graphhopper-client";
 import { isRoutingEnabled } from "../routing/routing-kill-switch";
-import { runMapMatchingJob, requeueUnmatchable } from "../map-matching-job";
+import { runMapMatchingJob, runNightlyMapMatching, requeueUnmatchable } from "../map-matching-job";
 import { isThinkCentrePoweredOff } from "../lib/thinkcentre-powered-off";
+import { isThinkCentreOffline } from "../lib/thinkcentre-offline";
 
 const dbExecute = vi.mocked(db.execute);
 const mapMatchMock = vi.mocked(mapMatch);
 const isRoutingEnabledMock = vi.mocked(isRoutingEnabled);
 const isPoweredOffMock = vi.mocked(isThinkCentrePoweredOff);
+const isOfflineMock = vi.mocked(isThinkCentreOffline);
 const dialect = new PgDialect();
 
 type Row = { session_id: string; sample_count: string; attempts?: number };
@@ -148,9 +154,12 @@ beforeEach(() => {
   isRoutingEnabledMock.mockResolvedValue(true);
   isPoweredOffMock.mockReset();
   isPoweredOffMock.mockResolvedValue(false);
+  isOfflineMock.mockReset();
+  isOfflineMock.mockResolvedValue(false);
   process.env.MAP_MATCHING_MAX_ATTEMPTS = "5";
   process.env.MAP_MATCHING_RETRY_BASE_MIN = "60";
   process.env.MAP_MATCHING_BATCH_RIDE = "50";
+  process.env.GRAPHHOPPER_URL = "http://graphhopper.test";
   delete process.env.DISABLE_MAP_MATCHING;
   // Backoff scheduler quasi-istantaneo nei test (no attese reali).
   process.env.SCHEDULER_RETRY_MAX_ATTEMPTS = "3";
@@ -418,5 +427,19 @@ describe("runMapMatchingJob — cap tentativi e backoff", () => {
     // Guardia: nessuna scrittura sul DB quando l'engine è offline (eviterebbe solo
     // di ricreare il backlog).
     expect(dbExecute).not.toHaveBeenCalled();
+  });
+});
+
+describe("runNightlyMapMatching — stati terminali", () => {
+  it("non riaccoda automaticamente exhausted/unmatchable", async () => {
+    await runNightlyMapMatching();
+
+    // Il job notturno esegue solo la discovery del job normale. Non deve fare
+    // né il conteggio storico né l'UPDATE di requeue sugli stati terminali.
+    expect(dbExecute).toHaveBeenCalledTimes(1);
+    const discoverySql = render(dbExecute.mock.calls[0]?.[0]).sql.toLowerCase();
+    expect(discoverySql).toContain("match_status in ('pending', 'retry')");
+    expect(discoverySql).not.toContain("match_status = 'unmatchable'");
+    expect(discoverySql).not.toContain("match_status = 'exhausted'");
   });
 });

@@ -406,35 +406,9 @@ export { getMapMatchingStats, getMatchingBacklogEstimate, requeueUnmatchable, dr
  * prima/dopo. Usa la funzione esistente requeueUnmatchable().
  */
 export async function runNightlyMapMatching(): Promise<void> {
-  try {
-    const before = await withBgDbSlot(() =>
-      withSchedulerRetry(
-        () => db.execute<{ exhausted: string; unmatchable: string }>(sql`
-          SELECT
-            COUNT(*) FILTER (WHERE match_status = 'exhausted')::text AS exhausted,
-            COUNT(*) FILTER (WHERE match_status = 'unmatchable')::text AS unmatchable
-          FROM ride_telemetry
-        `),
-        { label: "map-matching recovery count" },
-      ),
-    );
-    const beforeExhausted = parseInt(before.rows[0]?.exhausted ?? "0", 10);
-    const beforeUnmatchable = parseInt(before.rows[0]?.unmatchable ?? "0", 10);
-
-    const result = await requeueUnmatchable();
-    if (result.skipped) {
-      console.log(`[MAP-MATCH] Self-heal exhausted saltato: ${result.reason}`);
-    } else {
-      console.log(
-        `[MAP-MATCH] Self-heal exhausted→pending — prima: ${beforeExhausted} exhausted, ${beforeUnmatchable} unmatchable; ` +
-          `ri-accodati ${result.requeuedSamples} campioni / ${result.requeuedSessions} sessioni a 'pending'`,
-      );
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[MAP-MATCH] Self-heal exhausted fallito (non fatale): ${msg.slice(0, 150)}`);
-  }
-
+  // 'exhausted' and 'unmatchable' are terminal. Automatically requeueing them
+  // turns a dependency outage into an endless retry loop. Operators can use the
+  // explicit rematch endpoint after the routing engine has been repaired.
   await runMapMatchingJob();
 }
 
