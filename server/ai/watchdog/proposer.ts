@@ -213,7 +213,7 @@ async function runCrashContextProposer(snap: HealthSnapshot, ctx: CrashProposalC
         }));
 
       const resolveAndCall = async (): Promise<{ value: Awaited<ReturnType<typeof callModel>>; model: ReturnType<typeof resolveModel> }> => {
-        const om = tryBuildOllama();
+        const om = tryBuildOllama("horus");
         if (om) {
           try {
             const value = await callModel(om);
@@ -405,7 +405,7 @@ export async function runProposer(snap: HealthSnapshot, opts: ProposerOptions = 
       const resolveAndCall = async (): Promise<{ value: Awaited<ReturnType<typeof callModel>>; model: ReturnType<typeof resolveModel> }> => {
         // Step 0: Ollama-first (skipOllama non impostato → tentiamo Ollama)
         {
-          const om = tryBuildOllama();
+          const om = tryBuildOllama("horus");
           if (om) {
             try {
               const value = await callModel(om);
