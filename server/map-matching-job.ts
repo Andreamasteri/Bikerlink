@@ -397,13 +397,10 @@ export { getMapMatchingStats, getMatchingBacklogEstimate, requeueUnmatchable, dr
 // ─── Nightly self-heal + run ────────────────────────────────────────────────────
 
 /**
- * Giro notturno completo: PRIMA ri-accoda i campioni rimasti `exhausted`
- * (terminali per cap tentativi — tipicamente perché l'engine era offline)
- * riportandoli a `pending`, POI esegue il map-matching così li riprocessa nello
- * stesso giro. È il self-heal del backlog: senza questo, le sessioni esaurite
- * durante un'indisponibilità prolungata di GraphHopper restavano bloccate per
- * sempre. Il requeue è best-effort (non fa abortire il run) e logga i conteggi
- * prima/dopo. Usa la funzione esistente requeueUnmatchable().
+ * Giro notturno: processa esclusivamente il backlog eleggibile (pending/retry)
+ * rispettando backoff e cap dei tentativi. Gli stati terminali exhausted e
+ * unmatchable non vengono riaccodati automaticamente: il re-match richiede
+ * un'azione esplicita dell'operatore dopo il ripristino del motore.
  */
 export async function runNightlyMapMatching(): Promise<void> {
   // 'exhausted' and 'unmatchable' are terminal. Automatically requeueing them
