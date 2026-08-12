@@ -174,7 +174,7 @@ export async function isOllamaReachable(persona: OllamaPersona = "bowie"): Promi
     // dal backend usa l'URL diretto, quindi /api/tags è più robusto).
     const res = await fetch(`${url}/api/tags`, { method: "GET", headers, signal: controller.signal });
     clearTimeout(timer);
-    _probeResult[persona] = res.ok || res.status < 500;
+    _probeResult[persona] = res.ok;
     _probeTs[persona] = Date.now();
     return _probeResult[persona] as boolean;
   } catch {
