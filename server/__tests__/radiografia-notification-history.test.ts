@@ -70,6 +70,15 @@ describe("recordNotificationHistory — una INSERT per riga", () => {
     expect(mockExecute).not.toHaveBeenCalled();
   });
 
+  it("ignora i watchdog_status ripetitivi", async () => {
+    await recordNotificationHistory([
+      { userId: null, notificationType: "watchdog_status", token: "ExponentPushToken[status]", status: "sent" },
+      { userId: null, notificationType: "watchdog_restart", token: "ExponentPushToken[restart]", status: "sent" },
+    ]);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+    expect(tokenOfCall(0)).toBe("ExponentPushToken[restart]");
+  });
+
   it("non propaga errori se la INSERT fallisce (non-fatal)", async () => {
     mockExecute.mockRejectedValueOnce(new Error("db down"));
     await expect(

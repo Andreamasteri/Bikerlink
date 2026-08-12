@@ -276,6 +276,41 @@ describe("vram-routes.js — agent name after model upgrade (real production cod
     expect(res.body.breakdown[0].agent).toBe("Horus");
   });
 
+  it("returns a healthy offline response when GPU metrics are unavailable", async () => {
+    const { client } = makeTestApp({
+      ...singleDefaultModel,
+      readGpuStats: () => {
+        throw new Error("nvidia-smi: command not found");
+      },
+    });
+
+    const res = await client.get("/vram");
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      ok: true,
+      available: false,
+      reason: "gpu-metrics-unavailable",
+      current: null,
+      breakdown: [],
+      breakdownConfidence: "none",
+    });
+    expect(res.body.error).toBeUndefined();
+  });
+
+  it("keeps auxiliary telemetry failures as real 500 errors", async () => {
+    const { client } = makeTestApp({
+      ...singleDefaultModel,
+      readComputeApps: () => {
+        throw new Error("ollama process listing failed");
+      },
+    });
+
+    const res = await client.get("/vram");
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/ollama process listing failed/);
+    expect(res.body.available).toBeUndefined();
+  });
+
   it("no GPU processes → breakdown is empty and confidence is 'none'", async () => {
     const { client } = makeTestApp(noProcesses);
 

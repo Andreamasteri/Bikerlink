@@ -33,6 +33,11 @@ interface ExpoPushTicket {
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
+// I watchdog_status sono snapshot ripetitivi, non eventi utili allo storico.
+// Gli alert watchdog specifici (problem, restart, network instability, ecc.)
+// restano registrati; le notifiche funzionali continuano a essere registrate.
+const NON_PERSISTED_NOTIFICATION_TYPES = new Set(["watchdog_status"]);
+
 export function isValidExpoPushToken(token: string): boolean {
   return token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken[");
 }
@@ -126,9 +131,10 @@ export async function clearStaleBowieDeviceToken(token: string): Promise<void> {
 export async function recordNotificationHistory(
   rows: Array<{ userId: string | null; notificationType: string; token: string; status: string; errorMessage?: string }>,
 ): Promise<void> {
-  if (!rows.length) return;
+  const persistedRows = rows.filter((row) => !NON_PERSISTED_NOTIFICATION_TYPES.has(row.notificationType));
+  if (!persistedRows.length) return;
   try {
-    for (const v of rows) {
+    for (const v of persistedRows) {
       await db.execute(sql`
         INSERT INTO notification_history (user_id, notification_type, token, status, error_message)
         VALUES (${v.userId}, ${v.notificationType}, ${v.token}, ${v.status}, ${v.errorMessage ?? null})

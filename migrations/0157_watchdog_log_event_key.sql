@@ -1,3 +1,5 @@
+-- Migration filename intentionally remains 0157_watchdog_log_event_key.sql
+-- It is tracked separately from the other historical 0157 migration.
 -- Persist the stable watchdog event identity in every audit row.
 -- This is additive and preserves all existing audit records.
 ALTER TABLE ai_watchdog_log
