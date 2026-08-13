@@ -55,24 +55,24 @@ describe("deriveTargetUserTypes", () => {
     expect(deriveTargetUserTypes(p)).toEqual(["biker", "coppia"]);
   });
 
-  it("find_a_biker → zavorrina + coppia", () => {
+  it("find_a_biker → biker + coppia", () => {
     const p = makeProposal({ searchType: "find_a_biker", targetUserTypes: [] });
-    expect(deriveTargetUserTypes(p)).toEqual(["zavorrina", "coppia"]);
+    expect(deriveTargetUserTypes(p)).toEqual(["biker", "coppia"]);
   });
 
-  it("find_a_guest → biker + coppia", () => {
+  it("find_a_guest → zavorrina + coppia", () => {
     const p = makeProposal({ searchType: "find_a_guest", targetUserTypes: [] });
-    expect(deriveTargetUserTypes(p)).toEqual(["biker", "coppia"]);
-  });
-
-  it("hitchhiker → zavorrina + coppia", () => {
-    const p = makeProposal({ searchType: "hitchhiker", targetUserTypes: [] });
     expect(deriveTargetUserTypes(p)).toEqual(["zavorrina", "coppia"]);
   });
 
-  it("hitcher → biker + coppia", () => {
-    const p = makeProposal({ searchType: "hitcher", targetUserTypes: [] });
+  it("hitchhiker → biker + coppia", () => {
+    const p = makeProposal({ searchType: "hitchhiker", targetUserTypes: [] });
     expect(deriveTargetUserTypes(p)).toEqual(["biker", "coppia"]);
+  });
+
+  it("hitcher → zavorrina + coppia", () => {
+    const p = makeProposal({ searchType: "hitcher", targetUserTypes: [] });
+    expect(deriveTargetUserTypes(p)).toEqual(["zavorrina", "coppia"]);
   });
 
   it("unknown searchType → biker + zavorrina + coppia", () => {

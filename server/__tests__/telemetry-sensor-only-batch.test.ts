@@ -15,7 +15,18 @@ import request from "supertest";
 
 vi.mock("../db", () => {
   const execute = vi.fn();
-  const insert = vi.fn(() => ({ values: vi.fn().mockResolvedValue(undefined) }));
+  const insert = vi.fn(() => {
+    const values = vi.fn((rows: unknown) => ({
+      onConflictDoNothing: vi.fn(() => ({
+        returning: vi.fn(async () =>
+          Array.isArray(rows)
+            ? rows.map((row) => ({ ingestKey: (row as { ingestKey?: string }).ingestKey ?? null }))
+            : [],
+        ),
+      })),
+    }));
+    return { values };
+  });
   // POST /batch ora esegue insert + aggiornamento riepilogo in una transazione:
   // la fake tx riusa gli stessi spy così i test sui campioni inseriti continuano
   // a valere e updateTelemetrySessionStats (che chiama tx.execute) non rompe.
@@ -66,9 +77,6 @@ describe("POST /api/telemetry/batch — campioni sensor-only", () => {
     app = buildApp();
 
     vi.mocked(db.execute).mockResolvedValue({ rows: [] } as unknown as Awaited<ReturnType<typeof db.execute>>);
-    vi.mocked(db.insert).mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ReturnType<typeof db.insert>);
   });
 
   // ── (a) lat/lon esplicitamente null → salvato ─────────────────────────────
