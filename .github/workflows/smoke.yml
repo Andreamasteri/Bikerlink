@@ -22,10 +22,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22.23.1"
           cache: npm
@@ -41,8 +41,8 @@ jobs:
           node -e '
             const u = new URL(process.env.BASE_URL);
             if (u.protocol !== "https:") throw new Error("Candidate smoke requires HTTPS");
-            if (!/(staging|candidate)/i.test(u.hostname)) {
-              throw new Error("Refusing host without staging/candidate marker: " + u.hostname);
+            if (!/(staging|candidate|pr-\d+)/i.test(u.hostname)) {
+              throw new Error("Refusing host without staging/candidate/PR marker: " + u.hostname);
             }
           '
 
@@ -63,7 +63,7 @@ jobs:
 
       - name: Upload smoke report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-report-${{ github.run_id }}
           path: smoke-report.txt
