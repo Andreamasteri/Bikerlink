@@ -2,7 +2,7 @@
  * Cloudflare Access — Service Token helper (BikerLink)
  *
  * I servizi self-hosted sul ThinkCentre (GraphHopper, Valhalla, Photon,
- * Whisper) sono esposti su biker-link.net tramite Cloudflare Tunnel. Con
+ * ) sono esposti su biker-link.net tramite Cloudflare Tunnel. Con
  * Cloudflare Access si aggiunge un layer zero-trust DAVANTI a ogni sottodominio:
  * l'edge Cloudflare valida le richieste prima che raggiungano l'origine.
  *
@@ -18,7 +18,7 @@
  * Comportamento:
  *   - Se ENTRAMBE sono impostate, cfAccessHeaders() restituisce i due header.
  *   - Altrimenti restituisce {} (degrada con grazia): i token custom esistenti
- *     (X-GH-Token / X-Valhalla-Key / X-Photon-Token / X-Whisper-Token)
+ *     (X-GH-Token / X-Valhalla-Key / X-Photon-Token)
  *     restano l'autenticazione attiva come fallback.
  *
  * Gli header sono validati e consumati dall'edge Cloudflare; l'origine li
@@ -27,15 +27,21 @@
  * (tile CDN, API cloud pubbliche).
  */
 
-const CF_ACCESS_CLIENT_ID = process.env.CF_ACCESS_CLIENT_ID?.trim() ?? "";
-const CF_ACCESS_CLIENT_SECRET = process.env.CF_ACCESS_CLIENT_SECRET?.trim() ?? "";
+function genericPair(): { id: string; secret: string } {
+  // Resolve at request time so a rotated secret is picked up without requiring
+  // a process restart. Values are never logged or returned to callers.
+  return {
+    id: process.env.CF_ACCESS_CLIENT_ID?.trim() ?? "",
+    secret: process.env.CF_ACCESS_CLIENT_SECRET?.trim() ?? "",
+  };
+}
 
 /**
  * Task #4 — Override opzionale per-agente. Un agente AI (bowie/horus/ares/
  * ares) può avere un Service Token dedicato via <AGENT>_CF_ACCESS_CLIENT_ID
  * / <AGENT>_CF_ACCESS_CLIENT_SECRET. Se una delle due manca, si ricade sulla
  * coppia generica CF_ACCESS_CLIENT_ID/SECRET (comportamento storico invariato per
- * GraphHopper/Valhalla/Nominatim/Whisper, che chiamano senza argomento).
+ * GraphHopper/Valhalla/Nominatim, che chiamano senza argomento).
  * Letto a request-time così un secret aggiunto in futuro è raccolto senza refactor.
  */
 function resolvePair(agent?: string): { id: string; secret: string } {
@@ -45,7 +51,7 @@ function resolvePair(agent?: string): { id: string; secret: string } {
     const secret = process.env[`${p}_CF_ACCESS_CLIENT_SECRET`]?.trim();
     if (id && secret) return { id, secret };
   }
-  return { id: CF_ACCESS_CLIENT_ID, secret: CF_ACCESS_CLIENT_SECRET };
+  return genericPair();
 }
 
 /** true se entrambe le credenziali del Service Token CF Access sono configurate. */
@@ -56,7 +62,7 @@ export function isCfAccessConfigured(agent?: string): boolean {
 
 /**
  * Header del Service Token Cloudflare Access da allegare alle richieste verso i
- * servizi self-hosted protetti (gh/valhalla/photon/whisper su biker-link.net).
+ * servizi self-hosted protetti (gh/valhalla/photon su biker-link.net).
  * Restituisce {} se le credenziali non sono configurate (fallback ai token custom).
  * Con `agent` usa l'eventuale override per-agente (fallback alla coppia generica).
  */

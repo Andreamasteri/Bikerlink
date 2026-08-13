@@ -333,7 +333,7 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const parsed = privacySettingsSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const { hideFromMap, hideOnlineStatus, hideLastSeen, hideDistance, positionFuzz, positionFuzzKm, gpsPrecision, fakeHomeEnabled, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, fakeWorkEnabled, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius, fakeWhateverEnabled, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius, offlinePositionRandomize, fixedPositionEnabled, fixedPositionLat, fixedPositionLng } = parsed.data;
+    const { hideFromMap, hideOnlineStatus, hideLastSeen, hideDistance, positionFuzz, positionFuzzKm, gpsPrecision, fakeHomeEnabled, homeLatitude, homeLongitude, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, fakeWorkEnabled, workLatitude, workLongitude, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius, fakeWhateverEnabled, whateverLatitude, whateverLongitude, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius, offlinePositionRandomize, fixedPositionEnabled, fixedPositionLat, fixedPositionLng } = parsed.data;
 
     const existing = await storage.getUserProfile(userId);
     const updateData: Partial<InsertUserProfile> = {};
@@ -363,18 +363,24 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     }
 
     if (fakeHomeEnabled !== undefined) updateData.fakeHomeEnabled = fakeHomeEnabled;
-    if (fakeHomeLatitude !== undefined) updateData.homeLatitude = fakeHomeLatitude;
-    if (fakeHomeLongitude !== undefined) updateData.homeLongitude = fakeHomeLongitude;
+    if (homeLatitude !== undefined) updateData.homeLatitude = homeLatitude ?? undefined;
+    if (homeLongitude !== undefined) updateData.homeLongitude = homeLongitude ?? undefined;
+    if (fakeHomeLatitude !== undefined) updateData.fakeHomeLatitude = fakeHomeLatitude ?? undefined;
+    if (fakeHomeLongitude !== undefined) updateData.fakeHomeLongitude = fakeHomeLongitude ?? undefined;
     if (fakeHomeRadius !== undefined) updateData.fakeHomeRadius = fakeHomeRadius ?? undefined;
 
     if (fakeWorkEnabled !== undefined) updateData.fakeWorkEnabled = fakeWorkEnabled;
-    if (fakeWorkLatitude !== undefined) updateData.workLatitude = fakeWorkLatitude;
-    if (fakeWorkLongitude !== undefined) updateData.workLongitude = fakeWorkLongitude;
+    if (workLatitude !== undefined) updateData.workLatitude = workLatitude ?? undefined;
+    if (workLongitude !== undefined) updateData.workLongitude = workLongitude ?? undefined;
+    if (fakeWorkLatitude !== undefined) updateData.fakeWorkLatitude = fakeWorkLatitude ?? undefined;
+    if (fakeWorkLongitude !== undefined) updateData.fakeWorkLongitude = fakeWorkLongitude ?? undefined;
     if (fakeWorkRadius !== undefined) updateData.fakeWorkRadius = fakeWorkRadius ?? undefined;
 
     if (fakeWhateverEnabled !== undefined) updateData.fakeWhateverEnabled = fakeWhateverEnabled;
-    if (fakeWhateverLatitude !== undefined) updateData.whateverLatitude = fakeWhateverLatitude;
-    if (fakeWhateverLongitude !== undefined) updateData.whateverLongitude = fakeWhateverLongitude;
+    if (whateverLatitude !== undefined) updateData.whateverLatitude = whateverLatitude ?? undefined;
+    if (whateverLongitude !== undefined) updateData.whateverLongitude = whateverLongitude ?? undefined;
+    if (fakeWhateverLatitude !== undefined) updateData.fakeWhateverLatitude = fakeWhateverLatitude ?? undefined;
+    if (fakeWhateverLongitude !== undefined) updateData.fakeWhateverLongitude = fakeWhateverLongitude ?? undefined;
     if (fakeWhateverRadius !== undefined) updateData.fakeWhateverRadius = fakeWhateverRadius ?? undefined;
 
     if (existing) {

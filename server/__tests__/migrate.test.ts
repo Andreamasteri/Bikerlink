@@ -194,11 +194,11 @@ describe("0152 reconciliation migration boundaries", () => {
     )).toBe(true);
   });
 
-  it("isolates every 0155 statement so CREATE INDEX CONCURRENTLY is autocommit-safe", () => {
+  it("isolates every 0160 statement so CREATE INDEX CONCURRENTLY is autocommit-safe", () => {
     const migrationPath = path.resolve(
       process.cwd(),
       "migrations",
-      "0155_temp_spill_indexes_and_watchdog_identity.sql"
+      "0160_temp_spill_indexes_and_watchdog_identity.sql"
     );
     const sql = fs.readFileSync(migrationPath, "utf-8");
     const statements = splitStatements(sql);

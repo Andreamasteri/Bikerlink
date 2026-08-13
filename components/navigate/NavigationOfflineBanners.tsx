@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Alert } from "react-native";
 import { useT } from "@/lib/language-context";
@@ -16,19 +16,9 @@ interface OfflineState {
   deleteOffline: () => void;
 }
 
-interface WhisperState {
-  recording: boolean;
-  transcribing: boolean;
-  error?: string | null;
-  startRecording: () => void;
-}
-
 interface Props {
   isOffline: boolean;
   offline: OfflineState;
-  whisper: WhisperState;
-  voiceCmdToast: string | null;
-  onVoiceCommandRelease: () => void;
   styles: {
     offlineBanner: object;
     offlineBannerText: object;
@@ -41,19 +31,12 @@ interface Props {
     staleBannerText: object;
     offlineAvailableBanner: object;
     offlineAvailableBannerText: object;
-    voiceMicBtn: object;
-    voiceMicBtnActive: object;
-    voiceToast: object;
-    voiceToastText: object;
   };
 }
 
 export function NavigationOfflineBanners({
   isOffline,
   offline,
-  whisper,
-  voiceCmdToast,
-  onVoiceCommandRelease,
   styles: s,
 }: Props) {
   const t = useT();
@@ -128,31 +111,6 @@ export function NavigationOfflineBanners({
         </View>
       )}
 
-      <TouchableOpacity
-        style={[
-          s.voiceMicBtn,
-          whisper.recording && s.voiceMicBtnActive,
-        ]}
-        onPressIn={() => whisper.startRecording()}
-        onPressOut={onVoiceCommandRelease}
-        activeOpacity={0.8}
-      >
-        {whisper.transcribing ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Ionicons
-            name={whisper.recording ? "mic" : "mic-outline"}
-            size={22}
-            color="#fff"
-          />
-        )}
-      </TouchableOpacity>
-
-      {voiceCmdToast !== null && (
-        <View style={s.voiceToast}>
-          <Text style={s.voiceToastText} numberOfLines={2}>{voiceCmdToast}</Text>
-        </View>
-      )}
     </>
   );
 }

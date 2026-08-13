@@ -213,7 +213,7 @@ async function runCrashContextProposer(snap: HealthSnapshot, ctx: CrashProposalC
         }));
 
       const resolveAndCall = async (): Promise<{ value: Awaited<ReturnType<typeof callModel>>; model: ReturnType<typeof resolveModel> }> => {
-        const om = tryBuildOllama();
+        const om = tryBuildOllama("horus");
         if (om) {
           try {
             const value = await callModel(om);
@@ -271,7 +271,11 @@ async function runCrashContextProposer(snap: HealthSnapshot, ctx: CrashProposalC
       console.warn("[watchdog/proposer/crash] budget esaurito, skip");
       return null;
     }
-    console.warn("[watchdog/proposer/crash] error:", msg);
+    if (msg.startsWith("AI_SELFHOSTED_UNAVAILABLE")) {
+      console.info("[watchdog/proposer/crash] skip — Horus self-hosted non disponibile e fallback cloud disabilitato");
+    } else {
+      console.warn("[watchdog/proposer/crash] error:", msg);
+    }
     return null;
   }
 }
@@ -405,7 +409,7 @@ export async function runProposer(snap: HealthSnapshot, opts: ProposerOptions = 
       const resolveAndCall = async (): Promise<{ value: Awaited<ReturnType<typeof callModel>>; model: ReturnType<typeof resolveModel> }> => {
         // Step 0: Ollama-first (skipOllama non impostato → tentiamo Ollama)
         {
-          const om = tryBuildOllama();
+          const om = tryBuildOllama("horus");
           if (om) {
             try {
               const value = await callModel(om);
@@ -478,7 +482,11 @@ export async function runProposer(snap: HealthSnapshot, opts: ProposerOptions = 
       console.warn("[watchdog/proposer] budget esaurito, skip proposer");
       return null;
     }
-    console.warn("[watchdog/proposer] error:", msg);
+    if (msg.startsWith("AI_SELFHOSTED_UNAVAILABLE")) {
+      console.info("[watchdog/proposer] skip — Horus self-hosted non disponibile e fallback cloud disabilitato");
+    } else {
+      console.warn("[watchdog/proposer] error:", msg);
+    }
     return null;
   }
 }

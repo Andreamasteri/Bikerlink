@@ -146,6 +146,12 @@ router.get("/site-visits", async (req: Request, res: Response) => {
     const from = req.query.from ? String(req.query.from) : null;
     const to = req.query.to ? String(req.query.to) : null;
     const loggedOnly = req.query.loggedOnly === "1";
+    const beforeCreatedAt = req.query.beforeCreatedAt ? String(req.query.beforeCreatedAt) : null;
+    const beforeId = req.query.beforeId ? String(req.query.beforeId) : null;
+
+    if ((beforeCreatedAt && !beforeId) || (!beforeCreatedAt && beforeId)) {
+      return sendError(res, 400, "beforeCreatedAt e beforeId devono essere forniti insieme");
+    }
 
     const VALID_EVENTS = ["view", "register", "login"] as const;
     const rawEvent = req.query.event ? String(req.query.event) : null;
@@ -156,6 +162,9 @@ router.get("/site-visits", async (req: Request, res: Response) => {
     if (to) conditions.push(sql`sv.created_at < ${to}::date`);
     if (eventFilter) conditions.push(sql`sv.event = ${eventFilter}`);
     if (loggedOnly) conditions.push(sql`sv.user_id IS NOT NULL`);
+    if (beforeCreatedAt && beforeId) {
+      conditions.push(sql`(sv.created_at, sv.id) < (${beforeCreatedAt}::timestamp, ${beforeId})`);
+    }
 
     const whereClause = conditions.length > 0
       ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
@@ -189,9 +198,20 @@ router.get("/site-visits", async (req: Request, res: Response) => {
       `),
     ]);
 
+    const visits = rowsResult.rows;
+    const lastVisit = visits[visits.length - 1] as
+      | { id?: string; createdAt?: string | Date }
+      | undefined;
+
     return res.json({
       total: (countResult.rows[0] as { n: number }).n,
-      visits: rowsResult.rows,
+      visits,
+      nextCursor: lastVisit?.id && lastVisit?.createdAt
+        ? {
+            beforeId: lastVisit.id,
+            beforeCreatedAt: new Date(lastVisit.createdAt).toISOString(),
+          }
+        : null,
     });
   } catch (_error) {
     console.error("Admin site-visits list error:", _error);

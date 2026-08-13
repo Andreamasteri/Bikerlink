@@ -29,6 +29,7 @@ import contestRoutes from "./routes/contest";
 import adsRoutes from "./routes/ads";
 import chatRoutes from "./routes/chat";
 import notificationRoutes from "./routes/notifications";
+import fixedCouplesRoutes from "./routes/fixed-couples";
 import reportRoutes from "./routes/reports";
 import workshopRoutes from "./routes/workshops";
 import businessRoutes from "./routes/businesses";
@@ -329,6 +330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/matches", matchesSharedRoutes);
   app.use("/api/chat", chatRoutes);
   app.use("/api/notifications", notificationRoutes);
+  app.use("/api/fixed-couples", fixedCouplesRoutes);
   app.use("/api/reports", reportRoutes);
   app.use("/api/workshops", workshopRoutes);
   app.use("/api/businesses", businessRoutes);
@@ -342,8 +344,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/routing", routingAreasRouter);
   app.use("/api/routing", valhallaFunctionsRouter);
 
-  const { default: whisperRoutes } = await import("./routes/whisper");
-  app.use("/api/whisper", whisperRoutes);
   app.use(customRoutesRouter);
   app.use(customRoutes2Router);
   // Task #2517 — Bull Board UI for inspecting BullMQ queues. Mounted BEFORE

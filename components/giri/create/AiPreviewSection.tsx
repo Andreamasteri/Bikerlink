@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput } from 
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 
-import { AiPreviewState } from "./types";
+import { AiPreviewState, GeoResult } from "./types";
 
 interface AiPreviewSectionProps {
   aiPreview: AiPreviewState | null;
@@ -14,6 +14,7 @@ interface AiPreviewSectionProps {
   aiSuccessTimer: React.MutableRefObject<any>;
   updatePreviewItemName: (idx: number, name: string) => void;
   regeocodePillItem: (idx: number, name: string) => void;
+  selectPreviewItemSuggestion: (idx: number, candidate: GeoResult) => void;
   handleConfirmPreview: () => void;
   hasUnresolvedPois?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mode is string union type
@@ -29,6 +30,7 @@ export const AiPreviewSection: React.FC<AiPreviewSectionProps> = ({
   setAiPreview,
   updatePreviewItemName,
   regeocodePillItem,
+  selectPreviewItemSuggestion,
   handleConfirmPreview,
   hasUnresolvedPois = false,
   setMode,
@@ -36,6 +38,10 @@ export const AiPreviewSection: React.FC<AiPreviewSectionProps> = ({
 }) => {
   const colors = useColors();
   if (!aiPreview) return null;
+  const hasUnresolvedLocations = aiPreview.items.some(
+    (item) => item.geocoding || !item.resolved || !Number.isFinite(item.lat) || !Number.isFinite(item.lng)
+  );
+  const blocked = hasUnresolvedLocations || hasUnresolvedPois;
 
   return (
     <View style={styles.container}>
@@ -58,22 +64,34 @@ export const AiPreviewSection: React.FC<AiPreviewSectionProps> = ({
               placeholderTextColor={colors.textSecondary}
             />
             {item.geocoding && <ActivityIndicator size="small" color={colors.accent} />}
+            {!item.geocoding && item.suggestions && item.suggestions.length > 1 && (
+              <View style={styles.suggestions}>
+                <Text style={[styles.suggestionHint, { color: colors.textSecondary }]}>Seleziona il punto corretto</Text>
+                {item.suggestions.map((candidate) => (
+                  <Pressable
+                    key={candidate.name + "-" + candidate.lat + "-" + candidate.lng}
+                    style={[styles.suggestion, item.resolved && item.lat === candidate.lat && item.lng === candidate.lng && styles.suggestionSelected]}
+                    onPress={() => selectPreviewItemSuggestion(idx, candidate)}
+                  >
+                    <Text style={[styles.suggestionText, { color: colors.text }]} numberOfLines={2}>{candidate.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
         ))}
       </View>
 
-      {hasUnresolvedPois && (
-        <Text style={[styles.poiHint, { color: colors.textSecondary }]}>
-          Seleziona una tappa per ogni fermata richiesta per continuare
-        </Text>
+      {blocked && (
+        <Text style={[styles.poiHint, { color: colors.textSecondary }]}>Seleziona un indirizzo per ogni punto e ogni fermata richiesta per continuare</Text>
       )}
 
       <View style={styles.footerButtons}>
         <Pressable
-          style={[styles.confirmBtn, { backgroundColor: hasUnresolvedPois ? colors.surface : colors.accent, opacity: hasUnresolvedPois ? 0.5 : 1 }]}
-          onPress={hasUnresolvedPois ? undefined : handleConfirmPreview}
+          style={[styles.confirmBtn, { backgroundColor: blocked ? colors.surface : colors.accent, opacity: blocked ? 0.5 : 1 }]}
+          onPress={blocked ? undefined : handleConfirmPreview}
         >
-          <Text style={[styles.confirmBtnText, { color: hasUnresolvedPois ? colors.textSecondary : "#000" }]}>Conferma e Calcola</Text>
+          <Text style={[styles.confirmBtnText, { color: blocked ? colors.textSecondary : "#000" }]}>Conferma e Calcola</Text>
         </Pressable>
         <Pressable
           style={[styles.cancelBtn, { backgroundColor: colors.surface }]}
@@ -94,6 +112,11 @@ const styles = StyleSheet.create({
   pillInput: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 14, padding: 0 },
   footerButtons: { gap: 10 },
   poiHint: { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginBottom: 10 },
+  suggestions: { width: "100%", gap: 6, marginTop: 6 },
+  suggestionHint: { fontFamily: "Inter_400Regular", fontSize: 12, marginBottom: 2 },
+  suggestion: { paddingVertical: 7, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1, borderColor: "#ffffff25" },
+  suggestionSelected: { borderColor: "#22c55e", backgroundColor: "#22c55e18" },
+  suggestionText: { fontFamily: "Inter_400Regular", fontSize: 12 },
   confirmBtn: { paddingVertical: 14, borderRadius: 12, alignItems: "center" },
   confirmBtnText: { fontFamily: "Inter_700Bold", fontSize: 15 },
   cancelBtn: { paddingVertical: 14, borderRadius: 12, alignItems: "center" },

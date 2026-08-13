@@ -47,11 +47,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Migration prefix uniqueness gate
+        run: npx tsx server/scripts/check-migration-prefix-duplicates.ts
+
       - name: Typecheck client (Expo)
         run: npx tsc --noEmit -p tsconfig.json
 
       - name: Typecheck server
         run: npx tsc --noEmit -p server/tsconfig.json
+
+      - name: Matching regression tests
+        run: npx vitest run server/__tests__/matching/resolveMatchPool.test.ts server/__tests__/proposals/create-coordinates.test.ts
+
+      - name: Database target guard tests
+        run: npx vitest run server/__tests__/database-environment.test.ts
 
       - name: ESLint
         run: npm run lint

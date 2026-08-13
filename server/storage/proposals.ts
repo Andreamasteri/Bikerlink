@@ -51,8 +51,8 @@ export class ProposalsStorage extends ConversationsStorage {
     await db.delete(proposalParticipants).where(eq(proposalParticipants.id, id));
   }
 
-  async getActiveProposalsWithLocation(): Promise<Proposal[]> {
-    const results = await db.select({ proposal: proposals, role: users.role })
+  async getActiveProposalsWithLocation(): Promise<Array<Proposal & { authorUserType: string | null }>> {
+    const results = await db.select({ proposal: proposals, role: users.role, userType: users.userType })
       .from(proposals)
       .innerJoin(users, eq(users.id, proposals.userId))
       .where(and(
@@ -66,7 +66,7 @@ export class ProposalsStorage extends ConversationsStorage {
         sql`(${proposals.scheduledAt} IS NULL OR ${proposals.scheduledAt} >= NOW())`,
         ...systemAccountConditions(users),
       ));
-    return results.map(r => r.proposal);
+    return results.map(r => ({ ...r.proposal, authorUserType: r.userType }));
   }
 
   /**
@@ -106,7 +106,7 @@ export class ProposalsStorage extends ConversationsStorage {
    * candidate count (proposals with status=active before user-side filters).
    * Used by matching perf metrics to track candidatesPre vs candidatesPost.
    */
-  async getActiveProposalsWithLocationStats(): Promise<{ proposals: Proposal[]; candidatesPre: number }> {
+  async getActiveProposalsWithLocationStats(): Promise<{ proposals: Array<Proposal & { authorUserType: string | null }>; candidatesPre: number }> {
     const preRows = await db
       .select({ id: proposals.id })
       .from(proposals)

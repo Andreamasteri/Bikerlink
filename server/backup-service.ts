@@ -1,6 +1,6 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
-import zlib from "zlib";
+import { createHash } from "node:crypto";
 import { ZipArchive } from "archiver";
 import fs from "fs";
 import os from "os";
@@ -11,11 +11,12 @@ import { appSettings } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { storage } from "./storage";
 import { uploadBackupToGDrive } from "./google-drive-backup";
+import { getDeployEnvironment, getProductionDatabaseUrl } from "./lib/database-environment";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const DEFAULT_DB_HOURS = 24;
-const DEFAULT_MEDIA_HOURS = 168;
+const DEFAULT_MEDIA_HOURS = 24;
 
 export const BACKUP_OBJECT_PREFIX = ".private/backups";
 
@@ -31,6 +32,17 @@ function addMs(ms: number): Date {
 
 function getTimestamp(): string {
   return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
+}
+
+function sha256(buffer: Buffer): string {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+function assertProductionBackupTarget(): string {
+  if (getDeployEnvironment() !== "production") {
+    throw new Error("Backup DB/media consentiti esclusivamente in production.");
+  }
+  return getProductionDatabaseUrl();
 }
 
 async function readSetting(key: string): Promise<string | null> {
@@ -65,14 +77,19 @@ export interface BackupFrequency {
   mediaHours: number;
 }
 
+function normalizeFrequencyHours(raw: string | null, fallback: number): number {
+  const hours = raw == null ? NaN : Number(raw);
+  return Number.isInteger(hours) && hours >= 1 && hours <= 8760 ? hours : fallback;
+}
+
 export async function getBackupFrequency(): Promise<BackupFrequency> {
   const [dbVal, mediaVal] = await Promise.all([
     readSetting("backup.freq_db_hours"),
     readSetting("backup.freq_media_hours"),
   ]);
   return {
-    dbHours: dbVal ? parseInt(dbVal, 10) || DEFAULT_DB_HOURS : DEFAULT_DB_HOURS,
-    mediaHours: mediaVal ? parseInt(mediaVal, 10) || DEFAULT_MEDIA_HOURS : DEFAULT_MEDIA_HOURS,
+    dbHours: normalizeFrequencyHours(dbVal, DEFAULT_DB_HOURS),
+    mediaHours: normalizeFrequencyHours(mediaVal, DEFAULT_MEDIA_HOURS),
   };
 }
 
@@ -82,6 +99,11 @@ export async function setBackupFrequency(freq: Partial<BackupFrequency>): Promis
     dbHours: freq.dbHours ?? current.dbHours,
     mediaHours: freq.mediaHours ?? current.mediaHours,
   };
+  for (const [name, hours] of Object.entries(next)) {
+    if (!Number.isInteger(hours) || hours < 1 || hours > 8760) {
+      throw new Error(`Frequenza backup ${name} non valida: usare un intero tra 1 e 8760 ore.`);
+    }
+  }
   await Promise.all([
     upsertSetting("backup.freq_db_hours", String(next.dbHours), "Frequenza backup DB (ore)"),
     upsertSetting("backup.freq_media_hours", String(next.mediaHours), "Frequenza backup media (ore)"),
@@ -95,6 +117,9 @@ export interface LastBackupMeta {
   size: number;
   objectPath?: string;
   fileName?: string;
+  sha256?: string;
+  format?: "custom" | "zip";
+  environment?: "production";
 }
 
 async function saveLastBackup(type: "db" | "media", meta: LastBackupMeta) {
@@ -128,6 +153,7 @@ export async function getBackupStatus() {
     dbHours: freq.dbHours,
     mediaHours: freq.mediaHours,
     configured: true,
+    productionOnly: true,
   };
 }
 
@@ -148,51 +174,58 @@ export async function setAutoBackupEnabled(enabled: boolean) {
   }
 }
 
-export async function backupDatabase(): Promise<{ path: string; name: string; size: number }> {
+export async function backupDatabase(): Promise<{ path: string; name: string; size: number; sha256: string }> {
   if (isBackingUp) throw new Error("Backup già in corso");
   isBackingUp = true;
 
   const ts = getTimestamp();
-  const tmpSql = path.join(os.tmpdir(), `bikerlink_db_${ts}.sql`);
-  const tmpGz = tmpSql + ".gz";
+  const tmpDump = path.join(os.tmpdir(), `bikerlink_db_${ts}.dump`);
 
   try {
-    const dbUrl = process.env.DATABASE_URL!;
-    await execAsync(`pg_dump "${dbUrl}" --clean --if-exists -f "${tmpSql}" --no-password`);
+    const dbUrl = assertProductionBackupTarget();
+    await execFileAsync("pg_dump", [
+      dbUrl,
+      "--format=custom",
+      "--clean",
+      "--if-exists",
+      "--no-owner",
+      "--no-privileges",
+      "--file",
+      tmpDump,
+      "--no-password",
+    ]);
 
-    await new Promise<void>((resolve, reject) => {
-      const inp = fs.createReadStream(tmpSql);
-      const out = fs.createWriteStream(tmpGz);
-      const gz = zlib.createGzip({ level: 9 });
-      inp.pipe(gz).pipe(out);
-      out.on("finish", resolve);
-      out.on("error", reject);
-      inp.on("error", reject);
-    });
-
-    const buf = fs.readFileSync(tmpGz);
-    const fileName = `bikerlink_db_${ts}.sql.gz`;
+    const buf = fs.readFileSync(tmpDump);
+    const digest = sha256(buf);
+    const fileName = `bikerlink_db_${ts}.dump`;
     const objectPath = `${BACKUP_OBJECT_PREFIX}/db/${fileName}`;
 
-    await uploadBuffer(objectPath, buf, "application/gzip");
-    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: buf.length, objectPath, fileName };
+    await uploadBuffer(objectPath, buf, "application/octet-stream");
+    const meta: LastBackupMeta = {
+      timestamp: new Date().toISOString(),
+      size: buf.length,
+      sha256: digest,
+      format: "custom",
+      environment: "production",
+      objectPath,
+      fileName,
+    };
     await saveLastBackup("db", meta);
 
-    console.log(`[backup-service] DB backup su Object Storage: ${objectPath} (${buf.length} bytes)`);
+    console.log(`[backup-service] DB backup production su Object Storage: ${objectPath} (${buf.length} bytes, sha256=${digest})`);
 
-    uploadBackupToGDrive(buf, fileName, "application/gzip").catch((err) => {
+    uploadBackupToGDrive(buf, fileName, "application/octet-stream").catch((err) => {
       console.warn("[backup-service] GDrive upload DB fallito (non bloccante):", err);
     });
 
-    return { path: objectPath, name: fileName, size: buf.length };
+    return { path: objectPath, name: fileName, size: buf.length, sha256: digest };
   } finally {
     isBackingUp = false;
-    try { fs.unlinkSync(tmpSql); } catch { /* no-op: cleanup cleanup */ }
-    try { fs.unlinkSync(tmpGz); } catch { /* no-op: cleanup cleanup */ }
+    try { fs.unlinkSync(tmpDump); } catch { /* no-op: cleanup */ }
   }
 }
 
-export async function backupMedia(): Promise<{ path: string; name: string; size: number }> {
+export async function backupMedia(): Promise<{ path: string; name: string; size: number; sha256: string }> {
   if (isBackingUp) throw new Error("Backup già in corso");
   isBackingUp = true;
 
@@ -200,6 +233,7 @@ export async function backupMedia(): Promise<{ path: string; name: string; size:
   const tmpZip = path.join(os.tmpdir(), `bikerlink_media_${ts}.zip`);
 
   try {
+    assertProductionBackupTarget();
     const mediaDir = process.env.MEDIA_UPLOAD_DIR
       || process.env.UPLOAD_DIR
       || path.join(process.cwd(), ".data", "uploads");
@@ -218,25 +252,35 @@ export async function backupMedia(): Promise<{ path: string; name: string; size:
       archive.on("error", reject);
     });
 
+    const digest = sha256(zipBuffer);
     const fileName = `bikerlink_media_${ts}.zip`;
     const objectPath = `${BACKUP_OBJECT_PREFIX}/media/${fileName}`;
 
     await uploadBuffer(objectPath, zipBuffer, "application/zip");
-    const meta: LastBackupMeta = { timestamp: new Date().toISOString(), size: zipBuffer.length, objectPath, fileName };
+    const meta: LastBackupMeta = {
+      timestamp: new Date().toISOString(),
+      size: zipBuffer.length,
+      sha256: digest,
+      format: "zip",
+      environment: "production",
+      objectPath,
+      fileName,
+    };
     await saveLastBackup("media", meta);
 
-    console.log(`[backup-service] Media backup su Object Storage: ${objectPath} (${zipBuffer.length} bytes)`);
+    console.log(`[backup-service] Media backup production su Object Storage: ${objectPath} (${zipBuffer.length} bytes, sha256=${digest})`);
 
     uploadBackupToGDrive(zipBuffer, fileName, "application/zip").catch((err) => {
       console.warn("[backup-service] GDrive upload media fallito (non bloccante):", err);
     });
 
-    return { path: objectPath, name: fileName, size: zipBuffer.length };
+    return { path: objectPath, name: fileName, size: zipBuffer.length, sha256: digest };
   } finally {
     isBackingUp = false;
-    try { fs.unlinkSync(tmpZip); } catch { /* no-op: cleanup cleanup */ }
+    try { fs.unlinkSync(tmpZip); } catch { /* no-op: cleanup */ }
   }
 }
+
 
 async function startDbScheduler() {
   stopDbScheduler();
@@ -308,6 +352,11 @@ export function stopScheduler() {
 }
 
 export async function startScheduler() {
+  if (getDeployEnvironment() !== "production") {
+    stopScheduler();
+    console.warn("[backup-service] Scheduler non avviato: target non-production.");
+    return;
+  }
   await startDbScheduler();
   await startMediaScheduler();
 }

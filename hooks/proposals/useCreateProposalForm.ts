@@ -36,7 +36,7 @@ export const TARGET_USER_TYPE_OPTIONS = [
   { key: "hitcher", labelKey: "proposal.targetHitcher", icon: "account-arrow-right", color: Colors.accent },
 ];
 
-async function geocodeDeparture(address: string): Promise<{ lat: number; lng: number } | null> {
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
@@ -85,6 +85,8 @@ export function useCreateProposalForm() {
   const [maxParticipants, setMaxParticipants] = useState("");
   const [departureLat, setDepartureLat] = useState<number | null>(null);
   const [departureLng, setDepartureLng] = useState<number | null>(null);
+  const [destinationLat, setDestinationLat] = useState<number | null>(null);
+  const [destinationLng, setDestinationLng] = useState<number | null>(null);
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
   const [gpsSource, setGpsSource] = useState<"profile" | "live" | "map" | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -139,15 +141,42 @@ export function useCreateProposalForm() {
 
   const applyRouteToForm = useCallback(
     (result: AiRouteResult | LoadedRouteResult) => {
+      if ("title" in result && typeof result.title === "string" && result.title.trim()) {
+        setTitle(result.title.trim());
+      }
       setDepartureLat(result.departure.lat);
       setDepartureLng(result.departure.lng);
       setDepartureAddress(result.departure.name);
       setGpsSource("map");
-      if (result.stops.length > 0) {
-        setStops(result.stops);
-      }
+      setStops(result.stops);
       if (result.destination) {
         setDestinationAddress(result.destination.name);
+        setDestinationLat(result.destination.lat);
+        setDestinationLng(result.destination.lng);
+      } else {
+        setDestinationAddress("");
+        setDestinationLat(null);
+        setDestinationLng(null);
+      }
+      // Un nuovo percorso deve sostituire completamente gli orari precedenti:
+      // evita di riutilizzare date/ore rimaste da una pianificazione precedente.
+      setDateStr("");
+      setTimeFrom("");
+      setTimeTo("");
+      setReturnDeadlineEnabled(false);
+      setReturnDeadlineTime("");
+
+      if ("schedule" in result && result.schedule) {
+        const schedule = result.schedule;
+        if (schedule.departureDate && /^\d{4}-\d{2}-\d{2}$/.test(schedule.departureDate)) {
+          const [yyyy, mm, dd] = schedule.departureDate.split("-");
+          setDateStr(dd + "/" + mm + "/" + yyyy);
+        }
+        if (schedule.departureTime) setTimeFrom(schedule.departureTime);
+        if (schedule.returnTime) {
+          setReturnDeadlineEnabled(true);
+          setReturnDeadlineTime(schedule.returnTime);
+        }
       }
       Alert.alert(
         "Percorso caricato",
@@ -339,9 +368,9 @@ export function useCreateProposalForm() {
     let finalLng = departureLng;
     let geocodingOk = true;
 
-    if (!finalLat || !finalLng) {
+    if (!Number.isFinite(finalLat) || !Number.isFinite(finalLng)) {
       if (departureAddress.trim()) {
-        const geo = await geocodeDeparture(departureAddress.trim());
+        const geo = await geocodeAddress(departureAddress.trim());
         if (geo) {
           finalLat = geo.lat;
           finalLng = geo.lng;
@@ -364,6 +393,32 @@ export function useCreateProposalForm() {
         );
         return;
       }
+    }
+
+    const destinationRequired = needsDestination || (canExtendToDestination && extendToDestination);
+    if (destinationRequired && !destinationAddress.trim()) {
+      Alert.alert(t("common.error"), t("proposals.create.enterDest"));
+      return;
+    }
+
+    let finalDestinationLat = destinationLat;
+    let finalDestinationLng = destinationLng;
+    // Se l'AI o l'utente ha fornito una destinazione, la risolviamo sempre:
+    // la destinazione del viaggio non deve sparire solo perché il matching
+    // alla destinazione non è stato attivato.
+    if (destinationAddress.trim() && (!Number.isFinite(finalDestinationLat) || !Number.isFinite(finalDestinationLng))) {
+      const geo = await geocodeAddress(destinationAddress.trim());
+      if (!geo) {
+        Alert.alert(
+          "Destinazione non trovata",
+          "Seleziona una destinazione dalla mappa o inserisci un indirizzo più preciso."
+        );
+        return;
+      }
+      finalDestinationLat = geo.lat;
+      finalDestinationLng = geo.lng;
+      setDestinationLat(finalDestinationLat);
+      setDestinationLng(finalDestinationLng);
     }
 
     const data: Record<string, unknown> = {
@@ -390,17 +445,19 @@ export function useCreateProposalForm() {
       data.wishlistMotoId = anyMotoOk ? null : selectedWishlistMotoId;
       data.anyMotoOk = anyMotoOk;
     }
-    if (needsDestination) {
+    const hasDestinationCoordinates =
+      Number.isFinite(finalDestinationLat) && Number.isFinite(finalDestinationLng);
+    if (destinationAddress.trim() && hasDestinationCoordinates) {
       data.destinationAddress = destinationAddress.trim();
-      data.destinationLatitude = finalLat;
-      data.destinationLongitude = finalLng;
+      data.destinationLatitude = finalDestinationLat;
+      data.destinationLongitude = finalDestinationLng;
     }
     if (returnDeadline) data.returnDeadline = returnDeadline.toISOString();
     if (selectedClubId) data.clubId = selectedClubId;
     if (canExtendToDestination && extendToDestination) {
       data.extendToDestination = true;
-      data.destinationLatitude = finalLat;
-      data.destinationLongitude = finalLng;
+      data.destinationLatitude = finalDestinationLat;
+      data.destinationLongitude = finalDestinationLng;
       data.destinationSearchRadius = parseInt(destinationExtRadius) || 50;
     }
 
@@ -425,7 +482,7 @@ export function useCreateProposalForm() {
     returnDeadlineTime, setReturnDeadlineTime,
     stops, newStop, setNewStop,
     maxParticipants, setMaxParticipants,
-    departureLat, departureLng,
+    departureLat, departureLng, destinationLat, destinationLng,
     selectedClubId, setSelectedClubId,
     gpsSource, setGpsSource,
     gpsLoading,
@@ -435,7 +492,7 @@ export function useCreateProposalForm() {
     showLoadRouteModal, setShowLoadRouteModal,
     extendToDestination, setExtendToDestination,
     destinationExtRadius, setDestinationExtRadius,
-    setDepartureLat, setDepartureLng,
+    setDepartureLat, setDepartureLng, setDestinationLat, setDestinationLng,
     isBikerOrCoppia, isZavorrina, searchTypes,
     needsMotoSelection, needsWishlistMoto, needsDestination, canExtendToDestination,
     motos, wishlistMotos, myClubs,

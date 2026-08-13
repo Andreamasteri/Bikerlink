@@ -194,8 +194,34 @@ export function setPendingForce(name: string, value: boolean): void {
 }
 
 // ── Persistenza best-effort ─────────────────────────────────────────────────
+//
+// Il registro live resta in memoria. La tabella DB è uno specchio per restart e
+// admin, quindi non serve una INSERT/UPSERT per ogni transizione del loop:
+// persistere start+success+failure a ogni tick produce solo churn e contesa.
+const PERSIST_MIN_INTERVAL_MS = 30_000;
+const persistLastAt = new Map<string, number>();
+const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-async function persistJob(e: JobEntry): Promise<void> {
+function persistJob(e: JobEntry): void {
+  const now = Date.now();
+  const last = persistLastAt.get(e.name) ?? 0;
+  if (now - last >= PERSIST_MIN_INTERVAL_MS && !persistTimers.has(e.name)) {
+    persistLastAt.set(e.name, now);
+    void persistJobNow(e);
+    return;
+  }
+  if (persistTimers.has(e.name)) return;
+  const delay = Math.max(0, PERSIST_MIN_INTERVAL_MS - (now - last));
+  const timer = setTimeout(() => {
+    persistTimers.delete(e.name);
+    persistLastAt.set(e.name, Date.now());
+    void persistJobNow(e);
+  }, delay);
+  timer.unref?.();
+  persistTimers.set(e.name, timer);
+}
+
+async function persistJobNow(e: JobEntry): Promise<void> {
   try {
     await withBgDbSlot(async () => {
       await db

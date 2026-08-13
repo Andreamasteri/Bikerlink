@@ -36,7 +36,7 @@ export const EMAIL = process.env.SMOKE_EMAIL ?? `smoke+${TS}@bikerlink.test`;
 export const PASSWORD = process.env.SMOKE_PASSWORD ?? "Smoke1234!";
 export const NICKNAME = process.env.SMOKE_NICKNAME ?? `smoke${TS}`;
 export const INVITE_CODE = process.env.SMOKE_INVITE_CODE;
-export const DATABASE_URL = process.env.DATABASE_URL;
+export const DATABASE_URL = process.env.DATABASE_URL_CANDIDATE;
 
 if (/bikerlink\.(app|com|it)$/i.test(new URL(BASE_URL).hostname) && !ALLOW_PROD) {
   console.error(`[smoke] Rifiuto di eseguire contro produzione (${BASE_URL}). Imposta SMOKE_ALLOW_PROD=1 per forzare.`);

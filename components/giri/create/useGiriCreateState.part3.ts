@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Waypoint, Style, WeatherWaypoint, ResolvedPoiStop, PoiResult, AiPreviewItem, AiPreviewState, RouteResult, Style as StyleType } from "./types";
+import { Waypoint, Style, WeatherWaypoint, ResolvedPoiStop, PoiResult, AiPreviewItem, AiPreviewState, RouteResult, GeoResult, Style as StyleType } from "./types";
 import { parseAI, clientFallbackAiParse, AiKeyMissingError } from "./api";
 import { getApiUrl } from "@/lib/query-client";
 import { COMPASS_DIRECTIONS } from "./types";
@@ -57,7 +57,7 @@ export const handleAiParseHelper = async (
 
     const initialItems: AiPreviewItem[] = rawLocations.map((loc) => ({
       role: loc.role, name: loc.name, editedName: loc.name,
-      lat: 0, lng: 0, geocoding: !!loc.name, resolved: false
+      lat: 0, lng: 0, geocoding: !!loc.name, resolved: false, suggestions: []
     }));
 
     const preview: AiPreviewState = {
@@ -85,11 +85,18 @@ export const handleAiParseHelper = async (
         () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", item.name); return fetch(url.toString(), { credentials: "include" }); },
         async (resp: Response) => { if (!resp.ok) return []; return resp.json(); }
       ).then((results: any[]) => {
-        const best = results[0];
+        const candidates = (Array.isArray(results) ? results : [])
+          .map((item: any) => ({
+            name: String(item.name ?? ""),
+            lat: Number(item.lat),
+            lng: Number(item.lng ?? item.lon),
+          }))
+          .filter((item: GeoResult) => item.name && Number.isFinite(item.lat) && Number.isFinite(item.lng));
+        const best = candidates.length === 1 ? candidates[0] : null;
         setAiPreview((prev) => {
           if (!prev) return prev;
           const updatedItems = [...prev.items];
-          updatedItems[idx] = { ...updatedItems[idx], lat: best ? best.lat : 0, lng: best ? best.lng : 0, geocoding: false, resolved: !!best };
+          updatedItems[idx] = { ...updatedItems[idx], lat: best?.lat ?? 0, lng: best?.lng ?? 0, suggestions: candidates, geocoding: false, resolved: !!best };
           return { ...prev, items: updatedItems };
         });
       }).catch(() => {
@@ -137,11 +144,18 @@ export const regeocodePillItemHelper = (
     () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", name); return fetch(url.toString(), { credentials: "include" }); },
     async (resp: Response) => { if (!resp.ok) return []; return resp.json(); }
   ).then((results: any[]) => {
-    const best = results[0];
+    const candidates = (Array.isArray(results) ? results : [])
+      .map((item: any) => ({
+        name: String(item.name ?? ""),
+        lat: Number(item.lat),
+        lng: Number(item.lng ?? item.lon),
+      }))
+      .filter((item: GeoResult) => item.name && Number.isFinite(item.lat) && Number.isFinite(item.lng));
+    const best = candidates.length === 1 ? candidates[0] : null;
     setAiPreview((prev) => {
       if (!prev) return prev;
       const updatedItems = [...prev.items];
-      updatedItems[idx] = { ...updatedItems[idx], lat: best ? best.lat : 0, lng: best ? best.lng : 0, geocoding: false, resolved: !!best };
+      updatedItems[idx] = { ...updatedItems[idx], lat: best?.lat ?? 0, lng: best?.lng ?? 0, suggestions: candidates, geocoding: false, resolved: !!best };
       return { ...prev, items: updatedItems };
     });
   }).catch(() => {
@@ -151,6 +165,26 @@ export const regeocodePillItemHelper = (
       updatedItems[idx] = { ...updatedItems[idx], geocoding: false, resolved: false };
       return { ...prev, items: updatedItems };
     });
+  });
+};
+
+export const selectPreviewItemSuggestionHelper = (
+  idx: number,
+  candidate: GeoResult,
+  setAiPreview: (v: AiPreviewState | ((prev: AiPreviewState | null) => AiPreviewState | null)) => void
+) => {
+  setAiPreview((prev) => {
+    if (!prev) return prev;
+    const items = [...prev.items];
+    items[idx] = {
+      ...items[idx],
+      editedName: candidate.name,
+      lat: candidate.lat,
+      lng: candidate.lng,
+      resolved: true,
+      geocoding: false,
+    };
+    return { ...prev, items };
   });
 };
 
@@ -179,6 +213,13 @@ export const handleConfirmPreviewHelper = async (
   autoLoadWeather: (wps: Waypoint[]) => void
 ) => {
   if (!aiPreview) return;
+  const unresolved = aiPreview.items.filter(
+    (item) => item.geocoding || !item.resolved || !Number.isFinite(item.lat) || !Number.isFinite(item.lng)
+  );
+  if (unresolved.length > 0) {
+    Alert.alert("Luoghi da confermare", "Seleziona un indirizzo per ogni punto prima di calcolare il percorso.");
+    return;
+  }
   const geoWps: Waypoint[] = aiPreview.items.map((item) => ({
     lat: item.lat, lng: item.lng, name: item.editedName || item.name
   }));

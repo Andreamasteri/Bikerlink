@@ -260,8 +260,8 @@ export async function getUserStyleProfile(userId: string): Promise<UserStyleProf
             lean_angle,
             gforce_x, gforce_y, gforce_z,
             lat, lon, ts, session_id, speed_kmh,
-            LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
-            LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
+            LAG(lat) OVER (PARTITION BY session_id ORDER BY ts, id) AS prev_lat,
+            LAG(lon) OVER (PARTITION BY session_id ORDER BY ts, id) AS prev_lon
           FROM ride_telemetry
           WHERE user_id = ${userId}
         ),

@@ -57,7 +57,6 @@ export function ServiceBadgeStrip({ data }: { data: ThinkCentreHealthMini }) {
       label: "AI",
       items: [
         { name: "Ollama", color: svcColor(find("ollama")) },
-        { name: "Whisper", color: svcColor(find("whisper")) },
         { name: "AI Hub", color: svcColor(find("aihub")) },
       ],
     },

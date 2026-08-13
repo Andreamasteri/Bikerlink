@@ -51,10 +51,10 @@ function SessionTypeBadge({ type }: { type: string }) {
   );
 }
 
-function SamplesPreview({ sessionId }: { sessionId: string }) {
+function SamplesPreview({ userId, sessionId }: { userId: string; sessionId: string }) {
   const { data, isLoading } = useQuery<{ samples: GpsSample[]; total: number }>({
-    queryKey: ["/api/admin/telemetry/sessions", sessionId, "samples"],
-    queryFn: () => adminFetch(`/api/admin/telemetry/sessions/${sessionId}/samples`),
+    queryKey: ["/api/admin/telemetry/sessions", userId, sessionId, "samples"],
+    queryFn: () => adminFetch(`/api/admin/telemetry/sessions/${sessionId}/samples?userId=${encodeURIComponent(userId)}`),
     staleTime: 60_000,
   });
 
@@ -128,7 +128,7 @@ export function SessionCard({ session }: { session: Session }) {
         </TouchableOpacity>
       </View>
 
-      {expanded && <SamplesPreview sessionId={session.sessionId} />}
+      {expanded && <SamplesPreview userId={session.userId} sessionId={session.sessionId} />}
       {mapVisible && (
         <SessionMapModal session={session} visible={mapVisible} onClose={() => setMapVisible(false)} />
       )}
