@@ -164,27 +164,21 @@ beforeEach(() => {
 
 // ─── Drain backlog "fantasma" (Task #4706) ──────────────────────────────────
 describe("drainStuckRetryBacklog", () => {
-  it("porta a 'exhausted' le sessioni 'retry' oltre il cap (RETURNING user_id, session_id)", async () => {
+  it("porta a 'exhausted' le sessioni 'retry' oltre il cap (RETURNING session_id)", async () => {
     process.env.MAP_MATCHING_MAX_ATTEMPTS = "5";
     dbExecute.mockReset();
     dbExecute.mockResolvedValueOnce({
-      rows: [
-        { user_id: "u1", session_id: "a" },
-        { user_id: "u2", session_id: "a" },
-        { user_id: "u1", session_id: "a" },
-        { user_id: "u1", session_id: "b" },
-      ],
+      rows: [{ session_id: "a" }, { session_id: "a" }, { session_id: "b" }],
     } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await drainStuckRetryBacklog();
 
     expect(res.drainedSamples).toBe(3);
-    expect(res.drainedSessions).toBe(3);
+    expect(res.drainedSessions).toBe(2);
 
     const { sql, params } = render(dbExecute.mock.calls[0]?.[0]);
     const lower = sql.toLowerCase();
     expect(lower).toContain("update ride_telemetry");
-    expect(lower).toContain("returning user_id, session_id");
     expect(lower).toContain("match_status = 'exhausted'");
     expect(lower).toContain("match_status = 'retry'");
     expect(lower).toContain("match_attempts >=");

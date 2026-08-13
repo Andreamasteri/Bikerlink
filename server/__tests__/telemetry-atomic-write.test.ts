@@ -7,7 +7,17 @@ import request from "supertest";
 const { txExecute, tx, transaction, dbExecute, dbUpdateReturning } = vi.hoisted(() => {
   const txExecute = vi.fn();
   const tx = {
-    insert: vi.fn(() => ({ values: vi.fn() })),
+    insert: vi.fn(() => ({
+      values: vi.fn((rows: unknown) => ({
+        onConflictDoNothing: vi.fn(() => ({
+          returning: vi.fn(async () =>
+            Array.isArray(rows)
+              ? rows.map((row) => ({ ingestKey: (row as { ingestKey?: string }).ingestKey ?? null }))
+              : [],
+          ),
+        })),
+      })),
+    })),
     execute: txExecute,
   };
   // `db.transaction(cb)` esegue davvero il callback con la fake tx: se il callback
@@ -74,7 +84,7 @@ describe("Telemetry writes keep the per-session summary in sync atomically (Task
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(tx.insert).toHaveBeenCalled(); // ride_telemetry insert
     // updateTelemetrySessionStats runs on the SAME tx: SELECT prior + UPSERT.
-    expect(txExecute).toHaveBeenCalledTimes(2);
+    expect(txExecute).toHaveBeenCalledTimes(3);
   });
 
   it("POST /batch returns 500 (no silent divergence) if the summary update fails", async () => {
@@ -111,6 +121,6 @@ describe("Telemetry writes keep the per-session summary in sync atomically (Task
     // insert + riepilogo dentro la stessa transazione
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(tx.insert).toHaveBeenCalled();
-    expect(txExecute).toHaveBeenCalledTimes(2); // SELECT prior + UPSERT summary
+    expect(txExecute).toHaveBeenCalledTimes(3); // advisory lock + SELECT prior + UPSERT summary
   });
 });
