@@ -9,7 +9,11 @@ const http = require("http");
 const { URL } = require("url");
 
 const PORT = process.env.PORT || 4405;
-// Canonical name matches the BikerLink client; HUB_GATE_TOKEN remains a\n// backwards-compatible alias for existing ThinkCentre installations.\nfunction getGateToken() {\n  return process.env.AI_HUB_GATE_TOKEN || process.env.HUB_GATE_TOKEN || "";\n}
+// Canonical name matches the BikerLink client; HUB_GATE_TOKEN remains a
+// backwards-compatible alias for existing ThinkCentre installations.
+function getGateToken() {
+  return process.env.AI_HUB_GATE_TOKEN || process.env.HUB_GATE_TOKEN || "";
+}
 const SHARED_ROOT = process.env.SHARED_ROOT || path.join(os.homedir(), "agent-shared");
 
 const app = express();

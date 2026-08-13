@@ -44,7 +44,6 @@ inlinata nel client:
 | `GRAPHHOPPER_URL` | `server/graphhopper-client.ts`, `server/jobs/thinkcentre-monitor-probes.ts` | URL servizio self-hosted (Cloudflare Tunnel), solo server |
 | `VALHALLA_URL` | `server/routing/valhalla-client.ts`, `server/routing/valhalla-startup.ts` | URL servizio self-hosted, solo server |
 | `NOMINATIM_URL` | `server/lib/nominatim-client.ts`, `server/routes/routing-areas.ts` | URL servizio self-hosted, solo server |
-| `WHISPER_URL` | `server/routes/whisper.ts`, `server/ai/whisper-provider-config.ts` | URL servizio self-hosted, solo server |
 | `TILES_URL` | `lib/map-tiles.ts` (importata solo da route admin server) | URL tile self-hosted; sul client resta `undefined` (non `EXPO_PUBLIC_`) |
 | `REDIS_PROBE_URL` | `server/routes/admin/thinkcentre-health-infra-probes.ts` | Endpoint di probe per il **DragonflyDB** (Redis-compatible) self-hosted sul ThinkCentre — Redis è stato sostituito da DragonflyDB; l'endpoint resta `/probe/redis` solo per compatibilità. Solo server |
 | `TC_SSH_PORT` | `server/routes/ssh-exec.ts` | Parametro connessione SSH ThinkCentre, solo server |
@@ -62,11 +61,9 @@ inlinata nel client:
 Questi valori alimentano i pannelli admin **Metriche** e **Infra** del ThinkCentre.
 Vanno tenuti come **secret** e puntati all'host Cloudflare Tunnel `tc.biker-link.net`
 (il vecchio host DuckDNS `*.bikerlink.duckdns.org` è **dismesso**). Il codice appende
-da solo i path (`/sys-metrics`, `/whisper-health`, `/probe/*`), quindi impostare solo la base:
 
 | Secret | Valore corretto | Letto da |
 |---|---|---|
-| `THINKCENTRE_METRICS_URL` | `https://tc.biker-link.net` | `server/routes/admin/thinkcentre-metrics.ts`, `server/routes/admin-whisper-config.part2.ts` |
 | `NGINX_MONITOR_URL` | `https://tc.biker-link.net/probe/nginx` | `server/routes/admin/thinkcentre-health-infra-probes.ts` |
 | `UPTIME_KUMA_URL` | `https://tc.biker-link.net/probe/uptime-kuma` | idem |
 | `REDIS_PROBE_URL` | `https://tc.biker-link.net/probe/redis` | idem (ha precedenza sul TCP `REDIS_PROBE_HOST`) |

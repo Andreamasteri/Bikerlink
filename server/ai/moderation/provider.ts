@@ -8,7 +8,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { limiters } from "../../lib/throttle";
 import { storage } from "../../storage";
-import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
+import { getOllamaModel, isOllamaConfigured, getOllamaDiagnostics } from "../../lib/ollama-client";
 import { AGENT_MODEL_DEFAULTS } from "../../lib/agent-constants";
 import { isThinkCentreOffline } from "../../lib/thinkcentre-offline";
 import { isAiFallbackEnabled, isAiFallbackEnabledSync } from "../fallback-switch";
@@ -292,11 +292,18 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
 // Task #2966 — Rete finale self-hosted: Ollama (ThinkCentre). Illimitato e locale,
 // quindi fuori dai cooldown/cap dei provider cloud. Lo scheduler è pass-through
 // (nessun limiter Bottleneck). Ritorna null se BOWIE_OLLAMA_URL non è configurato.
-export function tryBuildOllama(): ResolvedModel | null {
-  if (!isOllamaConfigured) return null;
+export function tryBuildOllama(persona: "bowie" | "horus" = "bowie"): ResolvedModel | null {
+  // The generic cascade remains Bowie-compatible, while role-specific callers
+  // (notably the watchdog proposer) can explicitly target Horus on the TC.
+  const configured = persona === "horus"
+    ? Boolean(getOllamaDiagnostics("horus").url)
+    : isOllamaConfigured;
+  if (!configured) return null;
   try {
-    const modelId = process.env.BOWIE_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.bowie;
-    const model = getOllamaModel(modelId) as unknown as LanguageModelV2;
+    const modelId = persona === "horus"
+      ? process.env.HORUS_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.horus
+      : process.env.BOWIE_OLLAMA_MODEL ?? AGENT_MODEL_DEFAULTS.bowie;
+    const model = getOllamaModel(modelId, persona) as unknown as LanguageModelV2;
     return {
       id: "ollama",
       providerName: "ollama",

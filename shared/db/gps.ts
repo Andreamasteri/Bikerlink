@@ -121,6 +121,8 @@ export const rideTelemetry = pgTable("ride_telemetry", {
   index("ride_telemetry_user_id_idx").on(table.userId),
   index("ride_telemetry_session_id_idx").on(table.sessionId),
   index("ride_telemetry_ts_idx").on(table.ts),
+  index("ride_telemetry_user_session_ts_idx").on(table.userId, table.sessionId, table.ts, table.id),
+  index("ride_telemetry_user_session_status_ts_idx").on(table.userId, table.sessionId, table.matchStatus, table.ts),
   index("ride_telemetry_match_status_idx").on(table.matchStatus),
 ]);
 

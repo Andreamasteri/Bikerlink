@@ -232,7 +232,7 @@ export default function TelemetryUserDetailScreen() {
 
       <View style={styles.sessionsContainer}>
         {sessions.map((session) => (
-          <SessionCard key={session.sessionId} session={session} />
+          <SessionCard key={`${session.userId}:${session.sessionId}`} session={session} />
         ))}
         {!isLoading && sessions.length === 0 && (
           <View style={styles.emptyState}>

@@ -14,7 +14,7 @@ import {
 } from "./types";
 import { calcRoute } from "./api";
 import { handleImportGpxHelper, autoLoadWeatherHelper } from "./useGiriCreateState.part2";
-import { handleAiParseHelper, regeocodePillItemHelper, handleConfirmPreviewHelper } from "./useGiriCreateState.part3";
+import { handleAiParseHelper, regeocodePillItemHelper, selectPreviewItemSuggestionHelper, handleConfirmPreviewHelper } from "./useGiriCreateState.part3";
 
 export const SELECTED_MOTO_STORAGE_KEY = "bikerlink_giri_selected_moto_id";
 
@@ -118,12 +118,16 @@ export function useGiriCreateState(language?: string) {
     setAiPreview((prev) => {
       if (!prev) return prev;
       const items = [...prev.items];
-      items[idx] = { ...items[idx], editedName: newName, lat: 0, lng: 0, resolved: false };
+      items[idx] = { ...items[idx], editedName: newName, lat: 0, lng: 0, resolved: false, suggestions: [] };
       return { ...prev, items };
     });
   }, []);
 
   const regeocodePillItem = useCallback((idx: number, name: string) => regeocodePillItemHelper(idx, name, setAiPreview, logFetch), [logFetch]);
+
+  const selectPreviewItemSuggestion = useCallback((idx: number, candidate: GeoResult) => {
+    selectPreviewItemSuggestionHelper(idx, candidate, setAiPreview);
+  }, []);
 
   const selectPoiOption = useCallback((stopIdx: number, option: PoiResult) => {
     setResolvedPoiStops((prev) => {
@@ -347,7 +351,7 @@ export function useGiriCreateState(language?: string) {
     visibility, setVisibility, waypoints, setWaypoints, wpInputs, setWpInputs,
     wpSuggestions, setWpSuggestions, wpLoading, routeResult, calculating,
     routeError, weatherPreview, weatherLoading, handleAiParse,
-    updatePreviewItemName, regeocodePillItem, handleConfirmPreview, handleWpInput,
+    updatePreviewItemName, regeocodePillItem, selectPreviewItemSuggestion, handleConfirmPreview, handleWpInput,
     selectSuggestion, addWaypoint, removeWaypoint, handleCalculate, handleSave,
     handleImportGpx, isImportingGpx, debugVisible, debugLogs, handleTitleTap,
     clearDebugLogs, fuelLevel, setFuelLevel, selectedMotoId, setSelectedMotoId,

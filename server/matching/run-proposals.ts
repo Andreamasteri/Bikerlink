@@ -38,9 +38,11 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
       for (const p2 of otherActiveProposals) {
         if (!areCompatible(p1, p2)) continue;
 
-        const isBikerBikerProposal =
-          ((p1 as { authorUserType?: string }).authorUserType ?? "biker") === "biker" &&
-          ((p2 as { authorUserType?: string }).authorUserType ?? "biker") === "biker";
+      const isBikerAuthor = (userType: string | null | undefined) =>
+        userType === "biker" || userType === "coppia";
+      const isBikerBikerProposal =
+          isBikerAuthor((p1 as { authorUserType?: string | null }).authorUserType) &&
+          isBikerAuthor((p2 as { authorUserType?: string | null }).authorUserType);
         if (isBikerBikerProposal) {
           if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerBikerDistance")) continue;
         } else {
@@ -103,7 +105,7 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
 
 export async function runProposalZoneNotifications(proposal: Proposal): Promise<void> {
   try {
-    if (!proposal.departureLatitude || !proposal.departureLongitude) return;
+    if (proposal.departureLatitude == null || proposal.departureLongitude == null) return;
 
     const searchRadius = proposal.searchRadius || 50;
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -112,9 +114,10 @@ export async function runProposalZoneNotifications(proposal: Proposal): Promise<
     const explicitTargets = Array.isArray(proposal.targetUserTypes)
       ? (proposal.targetUserTypes as string[])
       : null;
+    const actualUserTypes = new Set(["biker", "zavorrina", "coppia"]);
 
-    if (explicitTargets && explicitTargets.length > 0) {
-      targetUserTypes = explicitTargets;
+    if (explicitTargets && explicitTargets.length > 0 && explicitTargets.some((t) => actualUserTypes.has(t))) {
+      targetUserTypes = explicitTargets.filter((t) => actualUserTypes.has(t));
     } else {
       const allTypes = getAllSearchTypes(proposal);
       if (allTypes.length > 0) {

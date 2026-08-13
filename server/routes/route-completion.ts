@@ -76,12 +76,11 @@ router.patch("/routes/:id", requireAuth, async (req: Request, res: Response) => 
       if (!isNaN(d.getTime())) updates.stoppedAt = d;
     }
 
-    // A telemetry-only PATCH is valid: the mobile client sends it after the
-    // route has already been stopped. Do not discard telemetry merely because
-    // there are no route summary fields in the same request.
-    const [updated] = Object.keys(updates).length > 0
-      ? await db.update(routes).set(updates).where(eq(routes.id, id)).returning()
-      : [route];
+    let updated = route;
+    if (Object.keys(updates).length > 0) {
+      const [row] = await db.update(routes).set(updates).where(eq(routes.id, id)).returning();
+      if (row) updated = row;
+    }
 
     // ── Telemetria sensori (Routes & Performance) ────────────────────────
     // Il client invia `telemetryData` come stringa JSON di array di campioni

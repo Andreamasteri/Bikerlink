@@ -98,11 +98,11 @@ export function useReadyState() {
     return () => { cancelled = true; };
   }, []);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading: profileLoading } = useQuery({
     queryKey: ["/api/users/profile"],
   });
 
-  const { data: meData } = useQuery({
+  const { data: meData, isLoading: meLoading } = useQuery({
     queryKey: ["/api/users/me"],
     enabled: !!user,
   });
@@ -391,7 +391,7 @@ export function useReadyState() {
     isGhostMode,
     hideFromMap,
     offlineRandomize,
-    isLoading,
+    isLoading: profileLoading || meLoading,
     toggleMutation,
     ghostMutation,
     privacyMutation,

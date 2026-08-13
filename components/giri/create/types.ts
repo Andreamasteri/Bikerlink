@@ -62,6 +62,7 @@ export interface AiPreviewItem {
   lng: number;
   geocoding: boolean;
   resolved: boolean;
+  suggestions?: GeoResult[];
 }
 
 export interface AiPoiStop {

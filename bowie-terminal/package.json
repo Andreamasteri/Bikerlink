@@ -3,10 +3,26 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "private": true,
-  "scripts": { "start": "npx expo start", "android": "expo run:android" },
+  "scripts": {
+    "start": "npx expo start",
+    "android": "expo run:android"
+  },
   "expo": {
-    "install": { "exclude": ["react", "react-native", "react-native-safe-area-context", "react-native-screens", "typescript"] },
-    "autolinking": { "exclude": ["react", "react-native"] }
+    "install": {
+      "exclude": [
+        "react",
+        "react-native",
+        "react-native-safe-area-context",
+        "react-native-screens",
+        "typescript"
+      ]
+    },
+    "autolinking": {
+      "exclude": [
+        "react",
+        "react-native"
+      ]
+    }
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
@@ -28,5 +44,10 @@
     "react-native-safe-area-context": "~5.8.0",
     "react-native-screens": "~4.26.2"
   },
-  "devDependencies": { "@babel/core": "^7.29.7", "@types/react": "^19.2.17", "babel-preset-expo": "~57.0.0", "typescript": "^7.0.2" }
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@types/react": "^19.2.17",
+    "babel-preset-expo": "~57.0.0",
+    "typescript": "^7.0.2"
+  }
 }

@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS ai_watchdog_event_state (
 CREATE INDEX IF NOT EXISTS ai_watchdog_event_state_updated_idx
   ON ai_watchdog_event_state (updated_at);
 --> statement-breakpoint
+-- This migration predates ai_watchdog_log.event_key (added in 0155), so
+-- derive the same stable identity from the columns that already exist.
 INSERT INTO ai_watchdog_event_state (event_key, last_status, last_log_id, updated_at)
 SELECT event_key, status, id, created_at
 FROM (

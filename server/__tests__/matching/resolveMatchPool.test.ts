@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("../../db", () => ({ db: {}, pool: {} }));
 vi.mock("@shared/schema", () => ({ matchPreferences: {}, motoClubMembers: {} }));
 
-import { resolveMatchPool } from "../../matching/scoring";
+import { deriveTargetUserTypes, resolveMatchPool } from "../../matching/scoring";
 
 type P = Parameters<typeof resolveMatchPool>[0];
 
@@ -96,6 +96,48 @@ describe("resolveMatchPool — single-type ↔ single-type (MATCH_RULES baseline
     const p1 = makeProposal({ searchType: null as unknown as P['searchType'] });
     const p2 = makeProposal({ searchType: "find_a_friend" });
     expect(resolveMatchPool(p1, p2)).toBe(false);
+  });
+});
+
+describe("resolveMatchPool — canonical author/target assignment regressions", () => {
+  it("matches biker find_a_guest with zavorrina find_a_biker", () => {
+    const biker = makeProposal({
+      userId: "biker-1",
+      authorUserType: "biker",
+      searchType: "find_a_guest",
+      targetUserTypes: ["zavorrina", "coppia"],
+    });
+    const zavorrina = makeProposal({
+      userId: "zav-1",
+      authorUserType: "zavorrina",
+      searchType: "find_a_biker",
+      targetUserTypes: ["biker", "coppia"],
+    });
+    expect(resolveMatchPool(biker, zavorrina)).toBe(true);
+    expect(resolveMatchPool(zavorrina, biker)).toBe(true);
+  });
+
+  it("derives target account types in the correct direction", () => {
+    expect(deriveTargetUserTypes(makeProposal({ searchType: "find_a_guest", targetUserTypes: [] })))
+      .toEqual(["zavorrina", "coppia"]);
+    expect(deriveTargetUserTypes(makeProposal({ searchType: "find_a_biker", targetUserTypes: [] })))
+      .toEqual(["biker", "coppia"]);
+  });
+
+  it("keeps compatibility for legacy intent aliases in targetUserTypes", () => {
+    const biker = makeProposal({
+      userId: "biker-2",
+      authorUserType: "biker",
+      searchType: "hitcher",
+      targetUserTypes: ["zavorrina", "coppia"],
+    });
+    const hitchhiker = makeProposal({
+      userId: "zav-2",
+      authorUserType: "zavorrina",
+      searchType: "hitchhiker",
+      targetUserTypes: ["hitcher"],
+    });
+    expect(resolveMatchPool(biker, hitchhiker)).toBe(true);
   });
 });
 

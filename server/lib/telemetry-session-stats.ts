@@ -114,6 +114,129 @@ export function computeSessionStatsDelta(
   };
 }
 
+export function isOutOfOrderBatch(
+  previousLastTs: number | null,
+  rows: InsertRideTelemetry[],
+): boolean {
+  return previousLastTs != null && rows.some((row) => row.ts <= previousLastTs);
+}
+
+async function rebuildTelemetrySessionStats(
+  userId: string,
+  sessionId: string,
+  sessionType: string,
+  executor: SqlExecutor,
+): Promise<void> {
+  // Late/offline batches invalidate the incremental anchor. Rebuild only this
+  // user/session from raw telemetry so the aggregate remains exact without
+  // deleting the original samples.
+  await executor.execute(sql`
+    WITH ordered AS (
+      SELECT
+        user_id,
+        session_id,
+        lat,
+        lon,
+        speed_kmh,
+        ts,
+        id,
+        LAG(lat) OVER (
+          PARTITION BY user_id, session_id
+          ORDER BY ts, id
+        ) AS prev_lat,
+        LAG(lon) OVER (
+          PARTITION BY user_id, session_id
+          ORDER BY ts, id
+        ) AS prev_lon,
+        ROW_NUMBER() OVER (
+          PARTITION BY user_id, session_id
+          ORDER BY ts DESC, id DESC
+        ) AS latest_rank
+      FROM ride_telemetry
+      WHERE user_id = ${userId} AND session_id = ${sessionId}
+    ),
+    distances AS (
+      SELECT
+        *,
+        CASE
+          WHEN prev_lat IS NOT NULL
+            AND prev_lon IS NOT NULL
+            AND lat IS NOT NULL
+            AND lon IS NOT NULL
+            AND ABS(lat - prev_lat) < 0.5
+            AND ABS(lon - prev_lon) < 0.5
+          THEN 2 * 6371 * ASIN(
+            SQRT(
+              POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
+              + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
+              * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
+            )
+          )
+          ELSE 0
+        END AS dist_all,
+        CASE
+          WHEN prev_lat IS NOT NULL
+            AND prev_lon IS NOT NULL
+            AND lat IS NOT NULL
+            AND lon IS NOT NULL
+            AND ABS(lat - prev_lat) < 0.5
+            AND ABS(lon - prev_lon) < 0.5
+            AND (speed_kmh IS NULL OR speed_kmh >= 20)
+          THEN 2 * 6371 * ASIN(
+            SQRT(
+              POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
+              + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
+              * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
+            )
+          )
+          ELSE 0
+        END AS dist_speed_filtered
+      FROM ordered
+    ),
+    aggregate AS (
+      SELECT
+        COALESCE(SUM(dist_all), 0) AS dist_all,
+        COALESCE(SUM(dist_speed_filtered), 0) AS dist_speed_filtered,
+        COUNT(*)::int AS sample_count,
+        COUNT(*) FILTER (WHERE lat IS NULL AND lon IS NULL)::int AS sensor_only_count
+      FROM distances
+    ),
+    latest AS (
+      SELECT last_lat, last_lon, last_ts
+      FROM (
+        SELECT lat AS last_lat, lon AS last_lon, ts AS last_ts, latest_rank
+        FROM ordered
+      ) ranked
+      WHERE latest_rank = 1
+    )
+    INSERT INTO telemetry_session_stats
+      (user_id, session_id, session_type, dist_all, dist_speed_filtered,
+       sample_count, sensor_only_count, last_lat, last_lon, last_ts, updated_at)
+    SELECT
+      ${userId}, ${sessionId}, ${sessionType},
+      aggregate.dist_all,
+      aggregate.dist_speed_filtered,
+      aggregate.sample_count,
+      aggregate.sensor_only_count,
+      latest.last_lat,
+      latest.last_lon,
+      latest.last_ts,
+      NOW()
+    FROM aggregate
+    CROSS JOIN latest
+    ON CONFLICT (user_id, session_id) DO UPDATE SET
+      session_type = EXCLUDED.session_type,
+      dist_all = EXCLUDED.dist_all,
+      dist_speed_filtered = EXCLUDED.dist_speed_filtered,
+      sample_count = EXCLUDED.sample_count,
+      sensor_only_count = EXCLUDED.sensor_only_count,
+      last_lat = EXCLUDED.last_lat,
+      last_lon = EXCLUDED.last_lon,
+      last_ts = EXCLUDED.last_ts,
+      updated_at = NOW()
+  `);
+}
+
 /**
  * Aggiorna (o crea) la riga `telemetry_session_stats` della sessione con i
  * contributi dei campioni appena inseriti. I `rows` sono quelli effettivamente
@@ -142,12 +265,22 @@ export async function updateTelemetrySessionStats(
   // Àncora = ultimo campione (per ts) già visto per questa sessione. Può essere
   // null (nessun batch precedente, oppure ultimo campione sensor-only).
   const priorRes = await executor.execute(sql`
-    SELECT last_lat, last_lon
+    SELECT last_lat, last_lon, last_ts
     FROM telemetry_session_stats
     WHERE user_id = ${userId} AND session_id = ${sessionId}
     LIMIT 1
   `);
-  const prior = priorRes.rows[0] as { last_lat: number | null; last_lon: number | null } | undefined;
+  const prior = priorRes.rows[0] as {
+    last_lat: number | null;
+    last_lon: number | null;
+    last_ts: number | null;
+  } | undefined;
+
+  const previousLastTs = prior?.last_ts != null ? Number(prior.last_ts) : null;
+  if (isOutOfOrderBatch(previousLastTs, rows)) {
+    await rebuildTelemetrySessionStats(userId, sessionId, sessionType, executor);
+    return;
+  }
 
   const prevLat = prior?.last_lat != null ? Number(prior.last_lat) : null;
   const prevLon = prior?.last_lon != null ? Number(prior.last_lon) : null;

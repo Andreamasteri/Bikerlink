@@ -231,26 +231,6 @@ export function OllamaBlock({
   );
 }
 
-export function WhisperBlock({
-  service,
-  fingerprint,
-  isLoading,
-  hasError,
-}: { service?: SimpleServiceHealth; fingerprint?: string | null; isLoading?: boolean; hasError?: boolean }) {
-  return (
-    <InfraBlock
-      serviceKey="whisper"
-      label="Whisper ASR"
-      icon="microphone-outline"
-      service={service}
-      fingerprint={fingerprint}
-      configNote="Aggiungere WHISPER_URL (porta host: 8080) e WHISPER_TOKEN nei secret Replit."
-      isLoading={isLoading}
-      hasError={hasError}
-    />
-  );
-}
-
 export function DragonflyBlock({
   service,
   isLoading,

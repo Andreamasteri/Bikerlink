@@ -289,9 +289,36 @@ function mountVramRoutes(app, opts) {
 
   // ── Routes ────────────────────────────────────────────────────────────────
 
+  function offlineVramResponse() {
+    return {
+      ok: true,
+      available: false,
+      reason: "gpu-metrics-unavailable",
+      agentMapSource:
+        vramState.pushedAgentMap && Object.keys(vramState.pushedAgentMap).length > 0
+          ? "pushed"
+          : "default",
+      current: null,
+      peak24h: null,
+      agentPeaks24h: {},
+      breakdown: [],
+      breakdownConfidence: "none",
+      lastSampleAt: null,
+    };
+  }
+
   app.get("/vram", gateMiddleware, (req, res) => {
+    let mem;
     try {
-      const mem = sys.readGpuStats();
+      mem = sys.readGpuStats();
+    } catch (err) {
+      // The TC may be offline or lack a working NVIDIA driver while the rest
+      // of BikerLink remains healthy. Keep GPU unavailability non-fatal.
+      console.warn("vram: GPU metrics unavailable:", err.message || err);
+      return res.status(200).json(offlineVramResponse());
+    }
+
+    try {
       const pct = (mem.usedMiB / mem.totalMiB) * 100;
       const now = Date.now();
       const windowSamples = vramState.samples.filter((s) => now - s.t <= WINDOW_MS);
@@ -330,6 +357,8 @@ function mountVramRoutes(app, opts) {
       if (pcieAer !== undefined) response.pcieAer = pcieAer;
       return res.json(response);
     } catch (err) {
+      // Only non-GPU telemetry failures remain real application errors.
+      console.warn("vram: auxiliary metrics failed:", err.message || err);
       return res.status(500).json({ error: String(err.message || err) });
     }
   });

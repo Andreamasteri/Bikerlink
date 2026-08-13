@@ -7,7 +7,7 @@
 // in produzione.
 import fg from "fast-glob";
 import path from "path";
-import { pathToFileURL, fileURLToPath } from "url";
+import { pathToFileURL } from "url";
 import type { IntegrityCheck } from "./types";
 
 import orphans from "./checks/orphans";
@@ -36,21 +36,11 @@ const STATIC_PACKS: IntegrityCheck[][] = [
 let cached: IntegrityCheck[] | null = null;
 
 function safeCurrentDir(): string | null {
-  // CJS path
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const d = (globalThis as any).__dirname as string | undefined;
-  if (d && typeof d === "string") return d;
-  try {
-    // ESM path — `import.meta.url` only valid in ESM context, hidden behind
-    // eval() so the CJS bundle (esbuild --format=cjs) doesn't choke at parse
-    // time. The esbuild direct-eval warning is silenced via the build-server.sh
-    // `--log-override:direct-eval=silent` flag (intentional, semantically
-    // identical, runs only in the dev tsx/ESM path).
-    const url = eval("import.meta.url") as string;
-    return path.dirname(fileURLToPath(url));
-  } catch {
-    return null;
-  }
+  // In CommonJS bundles Node provides __dirname. In tsx/ESM development,
+  // process.cwd() points to the repository root, so the source path is
+  // deterministic without parsing import.meta through eval().
+  if (typeof __dirname !== "undefined" && __dirname) return __dirname;
+  return path.resolve(process.cwd(), "server/ai/db-integrity");
 }
 
 async function discoverViaGlob(): Promise<IntegrityCheck[]> {

@@ -59,6 +59,7 @@ export async function runProposalToProfileMatching(
         and(
           eq(users.status, "active"),
           eq(users.isFake, false),
+          eq(users.ghostMode, false),
           eq(users.matchingDisabled, false),
           ...systemAccountConditions(users),
           isNotNull(userProfiles.latitude),

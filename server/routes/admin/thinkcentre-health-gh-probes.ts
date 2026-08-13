@@ -1,5 +1,5 @@
 /**
- * ThinkCentre — GraphHopper, Ollama e Whisper probes.
+ * ThinkCentre — GraphHopper e Ollama probes.
  * Estratti da thinkcentre-health.ts per mantenere i file sotto 600 righe.
  */
 
@@ -375,98 +375,4 @@ export async function probeOllama(): Promise<ServiceHealth> {
     recordProbeLog("ollama", { timestamp: Date.now(), ok: true, latencyMs: r.latencyMs, detail: "tags OK" });
   }
   return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, startingUp: r.ok ? false : isStartingUp("ollama"), latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing, availableModels, history: getHistory("ollama"), probeLog: getProbeLog("ollama") };
-}
-
-// ── Whisper ───────────────────────────────────────────────────────────────────
-
-export async function probeWhisper(): Promise<ServiceHealth> {
-  const base = process.env.WHISPER_URL?.replace(/\/$/, "");
-  const token = process.env.WHISPER_TOKEN;
-  if (!base) {
-    return { key: "whisper", label: "Whisper ASR", configured: false, ok: false, startingUp: false, latencyMs: null, url: null, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
-  }
-  const tokenMissing = !token || token.trim() === "";
-  const sampleRate = 16000;
-  const numSamples = Math.floor(sampleRate * 0.5);
-  const dataSize = numSamples * 2;
-  const wav = Buffer.alloc(44 + dataSize, 0);
-  wav.write("RIFF", 0); wav.writeUInt32LE(36 + dataSize, 4); wav.write("WAVE", 8);
-  wav.write("fmt ", 12); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20);
-  wav.writeUInt16LE(1, 22); wav.writeUInt32LE(sampleRate, 24);
-  wav.writeUInt32LE(sampleRate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
-  wav.write("data", 36); wav.writeUInt32LE(dataSize, 40);
-  // Il client STT reale (server/routes/whisper.ts) autentica verso Whisper con
-  // l'header X-Whisper-Token, che è ciò che la nginx davanti a Whisper sul
-  // ThinkCentre si aspetta. La probe DEVE usare lo stesso header: un
-  // Authorization: Bearer non combacia e produce un 401 applicativo — è stato
-  // il falso-negativo storico ("Whisper 401") di questa probe.
-  const headers: Record<string, string> = { ...cfAccessHeaders() };
-  if (token) headers["X-Whisper-Token"] = token;
-
-  const healthResult = await httpProbe(`${base}/health`, headers);
-  if (healthResult.ok) {
-    recordProbeLog("whisper", { timestamp: Date.now(), ok: true, latencyMs: healthResult.latencyMs, detail: "health OK" });
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, startingUp: false, latencyMs: healthResult.latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20_000);
-  const t0 = Date.now();
-  try {
-    const formData = new FormData();
-    formData.append("file", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "probe.wav");
-    formData.append("response_format", "json");
-    const res = await fetch(`${base}/inference`, { method: "POST", headers, body: formData, signal: controller.signal });
-    const latencyMs = Date.now() - t0;
-    if (res.status >= 200 && res.status < 300) {
-      recordProbeLog("whisper", { timestamp: Date.now(), ok: true, latencyMs, detail: "inference OK" });
-      return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, startingUp: false, latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
-    }
-    const body = await readBodySafe(res);
-    const bodySnippet = body.trim().slice(0, 400);
-    // Distingui un 401/403 di Cloudflare Access (blocco PRIMA di raggiungere
-    // l'origine: Service Token CF assente o non valido) da un 401 applicativo
-    // (token Whisper errato / drift rispetto all'X-Whisper-Token nella nginx del
-    // ThinkCentre). Il caso CF Access si riconosce dall'header `cf-access-error`
-    // o da un body "Access denied" / "Cloudflare Access".
-    const cfAccessBlocked =
-      (res.status === 401 || res.status === 403) &&
-      (res.headers.get("cf-access-error") !== null ||
-        /access denied|cloudflare access/i.test(bodySnippet));
-    let error: string;
-    if (cfAccessBlocked) {
-      error = sanitizeError(
-        `CF Access ha bloccato la richiesta (HTTP ${res.status}) — Service Token Cloudflare Access assente o non valido, NON il token Whisper${bodySnippet ? ` — ${bodySnippet}` : ""}`,
-      );
-    } else if (res.status === 401) {
-      error = bodySnippet
-        ? sanitizeError(`Token Whisper non valido — HTTP 401 — ${bodySnippet}`)
-        : "Token Whisper non valido (HTTP 401)";
-    } else {
-      error = bodySnippet
-        ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
-        : `HTTP ${res.status}`;
-    }
-    console.error("[thinkcentre-probe] whisper KO", { status: res.status, cfAccessBlocked, error });
-    recordError("whisper", error);
-    recordProbeLog("whisper", { timestamp: Date.now(), ok: false, latencyMs, detail: error });
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, startingUp: isStartingUp("whisper"), latencyMs, url: maskUrl(base), error, tokenMissing, cfAccessBlocked, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
-  } catch (err: unknown) {
-    const raw = err instanceof Error ? err.message : String(err);
-    let classified: string;
-    if (err instanceof Error && err.name === "AbortError") {
-      classified = `timeout (>20 s) — ${raw}`;
-    } else if (/fetch failed|ECONNREFUSED|ENOTFOUND/i.test(raw)) {
-      classified = `network error — ${raw}`;
-    } else {
-      classified = raw;
-    }
-    const error = sanitizeError(classified);
-    console.error("[thinkcentre-probe] whisper KO (rete/timeout)", { error });
-    recordError("whisper", error);
-    recordProbeLog("whisper", { timestamp: Date.now(), ok: false, latencyMs: null, detail: error });
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, startingUp: isStartingUp("whisper"), latencyMs: null, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper"), probeLog: getProbeLog("whisper") };
-  } finally {
-    clearTimeout(timer);
-  }
 }

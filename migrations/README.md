@@ -79,29 +79,26 @@ npx tsx server/scripts/check-migration-prefix-duplicates.ts
 
 ---
 
-## Duplicati storici (già applicati in prod)
+## Gruppo 0157 storico di candidate
 
-I file seguenti condividono un prefisso perché furono creati prima che la
-guardia fosse attiva. Sono già applicati in produzione e tracciati nella tabella
-`schema_migrations` per filename completo: **non vanno rinominati** (farlo li
-farebbe re-applicare o lascerebbe orfana la riga di tracking).
+I due file seguenti condividono il prefisso per una collisione storica. Sono
+applicati in candidate e tracciati nella tabella `schema_migrations` per filename
+completo; production non li ha ancora applicati. **Non vanno rinominati**: farlo
+altererebbe l'identità della migration.
 
-Sono allow-listati in `KNOWN_DUPLICATE_PREFIXES`
-(`server/migration-prefix-guard.ts`) e producono solo un warning al boot.
+Sono allow-listati in `KNOWN_DUPLICATE_FILE_SETS`
+(`server/migration-prefix-guard.ts`) solo quando il gruppo è completo e immutato; producono solo un warning al boot.
 
-| Prefisso | File                                       |
-|----------|--------------------------------------------|
-| `0067`   | `0067_ai_call_logs_and_memory.sql`         |
-| `0067`   | `0067_db_integrity_cascade_orphan_fix.sql` |
-| `0067`   | `0067_gist_index_user_profiles_geom.sql`   |
-| `0072`   | `0072_ride_telemetry_indexes.sql`          |
-| `0072`   | `0072_users_marketing_consent.sql`         |
+| Prefisso | File                                      |
+|----------|-------------------------------------------|
+| `0157`   | `0157_fixed_couples.sql`                 |
+| `0157`   | `0157_watchdog_log_event_key.sql`        |
 
 ---
 
 ## Aggiungere un nuovo duplicato all'allowlist (caso estremo)
 
 Se un file è già applicato in prod **e non può essere rinominato**, aggiungilo
-a `KNOWN_DUPLICATE_PREFIXES` in `server/migration-prefix-guard.ts` con un
+a `KNOWN_DUPLICATE_FILE_SETS` in `server/migration-prefix-guard.ts` con un
 commento che spieghi il motivo. Non abusare dell'allowlist: la regola è
 **un numero = un file**.

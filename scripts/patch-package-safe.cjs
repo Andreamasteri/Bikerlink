@@ -10,7 +10,14 @@ try {
 }
 
 if (existsSync(patchPackagePath)) {
-  execFileSync(process.platform === "win32" ? "patch-package.cmd" : "patch-package", [], {
+  const command = process.platform === "win32"
+    ? (process.env.ComSpec || "cmd.exe")
+    : "patch-package";
+  const args = process.platform === "win32"
+    ? ["/d", "/s", "/c", "patch-package.cmd"]
+    : [];
+
+  execFileSync(command, args, {
     cwd: process.cwd(),
     stdio: "inherit",
   });

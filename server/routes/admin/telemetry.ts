@@ -101,41 +101,20 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
         SELECT
           COUNT(DISTINCT user_id)::text AS users_with_telemetry,
           COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL '24 hours' THEN user_id END)::text AS active_users_24h,
-          COUNT(DISTINCT session_id)::text AS total_rides,
+          COUNT(DISTINCT (user_id, session_id))::text AS total_rides,
           COUNT(*)::text AS total_samples,
           MAX(created_at)::text AS latest_sample
         FROM ride_telemetry
         WHERE session_type NOT IN ('ideal_lap')
       `);
 
+      // The incremental session aggregate is maintained in the same
+      // transaction as telemetry ingestion. Reading it here avoids a
+      // 90-day Haversine/window scan over ride_telemetry on every admin request.
       const km = await tx.execute<{ total_km: string }>(sql`
-        WITH ordered AS (
-          SELECT
-            session_id,
-            lat, lon, ts,
-            speed_kmh,
-            LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
-            LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
-          FROM ride_telemetry
-          WHERE session_type NOT IN ('ideal_lap')
-            AND created_at >= NOW() - INTERVAL '${sql.raw(String(KM_WINDOW_DAYS))} days'
-        ),
-        distances AS (
-          SELECT
-            2 * 6371 * ASIN(
-              SQRT(
-                POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
-                + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
-                * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
-              )
-            ) AS dist_km
-          FROM ordered
-          WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
-            AND ABS(lat - prev_lat) < 0.5
-            AND ABS(lon - prev_lon) < 0.5
-            AND (speed_kmh IS NULL OR speed_kmh >= 20)
-        )
-        SELECT COALESCE(SUM(dist_km), 0)::text AS total_km FROM distances
+        SELECT COALESCE(SUM(dist_speed_filtered), 0)::text AS total_km
+        FROM telemetry_session_stats
+        WHERE session_type <> 'ideal_lap'
       `);
 
       return [count, km] as const;
@@ -405,9 +384,10 @@ router.get("/telemetry-top-riders", async (req: Request, res: Response) => {
         SELECT
           user_id,
           session_id,
+          id,
           lat, lon,
-          LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
-          LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
+          LAG(lat) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lat,
+          LAG(lon) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lon
         FROM ride_telemetry
         WHERE created_at >= NOW() - INTERVAL '24 hours'
           AND session_type NOT IN ('ideal_lap')

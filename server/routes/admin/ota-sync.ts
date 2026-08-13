@@ -37,6 +37,11 @@ export async function easGraphQL(query: string, variables?: Record<string, unkno
 // Task #2503: i nuovi update sincronizzati da EAS finiscono come `pending`.
 // Usa paginazione (limit 100 per pagina) per recuperare tutti gli update.
 export async function syncProductionUpdates(signal?: AbortSignal): Promise<{ inserted: number; backfilled: number }> {
+  const token = process.env.EAS_TOKEN ?? process.env.EXPO_TOKEN;
+  if (!token?.trim()) {
+    console.info("[ota-sync] EAS token non configurato — sincronizzazione OTA disabilitata in questo ambiente");
+    return { inserted: 0, backfilled: 0 };
+  }
   const PAGE_LIMIT = 100;
 
   type EasUpdate = { id: string; group?: string; message?: string; runtimeVersion?: string; createdAt?: string };

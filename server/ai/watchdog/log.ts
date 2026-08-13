@@ -56,6 +56,7 @@ export async function writeWatchdogLog(entry: WatchdogLogEntry): Promise<string 
         const [row] = await tx
           .insert(aiWatchdogLog)
           .values({
+            eventKey,
             kind: entry.kind,
             scope: entry.scope ?? null,
             status,

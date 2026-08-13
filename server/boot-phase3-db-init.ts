@@ -294,6 +294,7 @@ export async function runBootPhase3DbInit(): Promise<void> {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "ai_watchdog_log" (
         "id" varchar(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+        "event_key" varchar(180) NOT NULL,
         "kind" varchar(30) NOT NULL,
         "scope" varchar(60),
         "status" varchar(20) NOT NULL DEFAULT 'ok',
@@ -321,7 +322,36 @@ export async function runBootPhase3DbInit(): Promise<void> {
       CREATE INDEX IF NOT EXISTS "ai_watchdog_log_created_idx"
         ON "ai_watchdog_log" ("created_at")
     `);
-    console.log("[INIT] ai_watchdog_log: table/index check OK");
+    await db.execute(sql`
+      ALTER TABLE "ai_watchdog_log"
+        ADD COLUMN IF NOT EXISTS "event_key" varchar(180)
+    `);
+    await db.execute(sql`
+      UPDATE "ai_watchdog_log"
+      SET "event_key" = LEFT("kind" || ':' || COALESCE("scope", 'global'), 180)
+      WHERE "event_key" IS NULL
+    `);
+    await db.execute(sql`
+      ALTER TABLE "ai_watchdog_log"
+        ALTER COLUMN "event_key" SET NOT NULL
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "ai_watchdog_log_event_created_idx"
+        ON "ai_watchdog_log" ("event_key", "created_at", "id")
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "ai_watchdog_event_state" (
+        "event_key" varchar(180) PRIMARY KEY,
+        "last_status" varchar(20) NOT NULL,
+        "last_log_id" varchar(36),
+        "updated_at" timestamp NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS "ai_watchdog_event_state_updated_idx"
+        ON "ai_watchdog_event_state" ("updated_at")
+    `);
+    console.log("[INIT] ai_watchdog_log/event_state: table/index check OK");
   } catch (e) {
     console.warn("[INIT] Phase 3: ai_watchdog_log ensure failed (non-fatal):", e);
   }
