@@ -41,8 +41,8 @@ jobs:
           node -e '
             const u = new URL(process.env.BASE_URL);
             if (u.protocol !== "https:") throw new Error("Candidate smoke requires HTTPS");
-            if (!/(staging|candidate)/i.test(u.hostname)) {
-              throw new Error("Refusing host without staging/candidate marker: " + u.hostname);
+            if (!/(staging|candidate|pr-\d+)/i.test(u.hostname)) {
+              throw new Error("Refusing host without staging/candidate/PR marker: " + u.hostname);
             }
           '
 
