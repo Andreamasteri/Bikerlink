@@ -116,9 +116,8 @@ describe("Telemetry writes keep the per-session summary in sync atomically (Task
       });
 
     expect(res.status).toBe(200);
-    // dedup SELECT su db.execute → nessuna riga esistente
-    expect(dbExecute).toHaveBeenCalled();
-    // insert + riepilogo dentro la stessa transazione
+    // Il percorso usa l'idempotenza per campione dentro la transazione;
+    // non esegue più una SELECT di dedup sull'intera sessione.
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(tx.insert).toHaveBeenCalled();
     expect(txExecute).toHaveBeenCalledTimes(3); // advisory lock + SELECT prior + UPSERT summary
