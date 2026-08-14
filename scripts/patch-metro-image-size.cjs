@@ -1,6 +1,11 @@
 /*
- * Security mitigation for GHSA-w3rx-r6r6-pgpr and GHSA-5p2g-fcmc-qvqq in
+ * Runtime mitigation for GHSA-w3rx-r6r6-pgpr and GHSA-5p2g-fcmc-qvqq in
  * Metro's image-size dependency. BikerLink does not need ICNS, HEIF or JXL.
+ *
+ * npm audit may continue to report image-size@1.2.1 because this postinstall
+ * patch does not change the lockfile version. Treat the findings as mitigated
+ * runtime exposure, not as false positives or as a replacement for upgrading
+ * when Metro publishes a compatible fixed dependency.
  */
 const fs = require('node:fs');
 const path = require('node:path');

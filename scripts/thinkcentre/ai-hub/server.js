@@ -10,7 +10,9 @@ const { URL } = require("url");
 
 const PORT = process.env.PORT || 4405;
 // Canonical name matches the BikerLink client; HUB_GATE_TOKEN remains a
-// backwards-compatible alias for existing ThinkCentre installations.
+// backwards-compatible alias for existing ThinkCentre installations. The value
+// is read per request (no module-level cache); provider-side rotation still
+// requires restarting/redeploying this Node process to refresh process.env.
 function getGateToken() {
   return process.env.AI_HUB_GATE_TOKEN || process.env.HUB_GATE_TOKEN || "";
 }

@@ -56,6 +56,9 @@ jobs:
       - name: Typecheck server
         run: npx tsc --noEmit -p server/tsconfig.json
 
+      - name: Metro image security mitigation test
+        run: npx vitest run server/__tests__/metro-image-size-mitigation.test.ts
+
       - name: Matching regression tests
         run: npx vitest run server/__tests__/matching/resolveMatchPool.test.ts server/__tests__/proposals/create-coordinates.test.ts
 
