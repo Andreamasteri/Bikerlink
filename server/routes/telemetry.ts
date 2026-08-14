@@ -162,7 +162,7 @@ router.post("/batch", async (req: Request, res: Response) => {
     }
 
     const CHUNK = 500;
-    const insertedRows: typeof rows = [];
+    let insertedRows: typeof rows = [];
     try {
       // Task #81 — insert campioni + aggiornamento del riepilogo per-sessione
       // (telemetry_session_stats) ATOMICI in un'unica transazione: o entrambi
