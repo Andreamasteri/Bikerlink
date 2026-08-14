@@ -5,6 +5,11 @@ on:
     # GitHub cron uses UTC. Runs every 10 minutes.
     - cron: "*/10 * * * *"
   workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Optional candidate/preview HTTPS URL to smoke-test (overrides SMOKE_CANDIDATE_BASE_URL)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -32,7 +37,7 @@ jobs:
 
       - name: Verify smoke configuration
         env:
-          BASE_URL: ${{ secrets.SMOKE_CANDIDATE_BASE_URL }}
+          BASE_URL: ${{ inputs.base_url || secrets.SMOKE_CANDIDATE_BASE_URL }}
           BIKERLINK_DEPLOY_ENV: staging
           DATABASE_URL_CANDIDATE: ${{ secrets.DATABASE_URL_CANDIDATE }}
           SMOKE_REGISTRATION_TOKEN: ${{ secrets.SMOKE_REGISTRATION_TOKEN }}
@@ -53,7 +58,7 @@ jobs:
 
       - name: Run API smoke
         env:
-          BASE_URL: ${{ secrets.SMOKE_CANDIDATE_BASE_URL }}
+          BASE_URL: ${{ inputs.base_url || secrets.SMOKE_CANDIDATE_BASE_URL }}
           BIKERLINK_DEPLOY_ENV: staging
           DATABASE_URL_CANDIDATE: ${{ secrets.DATABASE_URL_CANDIDATE }}
           SMOKE_REGISTRATION_TOKEN: ${{ secrets.SMOKE_REGISTRATION_TOKEN }}
