@@ -37,6 +37,7 @@ export const PASSWORD = process.env.SMOKE_PASSWORD ?? "Smoke1234!";
 export const NICKNAME = process.env.SMOKE_NICKNAME ?? `smoke${TS}`;
 export const INVITE_CODE = process.env.SMOKE_INVITE_CODE;
 export const DATABASE_URL = process.env.DATABASE_URL_CANDIDATE;
+export const SMOKE_REGISTRATION_TOKEN = process.env.SMOKE_REGISTRATION_TOKEN;
 
 if (/bikerlink\.(app|com|it)$/i.test(new URL(BASE_URL).hostname) && !ALLOW_PROD) {
   console.error(`[smoke] Rifiuto di eseguire contro produzione (${BASE_URL}). Imposta SMOKE_ALLOW_PROD=1 per forzare.`);
@@ -80,6 +81,7 @@ export async function http(
   if (cookieJar) headers.Cookie = cookieJar;
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (!headers["X-Forwarded-For"]) headers["X-Forwarded-For"] = SPOOF_IP;
+  if (SMOKE_REGISTRATION_TOKEN) headers["X-Bikerlink-Smoke-Token"] = SMOKE_REGISTRATION_TOKEN;
   try {
     const res = await fetch(url, {
       method,
