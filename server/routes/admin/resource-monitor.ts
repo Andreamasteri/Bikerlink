@@ -31,6 +31,9 @@ const LOG_TABLES = [
   "ota_watchdog_reports",
   "thinkcentre_health_events",
   "ai_watchdog_reports",
+  "ai_watchdog_log",
+  "ride_telemetry",
+  "telemetry_session_stats",
   "site_visits",
   "user_sessions",
 ];

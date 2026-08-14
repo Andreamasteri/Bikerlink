@@ -1,4 +1,4 @@
-/** 
+/**
  * Database selection is environment-specific and intentionally fail-closed.
  *
  * The three runtime targets are deliberately explicit:

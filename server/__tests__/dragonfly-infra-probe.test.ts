@@ -30,6 +30,9 @@ vi.mock("ioredis", () => {
 // ── fetch mock (for legacy HTTP probe branch) ─────────────────────────────────
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
+// I probe di errore chiamano console.error intenzionalmente; silenziarlo qui evita
+// che Vitest lasci una console RPC pendente durante il teardown parallelo.
+vi.spyOn(console, "error").mockImplementation(() => {});
 
 // ── module import (MUST come after vi.mock) ───────────────────────────────────
 import { probeDragonflyInfra } from "../routes/admin/thinkcentre-health-infra-probes";

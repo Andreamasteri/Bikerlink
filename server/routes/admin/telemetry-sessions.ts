@@ -14,184 +14,85 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
 
     const [usersResult, countResult] = await Promise.all([
       db.execute<{
-        user_id: string;
-        username: string;
-        km_ride: string;
-        km_track: string;
-        session_count: string;
-        last_sample: string | null;
+        user_id: string; username: string; km_ride: string; km_track: string;
+        session_count: string; last_sample: string | null;
       }>(sql`
-        WITH ordered AS (
+        WITH user_agg AS (
           SELECT
             user_id,
-            session_id,
-            session_type,
-            created_at,
-            id,
-            lat, lon,
-            LAG(lat) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lat,
-            LAG(lon) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lon
-          FROM ride_telemetry
-        ),
-        session_km AS (
-          SELECT
-            user_id,
-            session_id,
-            MAX(session_type) AS session_type,
-            MAX(created_at) AS last_sample,
-            COALESCE(SUM(
-              CASE
-                WHEN prev_lat IS NOT NULL AND prev_lon IS NOT NULL
-                  AND ABS(lat - prev_lat) < 0.5 AND ABS(lon - prev_lon) < 0.5
-                THEN 2 * 6371 * ASIN(
-                  SQRT(
-                    POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
-                    + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
-                    * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
-                  )
-                )
-                ELSE 0
-              END
-            ), 0) AS km
-          FROM ordered
-          GROUP BY user_id, session_id
-        ),
-        user_agg AS (
-          SELECT
-            user_id,
-            COALESCE(SUM(km) FILTER (WHERE session_type NOT IN ('ideal_lap')), 0) AS km_ride,
-            COALESCE(SUM(km) FILTER (WHERE session_type = 'ideal_lap'), 0) AS km_track,
+            COALESCE(SUM(dist_speed_filtered) FILTER (WHERE session_type <> 'ideal_lap'), 0) AS km_ride,
+            COALESCE(SUM(dist_all) FILTER (WHERE session_type = 'ideal_lap'), 0) AS km_track,
             COUNT(*) AS session_count,
-            MAX(last_sample) AS last_sample
-          FROM session_km
+            MAX(updated_at) AS last_sample
+          FROM telemetry_session_stats
           GROUP BY user_id
         )
-        SELECT
-          ua.user_id::text,
-          COALESCE(u.nickname, 'utente#' || ua.user_id) AS username,
+        SELECT ua.user_id::text, COALESCE(u.nickname, 'utente#' || ua.user_id) AS username,
           ROUND(ua.km_ride::numeric, 2)::text AS km_ride,
           ROUND(ua.km_track::numeric, 2)::text AS km_track,
-          ua.session_count::text,
-          ua.last_sample::text AS last_sample
+          ua.session_count::text, ua.last_sample::text AS last_sample
         FROM user_agg ua
         LEFT JOIN users u ON u.id = ua.user_id
-        ORDER BY ua.km_ride DESC
+        ORDER BY ua.km_ride DESC, ua.user_id
         LIMIT ${limit} OFFSET ${offset}
       `),
       db.execute<{ total: string }>(sql`
-        SELECT COUNT(DISTINCT user_id)::text AS total FROM ride_telemetry
+        SELECT COUNT(DISTINCT user_id)::text AS total FROM telemetry_session_stats
       `),
     ]);
 
     const users = usersResult.rows.map((r) => ({
-      userId: r.user_id,
-      username: r.username,
+      userId: r.user_id, username: r.username,
       kmRide: Math.round(parseFloat(r.km_ride) * 10) / 10,
       kmTrack: Math.round(parseFloat(r.km_track) * 10) / 10,
-      sessionCount: parseInt(r.session_count, 10),
-      lastSample: r.last_sample ?? null,
+      sessionCount: parseInt(r.session_count, 10), lastSample: r.last_sample ?? null,
     }));
-
-    return res.json({
-      users,
-      total: parseInt(countResult.rows[0]?.total ?? "0", 10),
-      page,
-      limit,
-    });
+    return res.json({ users, total: parseInt(countResult.rows[0]?.total ?? "0", 10), page, limit });
   } catch (err) {
     const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/telemetry/users] error:", err, cause ? `| PG: ${cause}` : "");
-    logTelemetryEvent({
-      ts: new Date().toISOString(),
-      type: "ERROR",
-      context: "admin/telemetry/users",
-      message: errMsg,
-      detail: cause || (err instanceof Error ? err.stack : undefined),
-    });
+    logTelemetryEvent({ ts: new Date().toISOString(), type: "ERROR", context: "admin/telemetry/users", message: errMsg, detail: cause || (err instanceof Error ? err.stack : undefined) });
     return sendError(res, 500, "Errore lettura utenti telemetria");
   }
 });
-
 router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Response) => {
   try {
     const userId = String(req.params.userId);
-    if (!userId || userId.length < 1) return sendError(res, 400, "userId non valido");
-
+    if (!userId) return sendError(res, 400, "userId non valido");
     const result = await db.execute<{
-      user_id: string;
-      session_id: string;
-      session_type: string;
-      lap_name: string | null;
-      sample_count: string;
-      min_ts: string;
-      max_ts: string;
-      km: string;
+      session_id: string; session_type: string; lap_name: string | null;
+      sample_count: string; min_ts: string; max_ts: string; km: string;
     }>(sql`
-      WITH ordered AS (
-        SELECT
-          user_id,
-          session_id,
-          id,
-          session_type,
-          lap_name,
-          ts,
-          lat, lon,
-          LAG(lat) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lat,
-          LAG(lon) OVER (PARTITION BY user_id, session_id ORDER BY ts, id) AS prev_lon
+      WITH raw_meta AS (
+        SELECT session_id, MAX(session_type) AS session_type, MAX(lap_name) AS lap_name,
+          MIN(ts) AS min_ts, MAX(ts) AS max_ts
         FROM ride_telemetry
         WHERE user_id = ${userId}
+        GROUP BY session_id
       )
-      SELECT
-        user_id,
-        session_id,
-        MAX(session_type) AS session_type,
-        MAX(lap_name) AS lap_name,
-        COUNT(*)::text AS sample_count,
-        MIN(ts)::text AS min_ts,
-        MAX(ts)::text AS max_ts,
-        ROUND(COALESCE(SUM(
-          CASE
-            WHEN prev_lat IS NOT NULL AND prev_lon IS NOT NULL
-              AND ABS(lat - prev_lat) < 0.5 AND ABS(lon - prev_lon) < 0.5
-            THEN 2 * 6371 * ASIN(
-              SQRT(
-                POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
-                + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
-                * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
-              )
-            )
-            ELSE 0
-          END
-        ), 0)::numeric, 2)::text AS km
-      FROM ordered
-      GROUP BY user_id, session_id
-      ORDER BY MIN(ts) DESC
+      SELECT rm.session_id, rm.session_type, rm.lap_name,
+        COALESCE(tss.sample_count, 0)::text AS sample_count,
+        rm.min_ts::text, rm.max_ts::text,
+        ROUND(COALESCE(tss.dist_all, 0)::numeric, 2)::text AS km
+      FROM raw_meta rm
+      LEFT JOIN telemetry_session_stats tss
+        ON tss.user_id = ${userId} AND tss.session_id = rm.session_id
+      ORDER BY rm.max_ts DESC
     `);
-
     const sessions = result.rows.map((r) => ({
-      userId: r.user_id,
-      sessionId: r.session_id,
-      sessionType: r.session_type,
-      lapName: r.lap_name ?? null,
+      sessionId: r.session_id, sessionType: r.session_type, lapName: r.lap_name ?? null,
       sampleCount: parseInt(r.sample_count, 10),
       startedAt: new Date(Number(r.min_ts)).toISOString(),
       endedAt: new Date(Number(r.max_ts)).toISOString(),
       km: Math.round(parseFloat(r.km) * 10) / 10,
     }));
-
     return res.json({ sessions, userId });
   } catch (err) {
     const cause = err instanceof Error ? ((err.cause as Error | null)?.message ?? "") : "";
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error("[admin/telemetry/users/:userId/sessions] error:", err, cause ? `| PG: ${cause}` : "");
-    logTelemetryEvent({
-      ts: new Date().toISOString(),
-      type: "ERROR",
-      context: "admin/telemetry/users/:userId/sessions",
-      message: errMsg,
-      detail: cause || (err instanceof Error ? err.stack : undefined),
-    });
+    logTelemetryEvent({ ts: new Date().toISOString(), type: "ERROR", context: "admin/telemetry/users/:userId/sessions", message: errMsg, detail: cause || (err instanceof Error ? err.stack : undefined) });
     return sendError(res, 500, "Errore lettura sessioni utente");
   }
 });
@@ -199,16 +100,12 @@ router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Respon
 router.get("/telemetry/sessions/:sessionId/samples", async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
-    const userId = String(req.query.userId ?? "");
     if (!sessionId) return sendError(res, 400, "sessionId obbligatorio");
-    if (!userId) return sendError(res, 400, "userId obbligatorio");
 
     const MAX_SAMPLES = 200;
 
     const countResult = await db.execute<{ total: string }>(sql`
-      SELECT COUNT(*)::text AS total
-      FROM ride_telemetry
-      WHERE user_id = ${userId} AND session_id = ${sessionId}
+      SELECT COUNT(*)::text AS total FROM ride_telemetry WHERE session_id = ${sessionId}
     `);
     const total = parseInt(countResult.rows[0]?.total ?? "0", 10);
 
@@ -224,10 +121,10 @@ router.get("/telemetry/sessions/:sessionId/samples", async (req: Request, res: R
     }>(sql`
       WITH numbered AS (
         SELECT
-          id, ts, lat, lon, speed_kmh, lean_angle,
-          ROW_NUMBER() OVER (ORDER BY ts, id) AS rn
+          ts, lat, lon, speed_kmh, lean_angle,
+          ROW_NUMBER() OVER (ORDER BY ts) AS rn
         FROM ride_telemetry
-        WHERE user_id = ${userId} AND session_id = ${sessionId}
+        WHERE session_id = ${sessionId}
       )
       SELECT ts::text, lat::text, lon::text, speed_kmh::text, lean_angle::text, rn::text
       FROM numbered
