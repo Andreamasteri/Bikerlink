@@ -1,3 +1,4 @@
+import { getDatabaseUrlForRuntime } from "./lib/database-environment";
 // overflow di server/index.ts — sequenza di boot estratta per ridurre le dimensioni
 import { initState, markDegraded } from "./init-state";
 import { startMatchingEngine } from "./matching-engine";
@@ -145,9 +146,9 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
 
   // ── DB endpoint log — visibile nei boot log per conferma region (Frankfurt) ─
   // Estrae solo l'hostname dall'URL (niente credenziali) per permettere all'admin
-  // di verificare che DATABASE_URL punti al nodo corretto (eu-central-1 Frankfurt).
+  // di verificare che il target DB selezionato punti al nodo corretto (eu-central-1 Frankfurt).
   try {
-    const dbUrl = process.env.DATABASE_URL ?? "";
+    const dbUrl = getDatabaseUrlForRuntime();
     const dbHost = dbUrl ? new URL(dbUrl).hostname : "(URL assente)";
     const isNeon = dbHost.endsWith("neon.tech");
     const region = dbHost.includes("eu-central-1") ? "Frankfurt (eu-central-1)"
