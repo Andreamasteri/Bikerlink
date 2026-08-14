@@ -17,4 +17,13 @@ describe("watchdog event identity", () => {
     expect(buildWatchdogEventKey("alert", "status.red"))
       .toBe("alert:status.red");
   });
+
+  it("hashes long identities instead of merging them by truncation", () => {
+    const prefix = "x".repeat(180);
+    const a = buildWatchdogEventKey("alert", null, prefix + ":incident-a");
+    const b = buildWatchdogEventKey("alert", null, prefix + ":incident-b");
+    expect(a).not.toBe(b);
+    expect(a.length).toBeLessThanOrEqual(180);
+    expect(b.length).toBeLessThanOrEqual(180);
+  });
 });

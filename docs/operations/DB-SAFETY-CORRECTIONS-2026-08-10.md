@@ -1,6 +1,6 @@
 # BikerLink — correzioni di sicurezza release e backup
 
-Data: 2026-08-10  
+Data: 2026-08-10
 Branch: `codex/release-safety-corrections-20260810`
 
 ## Applicato

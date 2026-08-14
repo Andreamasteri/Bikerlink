@@ -133,7 +133,9 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
     } finally {
       if (pingTimer) clearTimeout(pingTimer);
       if (client) {
-        client.quit().catch(() => { /* ignore — client usa-e-getta */ });
+        // Attendi la chiusura del client usa-e-getta: evita promise pendenti
+        // durante il teardown dei probe/test e garantisce rilascio deterministico.
+        await client.quit().catch(() => { /* ignore — client usa-e-getta */ });
       }
     }
   }

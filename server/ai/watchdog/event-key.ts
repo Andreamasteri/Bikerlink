@@ -1,3 +1,5 @@
+import { createHash } from "crypto";
+
 /**
  * Stable identity for watchdog events.
  *
@@ -10,5 +12,9 @@ export function buildWatchdogEventKey(
   explicitKey?: string | null,
 ): string {
   const value = explicitKey?.trim() || `${kind}:${scope?.trim() || "global"}`;
-  return value.slice(0, 180);
+  // Truncating would merge different long identities. Keep a readable prefix
+  // and append a digest so uniqueness remains stable without storing details.
+  if (value.length <= 180) return value;
+  const digest = createHash("sha256").update(value).digest("hex");
+  return `${value.slice(0, 115)}:${digest}`;
 }

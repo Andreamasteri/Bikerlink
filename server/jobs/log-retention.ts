@@ -8,7 +8,7 @@
 // In più, esegue UNA-TANTUM uno svuotamento totale di `gps_errors` per ripulire
 // il flood storico accumulato prima della rimozione del buffer GPS offline lato
 // client. Il purge è idempotente (gated da un flag in app_settings).
-import { lt, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -67,7 +67,7 @@ const GPS_ERRORS_FULL_PURGE_FLAG = "logRetention.gpsErrorsPurgedV1";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const FIVE_DAYS_MS = 5 * ONE_DAY_MS;
 const INITIAL_DELAY_MS = 2 * 60 * 1000;
-const RETENTION_BATCH_SIZE = 1000;
+const RETENTION_BATCH_SIZE = 1_000;
 
 // notification_history ha ora anche una definizione Drizzle, ma il purge
 // resta SQL grezzo per mantenere il cleanup semplice, indicizzato e a basso impatto.
@@ -79,49 +79,37 @@ const NOTIFICATION_HISTORY_DEFAULT_RETENTION = 30;
 const NOTIFICATION_HISTORY_MIN_RETENTION = 7;
 const NOTIFICATION_HISTORY_MAX_RETENTION = 30;
 
-async function countOlderThan(target: RetentionTarget, cutoff: Date): Promise<number> {
-  const [row] = await withDbRetry(`[log-retention:${target.name}]`, () =>
-    db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(target.table)
-      .where(lt(target.tsColumn, cutoff)),
-  );
-  return row?.c ?? 0;
-}
-
 async function purgeTarget(target: RetentionTarget): Promise<number> {
   const cutoff = new Date(Date.now() - target.retentionDays * ONE_DAY_MS);
-  const count = await countOlderThan(target, cutoff);
-  if (count <= 0) return 0;
-
-  // Delete in bounded batches to avoid long transactions, lock amplification,
-  // and large WAL/temp bursts on append-only tables.
   let deleted = 0;
-  const tableName = `public.${target.name}`;
 
-  while (deleted < count) {
+  // A single DELETE can retain locks and generate a large WAL burst. Delete
+  // bounded physical batches so foreground writes can keep progressing.
+  while (true) {
     const result = await withDbRetry(`[log-retention:${target.name}]`, () =>
-      db.execute(sql.raw(`
-        WITH doomed AS (
+      db.execute(sql`
+        WITH victims AS (
           SELECT ctid
-          FROM ${tableName}
-          WHERE ${target.tsColumn.name} < '${cutoff.toISOString()}'
+          FROM ${target.table}
+          WHERE ${target.tsColumn} < ${cutoff}
           LIMIT ${RETENTION_BATCH_SIZE}
         )
-        DELETE FROM ${tableName} AS target
-        USING doomed
-        WHERE target.ctid = doomed.ctid
-      `)),
+        DELETE FROM ${target.table} AS retained
+        USING victims
+        WHERE retained.ctid = victims.ctid
+      `),
     );
 
-    const batchDeleted = Number((result as { rowCount?: number }).rowCount ?? 0);
-    deleted += batchDeleted;
-    if (batchDeleted === 0) break;
+    const batch = (result as { rowCount?: number }).rowCount ?? 0;
+    deleted += batch;
+    if (batch < RETENTION_BATCH_SIZE) break;
   }
 
-  console.log(
-    `[LOG-RETENTION] ${target.name}: rimosse ${deleted} righe più vecchie di ${target.retentionDays}gg in batch da ${RETENTION_BATCH_SIZE}`
-  );
+  if (deleted > 0) {
+    console.log(
+      `[LOG-RETENTION] ${target.name}: rimosse ${deleted} righe più vecchie di ${target.retentionDays}gg in batch da ${RETENTION_BATCH_SIZE}`,
+    );
+  }
   return deleted;
 }
 

@@ -3,7 +3,6 @@
 // Tutti e tre i tipi seguono la stessa finestra (nessun floor separato).
 import { Cron } from "croner";
 import { withJobGate } from "./gated-job";
-import { withBgDbSlot } from "../../lib/bg-db-limiter";
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { aiConflicts, aiDecisions, aiEvents } from "@shared/db";
@@ -21,11 +20,10 @@ function getRetentionDays(): number {
   if (!Number.isFinite(n) || n < 7) return 30;
   return Math.min(3650, n);
 }
-
 async function deleteOldRowsInBatches(tableName: "ai_events" | "ai_decisions" | "ai_conflicts", cutoff: Date): Promise<number> {
   let deleted = 0;
   for (;;) {
-    const result = await withBgDbSlot(() => db.execute(sql`
+    const result = await db.execute(sql`
       WITH doomed AS (
         SELECT id
         FROM ${sql.raw(tableName)}
@@ -37,7 +35,7 @@ async function deleteOldRowsInBatches(tableName: "ai_events" | "ai_decisions" | 
       USING doomed
       WHERE target.id = doomed.id
       RETURNING target.id
-    `));
+    `);
     const batch = result.rows?.length ?? 0;
     deleted += batch;
     if (batch < RETENTION_DELETE_BATCH) return deleted;
@@ -89,4 +87,3 @@ export function getCleanupStatus() {
     retentionDays: getRetentionDays(),
   };
 }
-
