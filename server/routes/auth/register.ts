@@ -121,8 +121,18 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       SMOKE_EMAIL_RE.test(data.email) ||
       data.email.endsWith("@bikerlink.test") ||
       SMOKE_NICKNAME_RE.test(data.nickname.trim());
+    const configuredSmokeToken = process.env.SMOKE_REGISTRATION_TOKEN;
+    const presentedSmokeToken = req.get("X-Bikerlink-Smoke-Token");
+    const tokenControlledSmoke =
+      Boolean(configuredSmokeToken) &&
+      Boolean(presentedSmokeToken) &&
+      presentedSmokeToken!.length === configuredSmokeToken!.length &&
+      crypto.timingSafeEqual(
+        Buffer.from(presentedSmokeToken!),
+        Buffer.from(configuredSmokeToken!),
+      );
     const controlledSmoke =
-      req.app.locals.controlledSmokeRegistration === true &&
+      (req.app.locals.controlledSmokeRegistration === true || tokenControlledSmoke) &&
       SMOKE_EMAIL_RE.test(data.email) &&
       SMOKE_NICKNAME_RE.test(data.nickname.trim()) &&
       !data.invitationCode;
