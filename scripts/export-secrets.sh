@@ -61,12 +61,8 @@ echo "" >> "$OUT"
 
 # ── Database / Redis ─────────────────────────────────────────
 echo "# --- Database / Redis ---" >> "$OUT"
-echo "TC_DRAGONFLY_URL=${TC_DRAGONFLY_URL:-}" >> "$OUT"
-echo "TC_REDIS_URL=${TC_REDIS_URL:-}" >> "$OUT"
-echo "REDIS_PROBE_HOST=${REDIS_PROBE_HOST:-}" >> "$OUT"
-echo "REDIS_PROBE_PORT=${REDIS_PROBE_PORT:-}" >> "$OUT"
-echo "REDIS_PROBE_URL=${REDIS_PROBE_URL:-}" >> "$OUT"
-echo "REDIS_TUNNEL_HOSTNAME=${REDIS_TUNNEL_HOSTNAME:-}" >> "$OUT"
+echo "REDIS_URL=${REDIS_URL:-}" >> "$OUT"
+echo "REDIS_TUNNEL_HOSTNAME=${REDIS_TUNNEL_HOSTNAME:-dragonfly-akuma.biker-link.net}" >> "$OUT"
 echo "" >> "$OUT"
 
 # ── ThinkCentre / SSH ────────────────────────────────────────
