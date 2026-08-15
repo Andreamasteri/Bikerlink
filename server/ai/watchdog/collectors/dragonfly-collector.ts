@@ -17,11 +17,11 @@ let hadSuccessfulConnection = false;
 
 export async function collectDragonfly(): Promise<Signal[]> {
   const signals: Signal[] = [];
-  const url = process.env.TC_DRAGONFLY_URL;
+  const url = process.env.REDIS_URL;
   if (!url) {
     signals.push({
       source: "dragonfly", metric: "dragonfly.absent", severity: "info",
-      details: { reason: "TC_DRAGONFLY_URL non impostato" },
+      details: { reason: "REDIS_URL non impostato" },
     });
     return signals;
   }
