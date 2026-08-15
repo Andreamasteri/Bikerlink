@@ -22,10 +22,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockQuit.mockResolvedValue("OK");
   delete process.env.REDIS_URL;
+  delete process.env.REDIS_PROBE_URL;
 });
 
 afterEach(() => {
   delete process.env.REDIS_URL;
+  delete process.env.REDIS_PROBE_URL;
 });
 
 describe("probeDragonflyInfra — VPS REDIS_URL", () => {
