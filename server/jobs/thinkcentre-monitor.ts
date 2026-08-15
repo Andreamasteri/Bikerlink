@@ -51,7 +51,6 @@ export {
   computeOverallStatus,
   probeGraphHopperAreas,
 } from "./thinkcentre-monitor-probes";
-import { reInitRedis, suspendRedis, setTcRedisProbeOk } from "../cache/redis";
 import { withJobGate } from "../ai/coordinator/gated-job";
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -183,22 +182,6 @@ async function handlePerServiceNotifications(
       void recordHealthEvent(s.key, prevOk ? "ok" : "ko", currentOk ? "ok" : "ko");
     }
 
-    // Per-service DragonflyDB lifecycle hooks (TC green/yellow — not handled by the red path):
-    if (s.key === "dragonfly") {
-      if (prevOk === false && currentOk === true) {
-        // Probe tornata OK (false → true): avvia reInit anche quando il TC non era "red"
-        // (altri servizi ancora up) — evita che ioredis resti disconnesso a tempo
-        // indeterminato dopo la race ECONNREFUSED al boot del bridge cloudflared.
-        void reInitRedis();
-        console.log("[thinkcentre-monitor] DragonflyDB probe tornata OK — reInit avviato");
-      } else if (prevOk === true && currentOk === false) {
-        // Probe andata KO (true → false): sospendi subito per azzerare state.client e
-        // bloccare il flooding "Stream isn't writeable" da matching-lock/Redlock.
-        console.log("[thinkcentre-monitor] DragonflyDB probe KO (TC green) — suspendRedis avviato");
-        void suspendRedis();
-      }
-    }
-
     if (!pushEnabled) continue;
     if (prevOk === false && currentOk === false) continue;
     if (currentOk) continue;
@@ -303,9 +286,6 @@ export async function runThinkCentreProbe(): Promise<void> {
   const isFirstRun = prev === null;
   lastStatus = current;
 
-  // Aggiorna il risultato della probe DragonflyDB in redis.ts (esposto via getRedisStatus().tcProbeOk).
-  const dragonflyProbeResult = services.find((s) => s.key === "dragonfly");
-  setTcRedisProbeOk(dragonflyProbeResult?.ok ?? null);
 
   if (isFirstRun) {
     console.log(`[thinkcentre-monitor] stato iniziale: ${current}`);
@@ -329,11 +309,6 @@ export async function runThinkCentreProbe(): Promise<void> {
       );
       console.log(`[thinkcentre-monitor] notifica offline inviata a ${n} admin`);
     }
-    // TC offline → sospendi DragonflyDB (evita flooding di errori di connessione).
-    // Nota: esiste anche un path per-servizio in handlePerServiceNotifications che
-    // chiama suspendRedis() quando la sola probe DragonflyDB transisce ok→ko mentre
-    // TC non è ancora "red". suspendRedis() è idempotente (guard su state.client==null).
-    void suspendRedis();
     return;
   }
 
