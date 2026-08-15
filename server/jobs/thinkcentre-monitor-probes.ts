@@ -43,7 +43,6 @@ export const PROBE_ENV_VARS = [
   "VALHALLA_URL",
   "VALHALLA_API_KEY",
   "UFW_STATUS_URL",
-  "REDIS_URL",
   "NGINX_MONITOR_URL",
   "UPTIME_KUMA_URL",
 ] as const;
