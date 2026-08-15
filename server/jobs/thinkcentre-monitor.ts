@@ -326,12 +326,7 @@ export async function runThinkCentreProbe(): Promise<void> {
       console.log(`[thinkcentre-monitor] notifica online inviata a ${n} admin`);
     }
     void checkMotorcycleProfile();
-    // TC tornato online → riprova connessione DragonflyDB se la probe è OK.
-    const dragonflyProbe = services.find((s) => s.key === "dragonfly");
-    if (dragonflyProbe?.ok === true) {
-      void reInitRedis();
-      console.log("[thinkcentre-monitor] DragonflyDB TC: riconnessione avviata (probe OK)");
-    }
+
     return;
   }
 
