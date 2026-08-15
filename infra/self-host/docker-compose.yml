@@ -3,8 +3,7 @@
 #
 # Servizi base:
 #   - postgres   PostgreSQL 16 + PostGIS 3.4   → :5432
-#   - dragonfly  DragonflyDB v1.38.1 (drop-in Redis-compatible) → :6379
-#   - valhalla   Valhalla (motorcycle nativo)  → :8002
+# #   - valhalla   Valhalla (motorcycle nativo)  → :8002
 #   - pgadmin    pgAdmin 4 (UI DB)             → :5050
 #
 # Routing "ad aree regionali" (sistema multi-istanza GraphHopper 12):
@@ -20,7 +19,7 @@
 # ⚠️ Codici/porte sincronizzati con shared/routing-areas.ts (FONTE DI VERITÀ).
 #
 # I servizi graphhopper-* sono sotto il profilo "areas": NON partono con un
-# semplice `docker compose up -d` (che avvia solo postgres/dragonfly/valhalla/pgadmin).
+# semplice `docker compose up -d` (che avvia solo postgres/valhalla/pgadmin).
 # Vengono accesi/spenti per nome dal watchdog in base allo stato abilitato:
 #     docker compose up -d graphhopper-<codice>
 #     docker compose stop  graphhopper-<codice>
@@ -84,61 +83,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
-
-  # ---------------------------------------------------------------------------
-  # DragonflyDB v1.38.1 (cache, code, heartbeat) — drop-in replacement per Redis 7
-  #
-  # Fino all'80% meno RAM rispetto a Redis (critico con Ollama + GraphHopper
-  # attivi), multi-thread su tutti i core, nessuno spike di memoria durante gli
-  # snapshot. Compatibile drop-in con ioredis/BullMQ/Redlock/Pub-Sub: nessuna
-  # modifica al codice applicativo, stessa porta 6379, stessa TC_DRAGONFLY_URL.
-  #
-  # --cluster_mode emulated: OBBLIGATORIO per BullMQ (usa script Lua il cui
-  #   prefisso di coda è passato via ARGV, non KEYS).
-  # --default_lua_flags=allow-undeclared-keys: OBBLIGATORIO insieme a
-  #   cluster_mode=emulated. Senza questo flag gli script BullMQ (es. addJob)
-  #   falliscono SEMPRE con "ERR ...script tried accessing undeclared key" —
-  #   a differenza del vero Redis Cluster, Dragonfly in modalità emulated
-  #   applica comunque il controllo "tutte le chiavi toccate devono essere
-  #   dichiarate in KEYS" a meno di questo override esplicito. Verificato con
-  #   smoke test end-to-end (queue.add + Worker) prima del cutover.
-  # --requirepass: stessa REDIS_PASSWORD usata in precedenza con Redis.
-  # --snapshot_cron "0 * * * *": snapshot orario (equivalente a --save 3600 1
-  #   di Redis). NOTA: DragonflyDB NON ha i flag Redis --maxmemory-policy,
-  #   --save o --aof_rewrite_min_size (CLI diversa, non un superset di Redis;
-  #   il binario va in crash-loop con "Unknown command line flag" se passati).
-  #   Non esiste un flag di eviction policy: con cluster_mode=emulated e
-  #   maxmemory impostato, Dragonfly applica eviction automatica quando serve.
-  # ulimits.memlock=-1: senza questo il container non parte.
-  # healthcheck: DragonflyDB include redis-cli; con --requirepass attivo va
-  #   autenticato (-a) o il ping fallisce sempre con NOAUTH → unhealthy falso.
-  # ---------------------------------------------------------------------------
-  dragonfly:
-    image: ghcr.io/dragonflydb/dragonfly:v1.38.1
-    container_name: bikerlink-dragonfly
-    restart: unless-stopped
-    command:
-      - "--cluster_mode=emulated"
-      - "--requirepass=${REDIS_PASSWORD}"
-      - "--maxmemory=1gb"
-      - "--snapshot_cron=0 * * * *"
-      - "--default_lua_flags=allow-undeclared-keys"
-    environment:
-      # Necessaria solo per l'healthcheck sotto (redis-cli gira DENTRO il
-      # container e legge questa env var, non quella interpolata in `command`).
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    ulimits:
-      memlock: -1
-    ports:
-      - "6379:6379"
-    volumes:
-      - dragonflydata:/data
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
 
   # ---------------------------------------------------------------------------
   # GraphHopper 12 — istanze per gruppo-area (vedi shared/routing-areas.ts)
@@ -406,7 +350,6 @@ services:
 
 volumes:
   pgdata:
-  dragonflydata:
   valhalladata:
   pgadmindata:
   nominatimdata:
