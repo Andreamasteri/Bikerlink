@@ -10,7 +10,7 @@ import { getCircuitStatus } from "../db-circuit-breaker";
 import { getHealthState } from "../lib/health-arbiter";
 import { getCoordinatorHealthSummary } from "../ai/coordinator/job-gate";
 import { isHorusCoordinatorLoopRunning, getHorusCoordinatorLoopStats } from "../ai/coordinator/horus-coordinator-loop";
-import { getRedisTunnelStatus } from "../cache/redis-tunnel";
+import { getRedisStatus } from "../cache/redis";
 import { getOrFetchAdminCached, deleteAdminCached } from "../lib/admin-auth-cache";
 import { withShortCache, clearShortCache } from "../lib/short-cache";
 
@@ -172,21 +172,19 @@ export function registerMoreRoutes(app: Express) {
     } catch {
       coordinator = { unavailable: true };
     }
-    // Stato del redis-tunnel cloudflared — INFORMATIVO (Sentry #126649029).
-    // Non influenza `status`/`degraded`; esposto per il watchdog e l'admin TC.
-    // floodActive=true quando il circuit breaker soft è intervenuto (>10 restart/5min).
+    // Stato informativo della connessione Redis/Dragonfly VPS.
     let redisTunnel: unknown;
     try {
-      const t = getRedisTunnelStatus();
+      const r = getRedisStatus();
       redisTunnel = {
-        enabled: t.enabled,
-        running: t.running,
-        restarts: t.restarts,
-        lastExitCode: t.lastExitCode,
-        lastExitReason: t.lastExitReason,
-        lastError: t.lastError,
-        lastExitAt: t.lastExitAt,
-        floodActive: t.floodStartedAt !== null,
+        enabled: r.configured,
+        running: r.available,
+        restarts: 0,
+        lastExitCode: null,
+        lastExitReason: null,
+        lastError: r.lastError,
+        lastExitAt: r.lastErrorAt,
+        floodActive: false,
       };
     } catch {
       redisTunnel = { unavailable: true };
