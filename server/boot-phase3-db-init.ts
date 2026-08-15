@@ -450,24 +450,24 @@ export async function runBootPhase3DbInit(): Promise<void> {
   }
 
   try {
-    const tcDragonflyUrl = process.env.TC_DRAGONFLY_URL;
-    if (!tcDragonflyUrl) {
-      console.log("[boot] DragonflyDB: TC_DRAGONFLY_URL non impostato — fallback in-memory attivo");
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) {
+      console.log("[boot] DragonflyDB: REDIS_URL non impostato — fallback in-memory attivo");
     } else {
       try {
         const ioredis = await import("ioredis").catch(() => null);
         if (ioredis) {
           const Redis = (ioredis as { default?: unknown }).default ?? ioredis;
           const RedisCtor = Redis as unknown as { new (url: string, opts?: unknown): { ping: () => Promise<string>; quit: () => Promise<unknown> } };
-          const client = new RedisCtor(tcDragonflyUrl, { lazyConnect: true, maxRetriesPerRequest: 1, connectTimeout: 2000 });
+          const client = new RedisCtor(redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1, connectTimeout: 2000 });
           const t0 = Date.now();
           await client.ping();
           const ms = Date.now() - t0;
           await client.quit().catch(() => {});
-          console.log(`[boot] DragonflyDB TC: raggiungibile — ping ${ms}ms (${tcDragonflyUrl.replace(/:[^:@]*@/, ":***@")})`);
+          console.log(`[boot] DragonflyDB VPS: raggiungibile — ping ${ms}ms (${redisUrl.replace(/:[^:@]*@/, ":***@")})`);
         }
       } catch (dragonflyErr) {
-        console.warn(`[boot] DragonflyDB TC: NON raggiungibile (${(dragonflyErr as Error).message}) — fallback in-memory attivo`);
+        console.warn(`[boot] DragonflyDB VPS: NON raggiungibile (${(dragonflyErr as Error).message}) — fallback in-memory attivo`);
       }
     }
   } catch (e) {
