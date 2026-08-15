@@ -9,9 +9,10 @@
 
 export async function cleanupOrphanSmokeUsers(): Promise<void> {
   if (process.env.SMOKE_CLEANUP_ORPHANS !== "1") return;
-  if (!process.env.DATABASE_URL) return;
+  const databaseUrl = process.env.DATABASE_URL_CANDIDATE ?? process.env.DATABASE_URL;
+  if (!databaseUrl) return;
   const { Client } = await import("pg");
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  const client = new Client({ connectionString: databaseUrl });
   try {
     await client.connect();
     await client.query(
