@@ -5,12 +5,9 @@
  * Importati da thinkcentre-health.ts.
  *
  * Env vars:
- *   REDIS_PROBE_URL       URL HTTP del probe Redis via TC agent (es. https://tc.biker-link.net/probe/redis)
- *                         Se impostato ha precedenza su REDIS_PROBE_HOST (modalità TCP diretta).
- *   REDIS_PROBE_HOST      hostname/IP Redis (TCP diretto, fallback se REDIS_PROBE_URL non impostato)
- *   REDIS_PROBE_PORT      porta Redis (default: 6379, usato solo in modalità TCP)
- *   NGINX_MONITOR_URL     URL nginx  — punta al probe TC agent: https://tc.biker-link.net/probe/nginx
- *   UPTIME_KUMA_URL       URL Uptime Kuma — punta al probe TC agent: https://tc.biker-link.net/probe/uptime-kuma
+ *   REDIS_URL              URL ioredis del DragonflyDB VPS
+ *   NGINX_MONITOR_URL      URL nginx
+ *   UPTIME_KUMA_URL        URL Uptime Kuma
  */
 
 import Redis from "ioredis";
