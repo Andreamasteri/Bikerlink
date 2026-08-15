@@ -67,6 +67,7 @@ import { registerMoreRoutes2 } from "./routes/more-routes-2";
 import { registerMediaPromoRoutes } from "./routes/media-promo";
 import { recordSessionError, recordSessionSuccess } from "./session-health";
 import { getOrFetchAdminCached, deleteAdminCached } from "./lib/admin-auth-cache";
+import { getDatabaseUrlForRuntime } from "./lib/database-environment";
 
 async function _requireAdmin(req: Request, res: Response, next: NextFunction) {
   const session = req.session as { userId?: string };
@@ -99,7 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Pool dedicato per il session store — separato dal pool principale per evitare
   // contesa sotto carico e per poter configurare keepAlive indipendente.
   const sessionPool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: getDatabaseUrlForRuntime(),
     keepAlive: true,
     // 10s: allineato al pool principale, < timeout Replit managed DB.
     idleTimeoutMillis: 10000,
