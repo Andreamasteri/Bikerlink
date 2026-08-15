@@ -195,11 +195,11 @@ export function deriveProblems(signals: Signal[]): Problem[] {
     } else if (s.metric === "dragonfly.unreachable") {
       const cf = (s.details as { consecutiveFailures?: number } | undefined)?.consecutiveFailures ?? 1;
       title = `DragonflyDB non raggiungibile — fallback in-memory attivo (${cf} fallimenti consecutivi)`;
-      suggestion = "Fallback in-memory attivo: il matching continua a funzionare. Verifica TC_DRAGONFLY_URL e stato del servizio per ripristinare il distributed lock.";
+      suggestion = "Fallback in-memory attivo: il matching continua a funzionare. Verifica REDIS_URL e stato del servizio per ripristinare il distributed lock.";
     } else if (s.metric === "ai_hub.unreachable") {
       const cf = (s.details as { consecutiveFailures?: number } | undefined)?.consecutiveFailures ?? 1;
       title = `AI Hub (TC) non raggiungibile — tool file/VRAM degradati, search_manual su fallback pgvector (${cf} fallimenti consecutivi)`;
-      suggestion = "Verifica il servizio ai-hub (pm2, porta 4405) sul ThinkCentre, il thinkcentre-agent proxy /ai-hub/* e i secret AI_HUB_URL/AI_HUB_GATE_TOKEN. search_manual continua sul motore pgvector locale.";
+      suggestion = "Verifica il servizio ai-hub (pm2, porta 4405) sul VPS, il thinkcentre-agent proxy /ai-hub/* e i secret AI_HUB_URL/AI_HUB_GATE_TOKEN. search_manual continua sul motore pgvector locale.";
     } else if (s.metric === "latency.p95_ms" || s.metric === "latency.p99_ms") {
       title = `Latenza API ${s.metric}: ${s.value}ms`;
     } else if (s.metric === "http.5xx_per_min") {
@@ -244,7 +244,7 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       const det = s.details as { engines?: string[]; description?: string } | undefined;
       const engineList = det?.engines?.join(", ") ?? "sconosciuti";
       title = `Instabilità di rete: ${s.value} engine irraggiungibili (${engineList})`;
-      suggestion = "Verifica connettività Replit. Se ThinkCentre è offline, usa powered-off mode per sopprimere i relativi alert.";
+      suggestion = "Verifica connettività Replit. Se VPS è offline, usa powered-off mode per sopprimere i relativi alert.";
     } else if (s.metric.startsWith("health.engine.")) {
       const engine = s.metric.split(".")[2];
       title = `Routing engine ${engine} health-check KO`;
@@ -254,7 +254,7 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       const blockedMin = s.value ?? "?";
       const threshold = det?.thresholdMin ?? 60;
       title = `Map-matching bloccato da ${blockedMin}min — lock DragonflyDB rifiutato (soglia: ${threshold}min)`;
-      suggestion = "DragonflyDB rifiuta il lock distribuito — il ciclo di matching non parte. Verifica stato DragonflyDB (TC_DRAGONFLY_URL), riavvia il servizio DragonflyDB sul ThinkCentre o forza l'unlock dal pannello admin matching.";
+      suggestion = "DragonflyDB rifiuta il lock distribuito — il ciclo di matching non parte. Verifica stato DragonflyDB (REDIS_URL), riavvia il servizio DragonflyDB sul VPS o forza l'unlock dal pannello admin matching.";
     } else if (s.metric === "matching.last_run_h") {
       title = `Map-matching: ultimo run ${s.value}h fa`;
     } else if (s.metric === "matching.pending") {
@@ -338,8 +338,8 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       const det = s.details as { outageSec?: number; thresholdSec?: number } | undefined;
       const sec = det?.outageSec ?? s.value ?? "?";
       const threshold = det?.thresholdSec ?? 90;
-      title = `ThinkCentre riavviato lentamente: ${sec}s (soglia ${threshold}s)`;
-      suggestion = "Riavvio del ThinkCentre oltre la soglia di 90s. Possibile regressione del kernel (cgroup_drain_dying deadlock su Ubuntu 26.04 kernel ≤7.0.0-22-generic). Verifica la versione kernel con `uname -r` e considera l'upgrade a un kernel LTS dove il bug è confermato risolto. Il fix `ollama.service` ExecPreStop riduce l'esposizione ma non elimina il bug kernel.";
+      title = `VPS riavviato lentamente: ${sec}s (soglia ${threshold}s)`;
+      suggestion = "Riavvio del VPS oltre la soglia di 90s. Possibile regressione del kernel (cgroup_drain_dying deadlock su Ubuntu 26.04 kernel ≤7.0.0-22-generic). Verifica la versione kernel con `uname -r` e considera l'upgrade a un kernel LTS dove il bug è confermato risolto. Il fix `ollama.service` ExecPreStop riduce l'esposizione ma non elimina il bug kernel.";
     } else if (s.metric === "backend.crash_rate_1h") {
       // Task #934 — segnale crash_rate_1h: letto direttamente da logs/uptime-resets.log.
       const count = Number(s.value ?? 0);
@@ -367,7 +367,7 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       const delta = det?.delta ?? s.value ?? "?";
       const totalRestarts = det?.restartCount ?? "?";
       title = `Container routing riavviato: ${name.replace("bikerlink-", "")} (+${delta} restart, tot: ${totalRestarts})`;
-      suggestion = `Il container Docker ${name} si è riavviato inaspettatamente. Controlla i log sul ThinkCentre: \`docker logs ${name} --tail 100\`. Verifica memoria disponibile e OOM-killer con \`dmesg | grep -i oom\`.`;
+      suggestion = `Il container Docker ${name} si è riavviato inaspettatamente. Controlla i log sul VPS: \`docker logs ${name} --tail 100\`. Verifica memoria disponibile e OOM-killer con \`dmesg | grep -i oom\`.`;
     } else if (s.metric === "server.restart_alert") {
       const count = s.value ?? 1;
       const det = s.details as { minutesSinceLast?: number; latestAt?: string } | undefined;
@@ -391,7 +391,7 @@ export function deriveProblems(signals: Signal[]): Problem[] {
       const engine = s.metric.split(".")[1];
       const reason = (s.details as { reason?: string } | undefined)?.reason ?? "risultato non plausibile";
       title = `Routing ${engine}: correttezza KO — ${reason}`;
-      suggestion = `${engine} risponde ma restituisce un percorso non plausibile o errore silenzioso. Verifica il grafo/i tile di ${engine} e la sua salute sul ThinkCentre.`;
+      suggestion = `${engine} risponde ma restituisce un percorso non plausibile o errore silenzioso. Verifica il grafo/i tile di ${engine} e la sua salute sul VPS.`;
     } else if (s.metric === "routing.area_resolver.error") {
       const det = s.details as { reason?: string; sqlCode?: string } | undefined;
       const reason = det?.reason ?? "errore SQL nell'area resolver";
@@ -404,7 +404,7 @@ export function deriveProblems(signals: Signal[]): Problem[] {
     } else if (s.metric === "geocoding.photon.correct") {
       const reason = (s.details as { reason?: string } | undefined)?.reason ?? "risultato non plausibile";
       title = `Geocoding Photon: correttezza KO — ${reason}`;
-      suggestion = "Photon risponde ma il geocoding è vuoto/errato. Verifica l'indice Photon e la connettività sul ThinkCentre.";
+      suggestion = "Photon risponde ma il geocoding è vuoto/errato. Verifica l'indice Photon e la connettività sul VPS.";
     } else if (s.metric === "pipeline.correct") {
       const reason = (s.details as { reason?: string } | undefined)?.reason ?? "pipeline non corretta";
       title = `Pipeline routing: ${reason}`;
@@ -418,21 +418,21 @@ export function deriveProblems(signals: Signal[]): Problem[] {
   return problems;
 }
 
-// Problemi che sono CONSEGUENZA diretta del ThinkCentre offline — lista
+// Problemi che sono CONSEGUENZA diretta del VPS offline — lista
 // ESPLICITA e ristretta, mai per prefisso (un prefisso largo sopprimerebbe anche
 // guasti indipendenti):
-//  - DragonflyDB non raggiungibile (self-hosted sul ThinkCentre);
+//  - DragonflyDB non raggiungibile (self-hosted sul VPS);
 //  - backlog map-matching che cresce perché GraphHopper non risponde;
 //  - routing engine SELF-HOSTED down (graphhopper/valhalla). I cloud engine
-//    (mapbox/tomtom) sono ESCLUSI: un loro down è indipendente dal ThinkCentre
+//    (mapbox/tomtom) sono ESCLUSI: un loro down è indipendente dal VPS
 //    e deve restare azionabile;
 //  - pressione del pool conseguente (event-loop ingolfato dalle chiamate lente
-//    verso il ThinkCentre → SELECT 1 non ottiene slot, limiter bg in coda);
+//    verso il VPS → SELECT 1 non ottiene slot, limiter bg in coda);
 //  - instabilità di rete (N engine irraggiungibili): con TC spento i self-hosted
 //    risultano giù, gonfiando il contatore — il rumore non è azionabile;
 //  - DB ping lento (db.db.ping_ms): i job di map-matching girano a vuoto senza
 //    GH/Valhalla e saturano il pool → il ping rallenta come effetto collaterale.
-// NON inclusi (restano allarmi pieni anche a ThinkCentre spento):
+// NON inclusi (restano allarmi pieni anche a VPS spento):
 //  - maps.routing.engine_down.mapbox/tomtom (cloud, indipendenti dall'outage);
 //  - db.db.circuit_breaker (DB realmente giù — sempre azionabile).
 const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
@@ -446,13 +446,13 @@ const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
   "db.db.bg_limiter.dropped",
   "maps.health.network_instability",
   "db.db.ping_ms",
-  // Task #72 — sovraccarico sostenuto: con il ThinkCentre spento pool/ping/errori
+  // Task #72 — sovraccarico sostenuto: con il VPS spento pool/ping/errori
   // DB e l'event-loop ingolfato dalle chiamate lente verso i self-hosted sono
   // conseguenze attese dell'outage → downstream, push soppressa.
   "db.db.overload_sustained",
   "app.backend.overload_sustained",
   // Task #23 — sonde di correttezza routing self-hosted (namespace Horus): con il
-  // ThinkCentre spento i motori risultano scorretti/irraggiungibili → downstream.
+  // VPS spento i motori risultano scorretti/irraggiungibili → downstream.
   "horus.routing.graphhopper.correct",
   "horus.routing.valhalla.correct",
   "horus.geocoding.photon.correct",
@@ -469,10 +469,10 @@ function isOutageDownstreamProblem(id: string): boolean {
   return OUTAGE_DOWNSTREAM_IDS.has(id);
 }
 
-// Quando il ThinkCentre è in modalità "spento", retrocede i problemi a valle
+// Quando il VPS è in modalità "spento", retrocede i problemi a valle
 // dell'outage da critical/high a "warn": restano VISIBILI in dashboard (così
 // l'admin sa che ci sono) ma non scatenano escalation critica né push, perché
-// sono attesi e non azionabili finché il ThinkCentre è offline.
+// sono attesi e non azionabili finché il VPS è offline.
 export function suppressDownstreamWhenPoweredOff(problems: Problem[]): Problem[] {
   return problems.map((p) => {
     if (
@@ -482,9 +482,9 @@ export function suppressDownstreamWhenPoweredOff(problems: Problem[]): Problem[]
       return {
         ...p,
         severity: "warn" as Severity,
-        title: `${p.title} — soppresso (ThinkCentre spento)`,
+        title: `${p.title} — soppresso (VPS spento)`,
         suggestion:
-          "Allarme atteso mentre il ThinkCentre è in modalità spento: escalation e push soppresse, ma il problema resta visibile in dashboard. Riaccendi il ThinkCentre o disattiva la modalità powered-off per ripristinare gli alert.",
+          "Allarme atteso mentre il VPS è in modalità spento: escalation e push soppresse, ma il problema resta visibile in dashboard. Riaccendi il VPS o disattiva la modalità powered-off per ripristinare gli alert.",
       };
     }
     return p;
