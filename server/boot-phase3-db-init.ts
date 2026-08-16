@@ -450,27 +450,44 @@ export async function runBootPhase3DbInit(): Promise<void> {
   }
 
   try {
-    const tcDragonflyUrl = process.env.TC_DRAGONFLY_URL;
-    if (!tcDragonflyUrl) {
-      console.log("[boot] DragonflyDB: TC_DRAGONFLY_URL non impostato — fallback in-memory attivo");
+    // REDIS_URL is the canonical VPS/managed Redis endpoint. Keep the legacy
+    // TC variable as a compatibility fallback for older non-production setups.
+    const redisUrl = process.env.REDIS_URL?.trim() || process.env.TC_DRAGONFLY_URL?.trim();
+    if (!redisUrl) {
+      console.log("[boot] Redis: REDIS_URL non impostato — fallback in-memory attivo");
     } else {
       try {
         const ioredis = await import("ioredis").catch(() => null);
         if (ioredis) {
           const Redis = (ioredis as { default?: unknown }).default ?? ioredis;
-          const RedisCtor = Redis as unknown as { new (url: string, opts?: unknown): { ping: () => Promise<string>; quit: () => Promise<unknown> } };
-          const client = new RedisCtor(tcDragonflyUrl, { lazyConnect: true, maxRetriesPerRequest: 1, connectTimeout: 2000 });
+          const RedisCtor = Redis as unknown as {
+            new (url: string, opts?: unknown): {
+              ping: () => Promise<string>;
+              quit: () => Promise<unknown>;
+            };
+          };
+          const client = new RedisCtor(redisUrl, {
+            lazyConnect: true,
+            maxRetriesPerRequest: 0,
+            enableOfflineQueue: true,
+            connectTimeout: 3_000,
+            commandTimeout: 3_000,
+            retryStrategy: () => null,
+          });
           const t0 = Date.now();
+          if (typeof (client as { connect?: () => Promise<unknown> }).connect === "function") {
+            await (client as { connect: () => Promise<unknown> }).connect();
+          }
           await client.ping();
           const ms = Date.now() - t0;
           await client.quit().catch(() => {});
-          console.log(`[boot] DragonflyDB TC: raggiungibile — ping ${ms}ms (${tcDragonflyUrl.replace(/:[^:@]*@/, ":***@")})`);
+          console.log(`[boot] Redis: raggiungibile — ping ${ms}ms (${redisUrl.replace(/:[^:@]*@/, ":***@")})`);
         }
-      } catch (dragonflyErr) {
-        console.warn(`[boot] DragonflyDB TC: NON raggiungibile (${(dragonflyErr as Error).message}) — fallback in-memory attivo`);
+      } catch (redisErr) {
+        console.warn(`[boot] Redis: NON raggiungibile (${(redisErr as Error).message}) — fallback in-memory attivo`);
       }
     }
   } catch (e) {
-    console.warn("[INIT] Phase 3: DragonflyDB check failed (non-fatal):", e);
+    console.warn("[INIT] Phase 3: Redis check failed (non-fatal):", e);
   }
 }
