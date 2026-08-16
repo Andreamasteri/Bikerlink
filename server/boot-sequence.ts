@@ -129,11 +129,10 @@ export async function runBootSequence(server: Server, errorHandlersReady: Promis
   initUptimeTracking();
   startMetroMonitor();
 
-  // ── DragonflyDB TCP bridge (cloudflared access tcp) — Task #5261 ────────────────
-  // Apre il path privato TCP verso il DragonflyDB del ThinkCentre se configurato
-  // (REDIS_TUNNEL_HOSTNAME). No-op se non configurato (usa TC_DRAGONFLY_URL diretto).
-  // Non bloccante e MAI fatale: il monitor TC farà reInitRedis quando la probe
-  // DragonflyDB passa, anche se il listener non è ancora pronto qui.
+  // ── Legacy DragonflyDB TCP bridge (cloudflared access tcp) ─────────────────────
+  // Il bridge viene considerato solo per compatibilità locale: quando REDIS_URL
+  // è configurato, startRedisTunnel() lo disabilita sempre. Il percorso canonico
+  // cloud/VPS usa REDIS_URL direttamente e non dipende dal ThinkCentre.
   try {
     const { startRedisTunnel } = await import("./cache/redis-tunnel");
     await startRedisTunnel();
