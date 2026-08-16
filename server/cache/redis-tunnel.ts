@@ -385,7 +385,7 @@ export async function startRedisTunnel(waitMs = 8_000): Promise<boolean> {
 
   const hostname = process.env.REDIS_TUNNEL_HOSTNAME?.trim();
   if (!hostname) {
-    console.log("[redis-tunnel] REDIS_TUNNEL_HOSTNAME non impostato — bridge disattivo (uso TC_DRAGONFLY_URL diretto)");
+    console.log("[redis-tunnel] REDIS_TUNNEL_HOSTNAME non impostato — bridge disattivo (fallback in-memory se REDIS_URL non configurato)");
     return false;
   }
   if (!process.env.CF_ACCESS_CLIENT_ID || !process.env.CF_ACCESS_CLIENT_SECRET) {
