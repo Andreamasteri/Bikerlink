@@ -21,6 +21,15 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
     if (route.userId !== userId) {
       return sendError(res, 403, "Non autorizzato");
     }
+    if (route.status === "armed" || !route.startedAt) {
+      return sendError(res, 409, "La misurazione non è ancora iniziata");
+    }
+    // A client can lose the response after the database update and retry the
+    // same stop request. Returning the already completed row makes the
+    // endpoint idempotent and prevents a second profile counter increment.
+    if (route.status === "completed") {
+      return res.json(route);
+    }
 
     const stoppedAt = new Date();
 

@@ -1,6 +1,7 @@
 import * as TaskManager from "expo-task-manager";
 import { Platform } from "react-native";
 import type { LocationObject } from "expo-location";
+import { locationSessionManager } from "./location-session-manager";
 
 export const FOREGROUND_LOCATION_TASK_NAME = "bikerlink-foreground-service";
 export const FOREGROUND_SERVICE_DISABLED_KEY = "@bikerlink/foreground_service_disabled";
@@ -23,7 +24,7 @@ export async function startForegroundLocationService(): Promise<boolean> {
     if (running) return true;
     const { status } = await Location.getForegroundPermissionsAsync();
     if (status !== "granted") return false;
-    await Location.startLocationUpdatesAsync(FOREGROUND_LOCATION_TASK_NAME, {
+    return await locationSessionManager.startBackgroundTask(FOREGROUND_LOCATION_TASK_NAME, {
       accuracy: Location.Accuracy.Balanced,
       timeInterval: FOREGROUND_INTERVAL_MS,
       distanceInterval: 10,
@@ -34,7 +35,6 @@ export async function startForegroundLocationService(): Promise<boolean> {
         killServiceOnDestroy: false,
       },
     });
-    return true;
   } catch {
     return false;
   }
@@ -42,11 +42,7 @@ export async function startForegroundLocationService(): Promise<boolean> {
 
 export async function stopForegroundLocationService(): Promise<void> {
   try {
-    const running = await TaskManager.isTaskRegisteredAsync(FOREGROUND_LOCATION_TASK_NAME);
-    if (running) {
-      const Location = require("expo-location") as typeof import("expo-location");
-      await Location.stopLocationUpdatesAsync(FOREGROUND_LOCATION_TASK_NAME);
-    }
+    await locationSessionManager.stopBackgroundTask(FOREGROUND_LOCATION_TASK_NAME);
   } catch {
     // no-op: best-effort stop
   }

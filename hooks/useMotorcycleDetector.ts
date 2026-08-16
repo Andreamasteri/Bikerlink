@@ -6,6 +6,7 @@ import {
   loadMountCalibration,
   type MountAxisCalibration,
 } from "@/components/MountCalibWizard";
+import { locationSessionManager } from "@/lib/location-session-manager";
 
 export const RELAXED_MOUNT_MODE_KEY = "@bikerlink/relaxed_mount_mode";
 
@@ -247,13 +248,7 @@ export function useMotorcycleDetector({ enabled, relaxedMode = false }: Options)
       // GPS at 2 Hz — primary speed signal
       let sub: Location.LocationSubscription;
       try {
-        sub = await Location.watchPositionAsync(
-        {
-          accuracy:         Location.Accuracy.Balanced,
-          timeInterval:     GPS_INTERVAL_MS,
-          distanceInterval: 5,
-        },
-        (loc) => {
+        sub = locationSessionManager.subscribe((loc) => {
           if (cancelled) return;
           const now       = Date.now();
           const rawSpeed  = loc.coords.speed ?? 0;
@@ -293,8 +288,11 @@ export function useMotorcycleDetector({ enabled, relaxedMode = false }: Options)
               belowStopAtRef.current = null;
             }
           }
-        }
-        );
+        }, {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: GPS_INTERVAL_MS,
+          distanceInterval: 5,
+        });
       } catch (err) {
         // GPS subscription failed → fall back to accelerometer-only detection.
         console.warn("[useMotorcycleDetector] GPS subscription failed, using accelerometer fallback", err);

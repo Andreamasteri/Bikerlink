@@ -24,6 +24,8 @@ interface IdleConfigScreenProps {
   setHandsOffEnabled: (v: boolean) => void;
   countdownEnabled: boolean;
   setCountdownEnabled: (v: boolean) => void;
+  startMode: "manual" | "automatic";
+  setStartMode: (v: "manual" | "automatic") => void;
   batteryDrainStats: BatteryDrainStats;
   showBatteryStats: boolean;
   setShowBatteryStats: (v: boolean) => void;
@@ -47,6 +49,8 @@ export function IdleConfigScreen({
   setHandsOffEnabled,
   countdownEnabled,
   setCountdownEnabled,
+  startMode,
+  setStartMode,
   batteryDrainStats,
   showBatteryStats,
   setShowBatteryStats,
@@ -172,13 +176,38 @@ export function IdleConfigScreen({
       </View>
 
       {/* Start Button */}
+      <View style={styles.startModeSection}>
+        <Text style={styles.startModeTitle}>{t("tracking.startMode.title")}</Text>
+        <View style={styles.startModeRow}>
+          {([
+            ["manual", t("tracking.startMode.manual"), t("tracking.startMode.manualDescription")],
+            ["automatic", t("tracking.startMode.automatic"), t("tracking.startMode.automaticDescription")],
+          ] as const).map(([mode, label, description]) => (
+            <TouchableOpacity
+              key={mode}
+              style={[styles.startModeButton, startMode === mode && styles.startModeButtonActive]}
+              onPress={() => setStartMode(mode)}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={mode === "manual" ? "hand-left-outline" : "speedometer-outline"}
+                size={18}
+                color={startMode === mode ? Colors.accent : Colors.textSecondary}
+              />
+              <Text style={[styles.startModeLabel, startMode === mode && styles.startModeLabelActive]}>{label}</Text>
+              <Text style={styles.startModeDescription}>{description}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
       <TouchableOpacity
         style={styles.startBtn}
         onPress={handleStart}
         activeOpacity={0.85}
       >
         <Ionicons name="play" size={24} color="#1a1a1a" />
-        <Text style={styles.startBtnLabel}>START RIDE</Text>
+        <Text style={styles.startBtnLabel}>{t("tracking.start")}</Text>
       </TouchableOpacity>
 
       {/* Features grid */}
@@ -385,6 +414,56 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  startModeSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 7,
+  },
+  startModeTitle: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+    letterSpacing: 1.1,
+    textAlign: "center",
+  },
+  startModeRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  startModeButton: {
+    flex: 1,
+    minHeight: 76,
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surfaceLight,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+  },
+  startModeButtonActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "10",
+  },
+  startModeLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: Colors.textSecondary,
+    textAlign: "center",
+  },
+  startModeLabelActive: {
+    color: Colors.accent,
+  },
+  startModeDescription: {
+    fontSize: 9,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
+  },
   startBtnLabel: {
     fontSize: 18,
     fontFamily: "Inter_700Bold",
@@ -432,4 +511,3 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
 });
-

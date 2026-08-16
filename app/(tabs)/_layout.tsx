@@ -34,7 +34,7 @@ const FAKE_HOME_INTRO_KEY = "fake_home_intro_seen_v1";
 // ANTI-LOOP (root cause fix OTA #187):
 // tabsScreenOptions era un useMemo([colors.surface, colors.text]). Quando il tema
 // BikerLink caricava dal server al boot (300-700ms, rete), colors cambiava → nuovo
-// ref di tabsScreenOptions → React Navigation eseguiva forEach su tutti i 15 Tab.Screen
+// ref di tabsScreenOptions → React Navigation eseguiva forEach su tutti i 16 Tab.Screen
 // producendo nuovi merged-options object ad ogni iterazione → setOptions → navigation
 // state cambia → useLayoutEffect([navigation]) si ri-attiva → altro forEach → loop
 // infinito → "Maximum update depth exceeded".
@@ -48,8 +48,8 @@ const TABS_SCREEN_OPTIONS = { headerTitleStyle: TABS_HEADER_TITLE_STYLE } as con
 
 // ANTI-LOOP (root cause fix OTA #190):
 // i children di <Tabs> (Tabs.Screen elements) NON devono mai cambiare dopo il mount.
-// Qualsiasi ricreazione di options objects → useLayoutEffect × 15 → setOptions × 15
-// → scheduleUpdate × 15 → useSyncState.listeners × 50 → loop sincrono → crash.
+// Qualsiasi ricreazione di options objects → useLayoutEffect × 16 → setOptions × 16
+// → scheduleUpdate × 16 → useSyncState.listeners × 50 → loop sincrono → crash.
 // Fix: frozenTabScreensRef creato al primo render, mai aggiornato (vedere uso sotto).
 
 // ── OPZIONI TAB (costanti module-level) ──────────────────────────────────────
@@ -147,7 +147,10 @@ const TAB_OPTIONS_PROFILE = (t: TFn): TabScreenOptions => ({
   headerTitle: t("profile.myProfile"),
 });
 
-// Costruisce i 15 Tabs.Screen. Invocata UNA SOLA VOLTA tramite frozenTabScreensRef
+// Registro i 16 percorsi necessari al navigator. Solo 6 sono voci dirette nella
+// barra principale; le voci Community vengono aggregate e le altre restano
+// destinazioni interne raggiungibili via router. Invocata UNA SOLA VOLTA tramite
+// frozenTabScreensRef
 // (vedi TabLayout): l'array di elementi è creato al primo render e mai più ricreato,
 // così le options objects non cambiano mai reference → nessuna cascata di setOptions.
 function getTabScreens(
@@ -340,7 +343,7 @@ export default function TabLayout() {
   // include sia AssistantOnboardingTour (Modal che monta) sia TabLayout (re-render
   // da query data). Con le deps di useCallback che includono i valori React Query
   // (hasActiveMatches, unreadCount, ecc.), renderCustomTabBar ottiene un nuovo ref
-  // → tabBar prop cambia → React Navigation setOptions cascade su 15 Tabs.Screen
+  // → tabBar prop cambia → React Navigation setOptions cascade su 16 Tabs.Screen
   // → 50+ update annidati → "Maximum update depth exceeded" crash su Android.
   const isTabBarReady = !isLoading && !!user;
   const tabBarStateRef = useRef({
@@ -491,11 +494,11 @@ export default function TabLayout() {
   //
   // Il fix precedente (OTA #189) era ancora sbagliato: usava BOOT_SCREENS prima
   // di isTabBarReady e poi passava a frozenTabScreensRef.current — quella
-  // transizione creava di nuovo 15 nuovi options objects → cascade identico.
+  // transizione creava di nuovo 16 nuovi options objects → cascade identico.
   //
   // Regola: i children di <Tabs> (gli elementi React.ReactElement dei Tabs.Screen)
   // NON devono mai cambiare dopo il mount. Qualsiasi cambio ricrea le options objects
-  // → useLayoutEffect × 15 → setOptions × 15 → useSyncState.listeners × 50 → loop.
+  // → useLayoutEffect × 16 → setOptions × 16 → useSyncState.listeners × 50 → loop.
   //
   // Compromesso accettabile: al primo render user=null → isBikerOrCoppia=false →
   // il tab "garage" avrà title=t("garage.tabWishlist"). La screen del garage
@@ -512,7 +515,7 @@ export default function TabLayout() {
   //
   // ANTI-LOOP definitivo: un solo <Tabs> per tutto il lifecycle → TabNavigator
   // non si rimonta mai. Prima c'erano due branch (minimal / full) che causavano
-  // il remount al boot. Al remount, useScheduleUpdate accodava 15 callbacks×render
+  // il remount al boot. Al remount, useScheduleUpdate accodava 16 callbacks×render
   // → flushUpdates → store.setState (senza equality check) → useSyncExternalStore
   // re-render → altri 15 callbacks → 50 iterazioni → "Maximum update depth exceeded".
   // Ora renderCustomTabBar ritorna null mentre !isReady (via ref, deps=[]) e il

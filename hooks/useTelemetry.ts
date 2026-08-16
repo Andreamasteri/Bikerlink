@@ -4,6 +4,7 @@ import * as Location from "expo-location";
 import { Accelerometer, DeviceMotion } from "expo-sensors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { queryClient } from "@/lib/query-client";
+import { locationSessionManager } from "@/lib/location-session-manager";
 import {
   BG_TELEMETRY_SESSION_KEY,
   startTelemetryBackgroundTask,
@@ -201,15 +202,15 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
 
     if (!externalGpsRef.current) {
       try {
-        const sub = await Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.BestForNavigation, timeInterval: SAMPLE_INTERVAL_MS, distanceInterval: 0 },
+        const sub = locationSessionManager.subscribe(
           (loc) => {
             if (!canRecordForeground()) return;
             const sample = buildSample(loc);
             bufferRef.current.push(sample);
             if (bufferRef.current.length >= FLUSH_MAX_SAMPLES) flush(true);
             else maybeUploadByDistance();
-          }
+          },
+          { accuracy: Location.Accuracy.BestForNavigation, timeInterval: SAMPLE_INTERVAL_MS, distanceInterval: 0 },
         );
         locationSubRef.current = sub;
       } catch (err) {

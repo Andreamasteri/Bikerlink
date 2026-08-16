@@ -12,6 +12,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { type TaskbarStyle } from "@/lib/taskbar-style-context";
+import { useT } from "@/lib/language-context";
+import { isCommunityRouteName } from "@/lib/navigation-registry";
 
 export interface TabItem {
   name: string;
@@ -26,7 +28,6 @@ interface CustomTabBarProps {
   style: TaskbarStyle;
 }
 
-const COMMUNITY_TABS = new Set(["match", "motoclub", "contest", "music", "eventi", "arcade", "bowie"]);
 const MAX_SCORRI_VISIBLE = 6;
 
 function TabIcon({ tab, isActive }: { tab: TabItem; isActive: boolean }) {
@@ -74,6 +75,7 @@ export default function CustomTabBar({
   const tabBarPaddingBottom = insets.bottom;
   const tabBarHeight = 60 + insets.bottom;
   const colors = useColors();
+  const t = useT();
   const [communityOpen, setCommunityOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -133,13 +135,13 @@ export default function CustomTabBar({
   }
 
   if (style === "raggruppa") {
-    const communityMembers = tabs.filter((t) => COMMUNITY_TABS.has(t.name));
+    const communityMembers = tabs.filter((t) => isCommunityRouteName(t.name));
     const communityFocused = communityMembers.some((t) => t.isFocused);
 
     const displayItems: Array<TabItem | "community"> = [];
     let communityInserted = false;
     tabs.forEach((tab) => {
-      if (COMMUNITY_TABS.has(tab.name)) {
+      if (isCommunityRouteName(tab.name)) {
         if (!communityInserted) {
           displayItems.push("community");
           communityInserted = true;
@@ -171,7 +173,7 @@ export default function CustomTabBar({
                       { color: communityFocused ? colors.accent : colors.textSecondary },
                     ]}
                   >
-                    Community
+                    {t("navigation.community")}
                   </Text>
                 </Pressable>
               );

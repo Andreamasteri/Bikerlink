@@ -37,7 +37,9 @@ export const routes = pgTable("routes", {
   gpsBlackoutCount: integer("gps_blackout_count").notNull().default(0),
   gpsBlackoutSeconds: integer("gps_blackout_seconds").notNull().default(0),
   likes: integer("likes").notNull().default(0),
-  startedAt: timestamp("started_at").notNull().defaultNow(),
+  // An armed automatic-start session has not started measuring yet. Keep the
+  // actual measurement timestamp null until the movement gate is confirmed.
+  startedAt: timestamp("started_at").defaultNow(),
   stoppedAt: timestamp("stopped_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
@@ -147,6 +149,7 @@ export const createRouteSchema = z.object({
   title: z.string().max(200).optional().nullable(),
   trackingFrequency: z.number().int().min(1).max(60).optional(),
   isSprint: z.boolean().optional(),
+  status: z.enum(["active", "armed"]).optional(),
 });
 export type CreateRouteInput = z.infer<typeof createRouteSchema>;
 

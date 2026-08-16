@@ -2,6 +2,14 @@
 // @no-split
 
 const translations: Record<string, string> = {
+  "navigation.community": "Topluluk",
+  "tracking.startMode.title": "ÖLÇÜM BAŞLANGICI",
+  "tracking.startMode.manual": "Manuel",
+  "tracking.startMode.manualDescription": "Hazır olduğunda Start'a bas",
+  "tracking.startMode.automatic": "Otomatik başlangıç",
+  "tracking.startMode.automaticDescription": "5 saniye boyunca 5 km/sa",
+  "tracking.startMode.armedTitle": "Otomatik başlangıç etkin",
+  "tracking.startMode.armedDescription": "Ölçüm, yaklaşık 5 km/sa hızda 5 saniyelik kararlı hareketten sonra başlar.",
   "app.name": "BikerLink",
   "app.tagline": "U'll never ride alone",
   "auth.login": "Giriş Yap",

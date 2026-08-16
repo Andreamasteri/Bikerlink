@@ -8,6 +8,8 @@ interface SensorSettings {
   userEnabled: boolean;
 }
 
+export type TrackingStartMode = "manual" | "automatic";
+
 async function fetchSensorSettings(): Promise<SensorSettings> {
   const res = await fetch(new URL("/api/telemetry/sensor-settings", getApiUrl()).toString(), {
     credentials: "include",
@@ -20,6 +22,7 @@ export function useTrackingSettings() {
   const [profile, setProfile] = useState<UpdateProfile>("medium");
   const [countdownEnabled, setCountdownEnabled] = useState(false);
   const [countdownSec, setCountdownSec] = useState("10");
+  const [startMode, setStartMode] = useState<TrackingStartMode>("manual");
   const [handsOffEnabled, setHandsOffEnabled] = useState(false);
   const [handsOffSpeedStr, setHandsOffSpeedStr] = useState("50");
   const [is0100Enabled, setIs0100Enabled] = useState(false);
@@ -39,10 +42,14 @@ export function useTrackingSettings() {
   const handsOffSpeedRef = useRef(50);
   const is0100EnabledRef = useRef(false);
   const sensorsEnabledRef = useRef(false);
+  const startModeRef = useRef<TrackingStartMode>("manual");
 
   useEffect(() => {
     sensorsEnabledRef.current = sensorsEnabled;
   }, [sensorsEnabled]);
+  useEffect(() => {
+    startModeRef.current = startMode;
+  }, [startMode]);
 
   return {
     profile,
@@ -51,6 +58,8 @@ export function useTrackingSettings() {
     setCountdownEnabled,
     countdownSec,
     setCountdownSec,
+    startMode,
+    setStartMode,
     handsOffEnabled,
     setHandsOffEnabled,
     handsOffSpeedStr,
@@ -67,5 +76,6 @@ export function useTrackingSettings() {
     handsOffSpeedRef,
     is0100EnabledRef,
     sensorsEnabledRef,
+    startModeRef,
   };
 }

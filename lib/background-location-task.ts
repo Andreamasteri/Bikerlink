@@ -1,6 +1,7 @@
 import * as TaskManager from "expo-task-manager";
 import type { LocationObject } from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { locationSessionManager } from "./location-session-manager";
 
 export const BACKGROUND_LOCATION_TASK_NAME = "bikerlink-background-location";
 export const GPS_PRECISION_STORAGE_KEY = "@bikerlink/gps_precision";
@@ -46,7 +47,7 @@ export async function startBackgroundLocationTask(
 
     const resolvedAccuracy = accuracy ?? Location.Accuracy.Balanced;
 
-    await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME, {
+    return await locationSessionManager.startBackgroundTask(BACKGROUND_LOCATION_TASK_NAME, {
       accuracy: resolvedAccuracy,
       timeInterval: intervalSeconds * 1000,
       distanceInterval: 10,
@@ -57,7 +58,6 @@ export async function startBackgroundLocationTask(
       },
       showsBackgroundLocationIndicator: true,
     });
-    return true;
   } catch {
     return false;
   }
@@ -81,11 +81,7 @@ export async function restartBackgroundLocationTaskWithPrecision(
 
 export async function stopBackgroundLocationTask(): Promise<void> {
   try {
-    const Location = require("expo-location") as typeof import("expo-location");
-    const isRunning = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK_NAME);
-    if (isRunning) {
-      await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
-    }
+    await locationSessionManager.stopBackgroundTask(BACKGROUND_LOCATION_TASK_NAME);
   } catch {
     // no-op: best-effort stopping location task
   }
