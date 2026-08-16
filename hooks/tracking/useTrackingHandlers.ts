@@ -9,11 +9,11 @@ import { useT } from "@/lib/language-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { setTrackingActive, setHandsOffBroadcast, setSprintMeasuringBroadcast } from "@/lib/tracking-active";
 import { logGpsError } from "@/lib/gps-logger";
+import { locationSessionManager } from "@/lib/location-session-manager";
 import { loadBatteryDrainStats, appendBatteryDrainSample, BATTERY_MIN_RIDE_MINUTES } from "@/components/tracking/tracking-utils";
 import { MountAxisCalibration } from "@/components/MountCalibWizard";
 import type { GpsPoint } from "@/components/tracking/useGpsTracking";
 
-const BACKGROUND_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "@bikerlink/bg_points_pending";
 const MAP_LAST_GPS_KEY = "map_last_gps";
 const GHOST_MODE_KEY = "@bikerlink/ghost_mode_active";
@@ -60,9 +60,7 @@ export function buildCleanupTracking(deps: Pick<TrackingHandlerDeps, "bg" | "gps
     refs.accelSubRef.current = null;
     if (bg.bgTrackingActiveRef.current) {
       bg.bgTrackingActiveRef.current = false;
-      Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).then((h: boolean) => {
-        if (h) Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
-      });
+      void locationSessionManager.stopTrackingBackground();
     }
     setTrackingActive(false);
     gps.setGpsLost(false);
@@ -222,7 +220,11 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
           );
         }
       }).catch(() => {});
-      const res = await (await apiRequest("POST", "/api/routes", { status: "active", isSprint: !!settings.is0100EnabledRef.current })).json() as { id: string };
+      const startMode = settings.startModeRef.current;
+      const res = await (await apiRequest("POST", "/api/routes", {
+        status: startMode === "automatic" ? "armed" : "active",
+        isSprint: !!settings.is0100EnabledRef.current,
+      })).json() as { id: string };
       if (!res?.id) throw new Error("Server did not return a valid route id");
       resetTrackingState(); refs.routeIdRef.current = res.id;
       console.log("[handleStart] routeId set:", res.id);
@@ -242,6 +244,13 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
           }
         })
         .catch(() => {});
+      if (startMode === "automatic") {
+        // Keep the route armed on the server and wait for the central GPS
+        // coordinator to observe the configured movement gate.
+        session.setPhase("armed");
+        session.setLoading(false);
+        return;
+      }
       if (settings.countdownEnabled) {
         session.setPhase("countdown"); session.setCountdownValue(parseInt(settings.countdownSec || "10", 10)); session.setLoading(false);
         refs.countdownTickRef.current = setInterval(() => session.setCountdownValue((v: number) => {
@@ -254,7 +263,12 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
   }, [beginActiveTracking, settings, session, resetTrackingState, t, refs, requestBackgroundPermission]);
 
   const handleStop = useCallback(async () => {
-    if (session.phaseRef.current === "idle") return;
+    const phase = session.phaseRef.current;
+    if (phase === "idle") return;
+    // Disarm synchronously before awaiting DELETE. Otherwise the automatic
+    // detector could win a race during cancellation and activate a route that
+    // the user is already trying to discard.
+    if (phase === "armed") session.setPhase("idle");
     const rId = refs.routeIdRef.current;
     session.setLoading(true); cleanupTracking();
     if (!rId) {
@@ -262,6 +276,26 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
       Alert.alert(t("common.error"), t("tracking.routeNotCreatedError"));
       return;
     }
+
+    // Cancelling before automatic movement must remove the armed placeholder.
+    // It has no measurement timestamp or points and must never be completed as
+    // a zero-second ride.
+    if (phase === "armed") {
+      try {
+        await apiRequest("DELETE", `/api/routes/${rId}`);
+        queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
+      } catch (error) {
+        logGpsError(error, "cancel_armed_tracking");
+        Alert.alert(t("common.error"), t("tracking.routeNotCreatedError"));
+      } finally {
+        resetTrackingState();
+        session.setPhase("idle");
+        session.setLoading(false);
+        setVolumeUI(true);
+      }
+      return;
+    }
+
     try {
       const bgRaw = await AsyncStorage.getItem(BG_POINTS_KEY);
       if (bgRaw) {
@@ -326,7 +360,7 @@ export function useTrackingHandlers(deps: TrackingHandlerDeps) {
       session.setPhase("idle"); session.setLoading(false); setHandsOffActive(false); setHandsOffBroadcast(false);
       setVolumeUI(true);
     }
-  }, [cleanupTracking, flushPoints, stats, gps, sensors, sprint, battery, refetchRecords, t, session, settings, mapState, refs, offlineQueue, setVolumeUI, setHandsOffActive]);
+  }, [cleanupTracking, flushPoints, stats, gps, sensors, sprint, battery, refetchRecords, t, session, settings, mapState, refs, offlineQueue, setVolumeUI, setHandsOffActive, resetTrackingState]);
 
   const handlePause = useCallback(() => {
     if (session.phaseRef.current !== "active" && session.phaseRef.current !== "paused") return;

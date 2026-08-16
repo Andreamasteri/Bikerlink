@@ -5,10 +5,7 @@ import { loadTelemetryAlwaysActive, getTelemetryAlwaysActive } from "@/lib/telem
 import { loadMountCalibration } from "@/components/MountCalibWizard";
 import { loadRelaxedMountMode } from "@/hooks/useMotorcycleDetector";
 import { useAuth } from "@/lib/auth-context";
-import {
-  getManualTrackingActive,
-  subscribeManualTracking,
-} from "@/lib/manual-tracking-flag";
+import { isTrackingActive, registerTrackingActiveCallback } from "@/lib/tracking-active";
 
 interface AutoTelemetryContextValue {
   isAutoRiding: boolean;
@@ -36,7 +33,7 @@ function AutoTelemetryInner({ children }: { children: React.ReactNode }) {
   const [alwaysActive, setAlwaysActive]   = useState(getTelemetryAlwaysActive());
   const [isCalibrated, setIsCalibrated]   = useState(false);
   const [relaxedMode, setRelaxedMode]     = useState(false);
-  const [manualActive, setManualActive]   = useState(getManualTrackingActive());
+  const [canonicalTrackingActive, setCanonicalTrackingActive] = useState(isTrackingActive());
 
   // ── Hydrate prefs on mount + re-hydrate when user changes ────────────────
   useEffect(() => {
@@ -63,17 +60,13 @@ function AutoTelemetryInner({ children }: { children: React.ReactNode }) {
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional: depend on the primitive userId, not the whole user object
   }, [userId]);
 
-  // ── React immediately when manual tracking starts/stops ──────────────────
-  useEffect(() => {
-    return subscribeManualTracking(() => setManualActive(getManualTrackingActive()));
-  }, []);
+  useEffect(() => registerTrackingActiveCallback(setCanonicalTrackingActive), []);
 
   // ── Auto-detect only when all conditions are met ─────────────────────────
-  // Suppressed while manual route tracking is active (session_type='ride') to
-  // avoid two concurrent ride sessions inflating km_collected.
-  // Note: ideal_lap recording (useIdealLapRecorder) does NOT set manualActive,
-  // so auto-telemetry correctly keeps running during Giro Ideale sessions.
-  const isEnabled = !!user && alwaysActive && isCalibrated && !manualActive;
+  // Suppressed while the canonical route tracker is active to avoid two
+  // concurrent ride sessions inflating km_collected. Ideal lap recording does
+  // not claim the ride-tracking lease, so it can remain independent.
+  const isEnabled = !!user && alwaysActive && isCalibrated && !canonicalTrackingActive;
 
   const { isRiding } = useMotorcycleDetector({ enabled: isEnabled, relaxedMode });
 

@@ -7,23 +7,13 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useT, useLocale } from "@/lib/language-context";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
-import TrackingScreen from "@/app/(tabs)/tracking";
-import RoutesScreen from "@/app/routes/index";
-import GiriScreen from "@/app/(tabs)/giri";
 import {
-  MountAxisCalibration,
-  MountCalibWizard,
-  loadMountCalibration
-} from "@/components/MountCalibWizard";
-import { CalibrationBanner } from "@/components/CalibrationBanner";
-import {
-  HUB_SECTIONS,
   FILTER_KEYS,
   SEARCH_TYPE_I18N,
   getTypeIcon,
@@ -146,16 +136,6 @@ export default function ProposalsScreen() {
   const t = useT();
   const locale = useLocale();
   const [activeFilter, setActiveFilter] = useState("all");
-  const [activeHub, setActiveHub] = useState<"proposte" | "giri" | "percorsi" | "pianificati">("proposte");
-  const [mountCalib, setMountCalib] = useState<MountAxisCalibration | null>(null);
-  const [showMountCalibWizard, setShowMountCalibWizard] = useState(false);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadMountCalibration().then(setMountCalib).catch(() => {});
-    }, [])
-  );
-
   const queryKey =
     activeFilter === "all"
       ? ["/api/proposals"]
@@ -211,66 +191,9 @@ export default function ProposalsScreen() {
   allData.push({ type: "proposalHeader", key: "ph" });
   (Array.isArray(proposals) ? proposals : []).forEach((p) => allData.push({ type: "proposal", key: `p-${p.id}`, data: p }));
 
-  const handleHubPress = (key: "proposte" | "giri" | "percorsi" | "pianificati") => {
-    setActiveHub(key);
-  };
-
   return (
     <View style={styles.container}>
       <InlineMiniPlayer />
-      <View style={styles.hubRow}>
-        {HUB_SECTIONS.map((section) => {
-          const isActive = section.key === activeHub;
-          return (
-            <Pressable
-              key={section.key}
-              style={[styles.hubBtn, isActive && styles.hubBtnActive]}
-              onPress={() => handleHubPress(section.key)}
-            >
-              <Text style={[styles.hubText, isActive && styles.hubTextActive]} numberOfLines={2} textBreakStrategy="simple">
-                {t(section.i18nKey)}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {activeHub === "giri" ? (
-        <View style={{ flex: 1 }}>
-          <CalibrationBanner
-            isCalibrated={mountCalib !== null}
-            calibrationTimestamp={mountCalib?.timestamp ?? null}
-            onCalibrate={() => setShowMountCalibWizard(true)}
-          />
-          <View style={{ flex: 1 }}>
-            <TrackingScreen />
-          </View>
-          {showMountCalibWizard && (
-            <MountCalibWizard
-              onComplete={(calib) => {
-                setMountCalib(calib);
-                setShowMountCalibWizard(false);
-              }}
-              onDismiss={() => setShowMountCalibWizard(false)}
-            />
-          )}
-        </View>
-      ) : activeHub === "percorsi" ? (
-        <View style={{ flex: 1 }}>
-          <RoutesScreen />
-        </View>
-      ) : activeHub === "pianificati" ? (
-        <View style={{ flex: 1 }}>
-          {typeof GiriScreen === "function" ? (
-            <GiriScreen />
-          ) : (
-            <View style={styles.emptyHub}>
-              <Text style={styles.emptyHubText}>{t("Sezione non disponibile")}</Text>
-            </View>
-          )}
-        </View>
-      ) : (
-        <>
       <View style={styles.filterRow}>
         {FILTER_KEYS.map((f) => (
           <Pressable
@@ -339,8 +262,6 @@ export default function ProposalsScreen() {
       <Pressable style={styles.fab} onPress={handleCreatePress}>
         <Ionicons name="add" size={28} color={Colors.background} />
       </Pressable>
-        </>
-      )}
     </View>
   );
 }

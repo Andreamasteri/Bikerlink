@@ -21,7 +21,7 @@ import {
   loadRouteFromCache,
   activeStepIndex,
 } from "@/components/navigate/navigate-helpers";
-import { useLocationGate } from "@/lib/location-context";
+import { locationSessionManager } from "@/lib/location-session-manager";
 import type { NavWeatherZone } from "@/components/navigate/NavigationWeather";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -162,7 +162,6 @@ export function useNavigateState() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const locale = useLocale();
   const t = useT();
-  const { suspendSharedWatch, resumeSharedWatch } = useLocationGate();
 
   const topPad = insets.top;
   const bottomPad = insets.bottom;
@@ -178,6 +177,16 @@ export function useNavigateState() {
   const activeStepsRef = useRef<NavigationStep[] | null>(null);
   const activeTotalKmRef = useRef<number | null>(null);
   const activeTotalMinRef = useRef<number | null>(null);
+  const navigationTrackRef = useRef<Array<{
+    latitude: number;
+    longitude: number;
+    speedKmh: number;
+    timestamp: string;
+  }>>([]);
+  const navigationDistanceKmRef = useRef(0);
+  const navigationStartedAtRef = useRef<number | null>(null);
+  const navigationFinishedAtRef = useRef<number | null>(null);
+  const navigationMaxSpeedRef = useRef(0);
 
   const {
     mapReady, setMapReady,
@@ -230,6 +239,11 @@ export function useNavigateState() {
 
   useEffect(() => {
     if (!route) return;
+    navigationTrackRef.current = [];
+    navigationDistanceKmRef.current = 0;
+    navigationStartedAtRef.current = null;
+    navigationFinishedAtRef.current = null;
+    navigationMaxSpeedRef.current = 0;
     let pts: Array<[number, number]> = [];
     if (route.polyline) {
       pts = decodePolyline(route.polyline);
@@ -270,23 +284,20 @@ export function useNavigateState() {
   useEffect(() => {
     if (!hasPermission || !route || polylinePoints.length === 0) return;
 
-    suspendSharedWatch();
-
-    let sub: Location.LocationSubscription | null = null;
-    (async () => {
-      sub = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 1000, distanceInterval: 5 },
-        (loc) => {
-          handlePositionUpdate(loc.coords.latitude, loc.coords.longitude, loc.coords.heading ?? 0);
-        }
-      );
-      locationSubRef.current = sub;
-    })();
+    const sub = locationSessionManager.subscribe(
+      (loc) => handlePositionUpdate(
+        loc.coords.latitude,
+        loc.coords.longitude,
+        loc.coords.heading ?? 0,
+        Math.max(0, (loc.coords.speed ?? 0) * 3.6),
+      ),
+      { accuracy: Location.Accuracy.High, timeInterval: 1000, distanceInterval: 5 },
+    );
+    locationSubRef.current = sub;
 
     return () => {
-      sub?.remove();
+      sub.remove();
       locationSubRef.current = null;
-      resumeSharedWatch();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPermission, route?.id, polylinePoints.length]);
@@ -454,9 +465,19 @@ export function useNavigateState() {
     }
   }, [route, locale, t, setCurrentStep, setIsRerouting, setMapReady, setPolylinePoints]);
 
-  const handlePositionUpdate = useCallback((lat: number, lng: number, heading: number) => {
+  const handlePositionUpdate = useCallback((lat: number, lng: number, heading: number, speedKmh = 0) => {
     if (polylinePoints.length === 0) return;
     lastKnownPosRef.current = { lat, lng };
+    const now = Date.now();
+    const previous = navigationTrackRef.current[navigationTrackRef.current.length - 1];
+    if (!previous || previous.latitude !== lat || previous.longitude !== lng) {
+      if (navigationStartedAtRef.current === null) navigationStartedAtRef.current = now;
+      if (previous) {
+        navigationDistanceKmRef.current += haversineM(previous.latitude, previous.longitude, lat, lng) / 1000;
+      }
+      navigationTrackRef.current.push({ latitude: lat, longitude: lng, speedKmh, timestamp: new Date(now).toISOString() });
+      navigationMaxSpeedRef.current = Math.max(navigationMaxSpeedRef.current, speedKmh);
+    }
 
     const closestIdx = closestPointIndexOnPolyline(lat, lng, polylinePoints);
     const closestDist = haversineM(lat, lng, polylinePoints[closestIdx][0], polylinePoints[closestIdx][1]);
@@ -511,6 +532,7 @@ export function useNavigateState() {
       }
     } else if (stepIdx === steps.length - 1 && pct >= 95) {
       if (!isFinished) {
+        navigationFinishedAtRef.current = now;
         setIsFinished(true);
         setDistanceToNext(null);
         Speech.speak(t("nav.announce.arrived"), { language: locale });
@@ -570,6 +592,7 @@ export function useNavigateState() {
     hasPermission, isRerouting, isOffline,
     weatherLoading, currentWeather, aheadWeather,
     mapUri, offline, activeStepsRef,
+    navigationTrackRef, navigationDistanceKmRef, navigationStartedAtRef, navigationFinishedAtRef, navigationMaxSpeedRef,
     minimalMode, handleToggleMinimal,
     handleMapMessage, handleClose, triggerWeatherReroute,
   };

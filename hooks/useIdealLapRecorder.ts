@@ -2,6 +2,7 @@ import { useRef, useCallback, useState, useEffect } from "react";
 import * as Location from "expo-location";
 import { Accelerometer } from "expo-sensors";
 import { apiRequest } from "@/lib/query-client";
+import { locationSessionManager } from "@/lib/location-session-manager";
 import type { TelemetrySample } from "./useTelemetry";
 
 export type LapState = "idle" | "recording" | "ready_to_save" | "saved";
@@ -63,13 +64,7 @@ export function useIdealLapRecorder(lapIndex: number, targetKm?: number) {
     });
 
     try {
-      const sub = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 1000,
-          distanceInterval: 0,
-        },
-        (loc) => {
+      const sub = locationSessionManager.subscribe((loc) => {
           if (!activeRef.current) return;
           const { latitude, longitude, altitude, speed, heading } = loc.coords;
           const accel = accelRef.current;
@@ -108,8 +103,11 @@ export function useIdealLapRecorder(lapIndex: number, targetKm?: number) {
           ) {
             stopRef.current();
           }
-        }
-      );
+        }, {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 1000,
+          distanceInterval: 0,
+        });
       locationSubRef.current = sub;
     } catch (err) {
       console.warn("[useIdealLapRecorder] location subscription failed", err);

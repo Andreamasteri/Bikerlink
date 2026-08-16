@@ -69,6 +69,23 @@ function TrackingScreenInner() {
 
   return (
     <View style={styles.container}>
+      {state.phase === "armed" && (
+        <View style={[styles.container, { justifyContent: "center", padding: 24 }]}>
+          <Ionicons name="navigate-circle-outline" size={72} color={Colors.accent} style={{ alignSelf: "center" }} />
+          <Text style={{ color: Colors.text, fontFamily: "Inter_700Bold", fontSize: 22, textAlign: "center", marginTop: 16 }}>
+            {t("tracking.startMode.armedTitle")}
+          </Text>
+          <Text style={{ color: Colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 15, textAlign: "center", marginTop: 8 }}>
+            {t("tracking.startMode.armedDescription")}
+          </Text>
+          <TouchableOpacity
+            style={[styles.stopBtn, { marginTop: 28, alignSelf: "center", paddingHorizontal: 28 }]}
+            onPress={handlers.handleStop}
+          >
+            <Text style={styles.stopBtnLabel}>{t("common.cancel")}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {/* ── ACTIVE / PAUSED ──────────────────────────────────────────────── */}
       {(state.phase === "active" || state.phase === "paused") && (
         <TrackingDashboard
@@ -179,6 +196,8 @@ function TrackingScreenInner() {
           setHandsOffEnabled={handlers.setHandsOffEnabled}
           countdownEnabled={state.countdownEnabled}
           setCountdownEnabled={handlers.setCountdownEnabled}
+          startMode={state.startMode}
+          setStartMode={handlers.setStartMode}
           batteryDrainStats={state.batteryDrainStats}
           showBatteryStats={state.showBatteryStats}
           setShowBatteryStats={handlers.setShowBatteryStats}

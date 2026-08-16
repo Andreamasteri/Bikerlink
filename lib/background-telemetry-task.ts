@@ -3,6 +3,7 @@ import type { LocationObject } from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { TelemetrySample } from "@shared/tracking-fusion";
 import { stopBackgroundLocationTask } from "./background-location-task";
+import { locationSessionManager } from "./location-session-manager";
 
 export const TASK_TELEMETRY = "bikerlink-telemetry-bg";
 
@@ -39,7 +40,7 @@ export async function startTelemetryBackgroundTask(): Promise<boolean> {
     // the unnecessary OS wakeups as well.
     await stopBackgroundLocationTask();
 
-    await Location.startLocationUpdatesAsync(TASK_TELEMETRY, {
+    return await locationSessionManager.startBackgroundTask(TASK_TELEMETRY, {
       accuracy:         Location.Accuracy.BestForNavigation,
       timeInterval:     1000,
       distanceInterval: 0,
@@ -50,7 +51,6 @@ export async function startTelemetryBackgroundTask(): Promise<boolean> {
       },
       showsBackgroundLocationIndicator: true,
     });
-    return true;
   } catch {
     return false;
   }
@@ -64,11 +64,7 @@ export async function stopTelemetryBackgroundTask(): Promise<void> {
   // The restart is handled exclusively in finishSession (useTelemetry.ts),
   // which is only called at true ride-end.
   try {
-    const Location = require("expo-location") as typeof import("expo-location");
-    const isRunning = await TaskManager.isTaskRegisteredAsync(TASK_TELEMETRY);
-    if (isRunning) {
-      await Location.stopLocationUpdatesAsync(TASK_TELEMETRY);
-    }
+    await locationSessionManager.stopBackgroundTask(TASK_TELEMETRY);
   } catch {
     // no-op: best-effort stopping telemetry task
   }

@@ -2,6 +2,14 @@
 // @no-split
 
 const translations: Record<string, string> = {
+  "navigation.community": "Community",
+  "tracking.startMode.title": "MESSBEGINN",
+  "tracking.startMode.manual": "Manuell",
+  "tracking.startMode.manualDescription": "Start drücken, wenn du bereit bist",
+  "tracking.startMode.automatic": "Automatischer Start",
+  "tracking.startMode.automaticDescription": "5 km/h für 5 Sekunden",
+  "tracking.startMode.armedTitle": "Automatischer Start aktiviert",
+  "tracking.startMode.armedDescription": "Die Messung beginnt nach 5 Sekunden gleichmäßiger Bewegung mit etwa 5 km/h.",
   "app.name": "BikerLink",
   "app.tagline": "Du fährst nie allein",
   "auth.login": "Anmelden",

@@ -6,6 +6,7 @@ import { markAsyncError } from "@/lib/crash-logger";
 import { withTimeout } from "@/lib/resume-utils";
 import * as ExpoLocation from "expo-location";
 import { resolveBackgroundPermission, evaluateBackgroundRevocation } from "@/lib/location-permission";
+import { locationSessionManager } from "@/lib/location-session-manager";
 
 // GPS flood = ricezione anomala di fix mentre l'utente è fermo (sintomo di un
 // loop di watch impazzito che può saturare il JS thread). Finestra scorrevole di
@@ -49,8 +50,6 @@ interface LocationContextType {
   positionReady: boolean;
   currentPosition: SharedPosition | null;
   positionLoading: boolean;
-  suspendSharedWatch: () => void;
-  resumeSharedWatch: () => void;
 }
 
 const LocationContext = createContext<LocationContextType>({
@@ -67,8 +66,6 @@ const LocationContext = createContext<LocationContextType>({
   positionReady: true,
   currentPosition: null,
   positionLoading: true,
-  suspendSharedWatch: () => {},
-  resumeSharedWatch: () => {},
 });
 
 export function useLocationGate() {
@@ -92,7 +89,6 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const appState = useRef(AppState.currentState);
   const hadBackgroundPermissionRef = useRef(false);
   const sharedWatchRef = useRef<ExpoLocation.LocationSubscription | null>(null);
-  const suspendedRef = useRef(false);
   const gpsFixTimestampsRef = useRef<number[]>([]);
   // Cooldown anti-auto-flood: una volta rilevato un gps_flood, non rilogghiamo per
   // GPS_FLOOD_COOLDOWN_MS, così il logger stesso non satura la coda crash (e non
@@ -115,6 +111,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       setHasPermission(status === "granted");
       setPermissionDenied(status === "denied");
       setPermissionPrompt(status === "undetermined");
+      if (status === "granted") locationSessionManager.refresh();
     } catch {
       setHasPermission(true);
       setPermissionDenied(false);
@@ -154,6 +151,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       setHasPermission(granted);
       setPermissionDenied(status === "denied");
       setPermissionPrompt(status === "undetermined");
+      if (granted) locationSessionManager.refresh();
       return granted;
     } catch {
       setHasPermission(true);
@@ -192,21 +190,17 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const startSharedWatch = useCallback(async () => {
-    if (sharedWatchRef.current) return;
-    if (suspendedRef.current) return;
+    if (sharedWatchRef.current) {
+      locationSessionManager.refresh();
+      return;
+    }
     try {
       const { status } = await ExpoLocation.getForegroundPermissionsAsync();
       if (status !== "granted") {
         setPositionLoading(false);
         return;
       }
-      sharedWatchRef.current = await ExpoLocation.watchPositionAsync(
-        {
-          accuracy: ExpoLocation.Accuracy.Balanced,
-          timeInterval: 5000,
-          distanceInterval: 10,
-        },
-        (locationObj) => {
+      sharedWatchRef.current = locationSessionManager.subscribe((locationObj) => {
           const now = Date.now();
           gpsFixTimestampsRef.current = gpsFixTimestampsRef.current
             .filter((t) => now - t < GPS_FLOOD_WINDOW_MS)
@@ -241,8 +235,11 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
             longitude: locationObj.coords.longitude,
           });
           setPositionLoading(false);
-        }
-      );
+        }, {
+          accuracy: ExpoLocation.Accuracy.Balanced,
+          timeInterval: 5000,
+          distanceInterval: 10,
+        });
     } catch {
       setPositionLoading(false);
     }
@@ -254,16 +251,6 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       sharedWatchRef.current = null;
     }
   }, []);
-
-  const suspendSharedWatch = useCallback(() => {
-    suspendedRef.current = true;
-    stopSharedWatch();
-  }, [stopSharedWatch]);
-
-  const resumeSharedWatch = useCallback(() => {
-    suspendedRef.current = false;
-    startSharedWatch();
-  }, [startSharedWatch]);
 
   useEffect(() => {
     sendStartupBeacon("location_provider_mount");
@@ -336,8 +323,6 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       positionReady,
       currentPosition,
       positionLoading,
-      suspendSharedWatch,
-      resumeSharedWatch,
     }),
     [
       hasPermission,
@@ -353,8 +338,6 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       positionReady,
       currentPosition,
       positionLoading,
-      suspendSharedWatch,
-      resumeSharedWatch,
     ]
   );
 

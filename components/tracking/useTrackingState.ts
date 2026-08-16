@@ -14,6 +14,11 @@ import { apiRequest, getQueryFn } from "@/lib/query-client";
 import { setTrackingActive } from "@/lib/tracking-active";
 import { logGpsError } from "@/lib/gps-logger";
 import { TRACKING_FUSION, computeDestinationPoint, type FusionMode } from "@shared/tracking-fusion";
+import { locationSessionManager, TRACKING_BACKGROUND_LOCATION_TASK } from "@/lib/location-session-manager";
+import {
+  automaticStartTick,
+  createAutomaticStartState,
+} from "@/lib/automatic-start-detector";
 
 import * as Haptics from "expo-haptics";
 import * as TaskManager from "expo-task-manager";
@@ -40,7 +45,7 @@ import {
 import { useOnNativeLocation, useTrackingEffects } from "@/hooks/tracking/useTrackingEffects";
 
 // Types
-export type Phase = "idle" | "countdown" | "active" | "paused";
+export type Phase = "idle" | "armed" | "countdown" | "active" | "paused";
 
 export interface RouteRecord {
   id: string;
@@ -66,14 +71,13 @@ export interface LocalRouteRecord extends RouteRecord {
 }
 
 // Constants
-const BACKGROUND_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "@bikerlink/bg_points_pending";
 const BG_NOTIF_CONFIG_KEY = "@bikerlink/bg_notif_config";
 const BG_SENSOR_SNAPSHOT_KEY = "@bikerlink/bg_sensor_snapshot";
 const BG_NOTIF_THROTTLE = 5;
 
-if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
-  TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+if (!TaskManager.isTaskDefined(TRACKING_BACKGROUND_LOCATION_TASK)) {
+  TaskManager.defineTask(TRACKING_BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
     if (error || !data) return;
     const { locations } = data as { locations: Location.LocationObject[] };
     try {
@@ -97,7 +101,7 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
           if (cfgRaw) {
             const cfg = JSON.parse(cfgRaw);
             const pointsText = cfg.pointsLabel.replace("{count}", String(newCount));
-            await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+            await locationSessionManager.startTrackingBackground({
               accuracy: cfg.accuracy, timeInterval: cfg.timeInterval, distanceInterval: cfg.distanceInterval,
               foregroundService: { notificationTitle: cfg.title, notificationBody: `${cfg.body} • ${pointsText}`, notificationColor: "#FF6600", killServiceOnDestroy: false },
               pausesUpdatesAutomatically: false, activityType: Location.ActivityType.AutomotiveNavigation,
@@ -152,6 +156,9 @@ export function useTrackingState() {
   const lastLowAccuracyTelemetryRef = useRef(0);
   const [isTabFocused] = useState(true);
   const isTabFocusedRef = useRef(isTabFocused);
+  const automaticStartSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
+  const automaticStartStateRef = useRef(createAutomaticStartState());
+  const automaticStartActivatingRef = useRef(false);
 
   // Sync refs
   useEffect(() => { settings.profileRef.current = settings.profile; }, [settings.profile, settings.profileRef]);
@@ -373,7 +380,10 @@ export function useTrackingState() {
     // the profile's target accuracy once GPS is flowing.
     const startWatch = async (acc: Location.Accuracy, ti: number, di: number) => {
       if (refs.watchSubRef.current) { refs.watchSubRef.current.remove(); refs.watchSubRef.current = null; }
-      refs.watchSubRef.current = await Location.watchPositionAsync({ accuracy: acc, timeInterval: ti, distanceInterval: di }, (loc) => onNativeLocation(loc));
+      refs.watchSubRef.current = locationSessionManager.subscribe(
+        (loc) => onNativeLocation(loc),
+        { accuracy: acc, timeInterval: ti, distanceInterval: di },
+      );
     };
     try { await startWatch(Location.Accuracy.Balanced, 1000, 0); }
     catch (e) { logGpsError(e, "watchPositionAsync"); Alert.alert(t("common.error"), t("tracking.gpsStartError")); cleanupTracking(); session.setPhase("idle"); return; }
@@ -391,6 +401,59 @@ export function useTrackingState() {
       requestBackgroundPermission,
     });
 
+  const activateArmedTracking = useCallback(async () => {
+    if (session.phaseRef.current !== "armed" || automaticStartActivatingRef.current) return;
+    automaticStartActivatingRef.current = true;
+    const routeId = refs.routeIdRef.current;
+    if (!routeId) {
+      automaticStartActivatingRef.current = false;
+      return;
+    }
+    try {
+      await apiRequest("POST", `/api/routes/${routeId}/start`);
+      await beginActiveTracking();
+    } catch (error) {
+      logGpsError(error, "automatic_start_activate");
+      cleanupTracking();
+      refs.routeIdRef.current = null;
+      session.setPhase("idle");
+      Alert.alert(t("common.error"), t("tracking.routeCreateError"));
+    } finally {
+      automaticStartActivatingRef.current = false;
+    }
+  }, [beginActiveTracking, cleanupTracking, refs, session, t]);
+
+  // Automatic start has its own short-lived logical subscription. It only
+  // arms the canonical tracker; all measurement, buffering and stop logic stay
+  // in the same advanced tracking session used by manual start.
+  useEffect(() => {
+    automaticStartSubscriptionRef.current?.remove();
+    automaticStartSubscriptionRef.current = null;
+    automaticStartStateRef.current = createAutomaticStartState();
+    if (session.phase !== "armed") return;
+
+    automaticStartSubscriptionRef.current = locationSessionManager.subscribe((loc) => {
+      if (session.phaseRef.current !== "armed") return;
+      automaticStartStateRef.current = automaticStartTick(automaticStartStateRef.current, {
+        nowMs: loc.timestamp,
+        speedKmh: Math.max(0, (loc.coords.speed ?? 0) * 3.6),
+        accuracyM: loc.coords.accuracy,
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+      if (automaticStartStateRef.current.triggered) void activateArmedTracking();
+    }, {
+      accuracy: Location.Accuracy.High,
+      timeInterval: 1000,
+      distanceInterval: 0,
+    });
+
+    return () => {
+      automaticStartSubscriptionRef.current?.remove();
+      automaticStartSubscriptionRef.current = null;
+    };
+  }, [activateArmedTracking, session.phase, session.phaseRef]);
+
   // Wire startDeviceMotionRef now that startDeviceMotion is declared
   startDeviceMotionRef.current = startDeviceMotion;
 
@@ -407,6 +470,7 @@ export function useTrackingState() {
   return {
     state: {
       profile: settings.profile, countdownEnabled: settings.countdownEnabled, countdownSec: settings.countdownSec,
+      startMode: settings.startMode,
       handsOffEnabled: settings.handsOffEnabled, handsOffSpeedStr: settings.handsOffSpeedStr,
       is0100Enabled: settings.is0100Enabled, showMyRoute: settings.showMyRoute, sensorsEnabled: settings.sensorsEnabled,
       showMountCalibWizard: settings.showMountCalibWizard, mountAxisCalib: sensors.mountAxisCalib,
@@ -440,6 +504,7 @@ export function useTrackingState() {
     handlers: {
       setProfile: settings.setProfile, setCountdownEnabled: settings.setCountdownEnabled,
       setCountdownSec: settings.setCountdownSec, setHandsOffEnabled: settings.setHandsOffEnabled,
+      setStartMode: settings.setStartMode,
       setHandsOffSpeedStr: settings.setHandsOffSpeedStr, setIs0100Enabled: settings.setIs0100Enabled,
       setShowMyRoute: settings.setShowMyRoute, setShowMountCalibWizard: settings.setShowMountCalibWizard,
       setMountAxisCalib: sensors.setMountAxisCalib, setPhase: session.setPhase, setLoading: session.setLoading,

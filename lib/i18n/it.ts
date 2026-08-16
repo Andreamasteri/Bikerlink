@@ -3,6 +3,14 @@
 import aiAssistantIt from "./ai-assistant-it";
 
 const translations: Record<string, string> = {
+  "navigation.community": "Community",
+  "tracking.startMode.title": "INIZIO MISURAZIONE",
+  "tracking.startMode.manual": "Manuale",
+  "tracking.startMode.manualDescription": "Premi Start quando vuoi",
+  "tracking.startMode.automatic": "Partenza automatica",
+  "tracking.startMode.automaticDescription": "5 km/h per 5 secondi",
+  "tracking.startMode.armedTitle": "Partenza automatica attiva",
+  "tracking.startMode.armedDescription": "La misurazione inizierà dopo 5 secondi di movimento lineare a circa 5 km/h.",
   ...aiAssistantIt,
   "app.name": "BikerLink",
   "app.tagline": "U'll never ride alone",

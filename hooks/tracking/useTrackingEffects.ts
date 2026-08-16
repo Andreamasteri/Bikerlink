@@ -18,9 +18,9 @@ import {
 import { reportDrDeviation } from "@/lib/dr-deviation-uploader";
 import { setHandsOffBroadcast, setSprintMeasuringBroadcast } from "@/lib/tracking-active";
 import { logGpsError } from "@/lib/gps-logger";
+import { locationSessionManager } from "@/lib/location-session-manager";
 import type { GpsPoint } from "@/components/tracking/useGpsTracking";
 
-const BACKGROUND_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "@bikerlink/bg_points_pending";
 const BG_NOTIF_CONFIG_KEY = "@bikerlink/bg_notif_config";
 const IDLE_THRESHOLD_KMH = 2;
@@ -267,7 +267,7 @@ export function useTrackingEffects(deps: EffectDeps) {
         const bgResult = await requestBackgroundPermission();
         if (bgResult === "granted" && gen === bg.bgStartGenRef.current) {
           bg.bgTrackingActiveRef.current = true;
-          await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+          await locationSessionManager.startTrackingBackground({
             accuracy, timeInterval: ti, distanceInterval: di,
             foregroundService: { notificationTitle: t("tracking.bgTitle"), notificationBody: t("tracking.bgBody"), notificationColor: "#FF6600", killServiceOnDestroy: false },
             pausesUpdatesAutomatically: false, activityType: Location.ActivityType.AutomotiveNavigation,
@@ -277,7 +277,7 @@ export function useTrackingEffects(deps: EffectDeps) {
         bg.bgStartGenRef.current += 1;
         if (bg.bgTrackingActiveRef.current) {
           bg.bgTrackingActiveRef.current = false;
-          await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => {});
+          await locationSessionManager.stopTrackingBackground();
           const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
           if (raw) {
             const bgPoints: GpsPoint[] = JSON.parse(raw); await AsyncStorage.removeItem(BG_POINTS_KEY);

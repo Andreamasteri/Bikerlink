@@ -2,6 +2,14 @@
 // @no-split
 
 const translations: Record<string, string> = {
+  "navigation.community": "Κοινότητα",
+  "tracking.startMode.title": "ΕΝΑΡΞΗ ΜΕΤΡΗΣΗΣ",
+  "tracking.startMode.manual": "Χειροκίνητη",
+  "tracking.startMode.manualDescription": "Πάτησε Start όταν θέλεις",
+  "tracking.startMode.automatic": "Αυτόματη εκκίνηση",
+  "tracking.startMode.automaticDescription": "5 km/h για 5 δευτερόλεπτα",
+  "tracking.startMode.armedTitle": "Η αυτόματη εκκίνηση ενεργοποιήθηκε",
+  "tracking.startMode.armedDescription": "Η μέτρηση ξεκινά μετά από 5 δευτερόλεπτα σταθερής κίνησης περίπου στα 5 km/h.",
   "app.name": "BikerLink",
   "app.tagline": "U'll never ride alone",
   "auth.login": "Σύνδεση",
