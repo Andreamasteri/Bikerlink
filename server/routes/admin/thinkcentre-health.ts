@@ -496,7 +496,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
         }
       : null;
 
-    // Tunnel cloudflared redis — stato del bridge TCP Replit→DragonflyDB TC.
+    // Tunnel cloudflared redis — stato del bridge TCP Replit→DragonflyDB VPS.
     // Informativo: non influenza overall. Esposto qui per il panel DragonflyDB.
     let redisTunnel: {
       enabled: boolean;

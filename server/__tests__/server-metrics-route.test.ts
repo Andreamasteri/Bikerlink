@@ -89,11 +89,17 @@ vi.mock("../ai/coordinator/horus-coordinator-loop", () => ({
   getHorusCoordinatorLoopStats: vi.fn(() => ({ persona: "horus" })),
 }));
 
-vi.mock("../cache/redis-tunnel", () => ({
-  getRedisTunnelStatus: vi.fn(() => ({
+vi.mock("../cache/redis", () => ({
+  getRedisStatus: vi.fn(() => ({
     enabled: false, running: false, restarts: 0,
     lastExitCode: null, lastExitReason: null, lastError: null,
-    lastExitAt: null, floodStartedAt: null,
+    lastExitAt: null,
+    configured: false,
+    available: false,
+    source: "none",
+    probeOk: null,
+    lastError: null,
+    lastErrorAt: null,
   })),
 }));
 

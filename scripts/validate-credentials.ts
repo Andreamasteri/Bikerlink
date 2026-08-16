@@ -323,11 +323,11 @@ async function checkLastFm() {
 // ── Cache / Redis ─────────────────────────────────────────────────────────────
 
 async function checkRedis() {
-  const url = process.env.TC_DRAGONFLY_URL ?? process.env.REDIS_URL ?? process.env.REDIS_URI;
-  const credName = process.env.TC_DRAGONFLY_URL ? "TC_DRAGONFLY_URL" : process.env.REDIS_URL ? "REDIS_URL" : "REDIS_URI";
+  const url = process.env.REDIS_URL ?? process.env.REDIS_URI;
+  const credName = process.env.REDIS_URL ? "REDIS_URL" : "REDIS_URI";
 
   if (!url) {
-    record("Redis", "TC_DRAGONFLY_URL", "optional", false, null,
+    record("Redis", "REDIS_URL", "optional", false, null,
       "Non configurata (opzionale) — in-memory fallback attivo; BullMQ e pub/sub distribuiti non disponibili");
     return;
   }

@@ -2,7 +2,7 @@
  * Tests: dragonfly-collector watchdog signal coverage
  *
  * Verifies that collectDragonfly() emits the correct signals and severities for:
- *   1. TC_DRAGONFLY_URL unset → dragonfly.absent at "info"
+ *   1. REDIS_URL unset → dragonfly.absent at "info"
  *   2. PING success (fast) → dragonfly.ping_ms at "info"
  *   3. PING success (slow >200ms) → dragonfly.ping_ms at "warn"
  *   4. PING success + INFO memory → dragonfly.used_memory_mb emitted
@@ -39,9 +39,9 @@ async function freshCollector(
 ) {
   vi.resetModules();
   if (url) {
-    process.env.TC_DRAGONFLY_URL = url;
+    process.env.REDIS_URL = url;
   } else {
-    delete process.env.TC_DRAGONFLY_URL;
+    delete process.env.REDIS_URL;
   }
   if (Ctor !== null) {
     vi.doMock("ioredis", () => ({ default: Ctor }));
@@ -54,16 +54,16 @@ async function freshCollector(
 }
 
 afterEach(() => {
-  delete process.env.TC_DRAGONFLY_URL;
+  delete process.env.REDIS_URL;
   vi.restoreAllMocks();
 });
 
 // ─── absent ─────────────────────────────────────────────────────────────────
 
 describe("dragonfly-collector: absent signal", () => {
-  it("emits dragonfly.absent at info when TC_DRAGONFLY_URL is unset", async () => {
+  it("emits dragonfly.absent at info when REDIS_URL is unset", async () => {
     vi.resetModules();
-    delete process.env.TC_DRAGONFLY_URL;
+    delete process.env.REDIS_URL;
     const { collectDragonfly } = await import(
       "../../ai/watchdog/collectors/dragonfly-collector"
     );
