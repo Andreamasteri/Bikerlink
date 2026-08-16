@@ -98,21 +98,32 @@ export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
   // Fonte di verità principale — rispecchia ciò che vede il client applicativo.
   if (dragonflyUrl) {
     const t0 = Date.now();
-    let client: { ping: () => Promise<string>; quit: () => Promise<unknown> } | null = null;
+    let client: {
+      ping: () => Promise<string>;
+      quit: () => Promise<unknown>;
+      connect?: () => Promise<unknown>;
+    } | null = null;
     let pingTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       // Uses the statically-imported Redis so vi.mock("ioredis") intercepts it in tests.
       client = new Redis(dragonflyUrl, {
-        lazyConnect: false,
+        lazyConnect: true,
         maxRetriesPerRequest: 0,
-        enableOfflineQueue: false,
+        // This is a disposable probe: wait for the socket before issuing PING.
+        // Otherwise enableOfflineQueue:false can produce a false
+        // "Stream isn't writeable" while ioredis is still connecting.
+        enableOfflineQueue: true,
         connectTimeout: 3_000,
         commandTimeout: 3_000,
         retryStrategy: () => null,
       });
 
+      if (typeof client.connect === "function") {
+        await client.connect();
+      }
+
       // Gara PING vs hard-timeout 3s: garantisce che il probe non blocchi il ciclo
-      // del monitor se DragonflyDB accetta il TCP ma non risponde al comando.
+      // del monitor se Redis accetta il TCP ma non risponde al comando.
       await Promise.race([
         client.ping(),
         new Promise<never>((_, reject) => {
