@@ -91,7 +91,8 @@ async function tcpConnect(
  * che non espongono DragonflyDB direttamente.
  */
 export async function probeDragonflyInfra(): Promise<InfraServiceHealth> {
-  const dragonflyUrl = process.env.TC_DRAGONFLY_URL?.trim();
+  // REDIS_URL is canonical; TC_DRAGONFLY_URL remains a local legacy fallback.
+  const dragonflyUrl = process.env.REDIS_URL?.trim() || process.env.TC_DRAGONFLY_URL?.trim();
 
   // Probe applicativo: PING ioredis diretto a TC_DRAGONFLY_URL.
   // Fonte di verità principale — rispecchia ciò che vede il client applicativo.
