@@ -41,6 +41,7 @@ jobs:
           BIKERLINK_DEPLOY_ENV: staging
           DATABASE_URL_CANDIDATE: ${{ secrets.DATABASE_URL_CANDIDATE }}
           SMOKE_REGISTRATION_TOKEN: ${{ secrets.SMOKE_REGISTRATION_TOKEN }}
+          SMOKE_INVITE_CODE: ${{ secrets.SMOKE_INVITE_CODE }}
         run: |
           test -n "$BASE_URL" || { echo "::error::Missing smoke base URL"; exit 2; }
           test -n "$DATABASE_URL_CANDIDATE" || { echo "::error::Missing secret DATABASE_URL_CANDIDATE"; exit 2; }
@@ -62,6 +63,7 @@ jobs:
           BIKERLINK_DEPLOY_ENV: staging
           DATABASE_URL_CANDIDATE: ${{ secrets.DATABASE_URL_CANDIDATE }}
           SMOKE_REGISTRATION_TOKEN: ${{ secrets.SMOKE_REGISTRATION_TOKEN }}
+          SMOKE_INVITE_CODE: ${{ secrets.SMOKE_INVITE_CODE }}
           SMOKE_ALLOW_PROD: "0"
           SMOKE_CLEANUP_ORPHANS: "1"
           SMOKE_TIMEOUT_MS: "10000"
