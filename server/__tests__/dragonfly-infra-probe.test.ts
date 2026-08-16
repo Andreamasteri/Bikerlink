@@ -55,6 +55,7 @@ beforeEach(() => {
   // Restore default implementations after clearAllMocks.
   mockQuit.mockResolvedValue("OK");
   // Clear all dragonfly-related env vars.
+  delete process.env.REDIS_URL;
   delete process.env.TC_DRAGONFLY_URL;
   delete process.env.DRAGONFLY_PROBE_URL;
   delete process.env.REDIS_PROBE_URL;
@@ -71,6 +72,22 @@ afterEach(() => {
 });
 
 // ── ioredis PING branch ───────────────────────────────────────────────────────
+
+describe("probeDragonflyInfra — canonical REDIS_URL branch", () => {
+  it("prefers REDIS_URL over the retired ThinkCentre variable", async () => {
+    process.env.REDIS_URL = "redis://vps.internal:6379";
+    process.env.TC_DRAGONFLY_URL = "not-a-valid-url";
+    mockPing.mockResolvedValue("PONG");
+
+    const result = await probeDragonflyInfra();
+
+    expect(result.configured).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(MockRedis).toHaveBeenCalledTimes(1);
+    expect(MockRedis.mock.calls[0]?.[0]).toBe("redis://vps.internal:6379");
+  });
+});
 
 describe("probeDragonflyInfra — ioredis PING branch (TC_DRAGONFLY_URL set)", () => {
   it("returns ok=true when PING succeeds", async () => {
