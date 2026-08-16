@@ -475,8 +475,9 @@ export async function runBootPhase3DbInit(): Promise<void> {
             retryStrategy: () => null,
           });
           const t0 = Date.now();
-          if (typeof (client as { connect?: () => Promise<unknown> }).connect === "function") {
-            await (client as { connect: () => Promise<unknown> }).connect();
+          const connect = (client as unknown as { connect?: () => Promise<unknown> }).connect;
+          if (typeof connect === "function") {
+            await connect.call(client);
           }
           await client.ping();
           const ms = Date.now() - t0;
