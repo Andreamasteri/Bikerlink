@@ -372,6 +372,12 @@ async function spawnBridge(): Promise<void> {
  * reInitRedis non appena la probe Redis passa).
  */
 export async function startRedisTunnel(waitMs = 8_000): Promise<boolean> {
+  // REDIS_URL is the canonical VPS/Upstash path. Never start the retired
+  // ThinkCentre bridge when the cloud provider is configured.
+  if (process.env.REDIS_URL?.trim()) {
+    console.log("[redis-tunnel] REDIS_URL configured — legacy ThinkCentre bridge disabled");
+    return false;
+  }
   if (startAttempted) {
     return state.running ? probeLocalPort(state.localPort) : false;
   }
