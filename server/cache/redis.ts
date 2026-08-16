@@ -38,7 +38,25 @@ const state: ClientState = {
 let initAttempted = false;
 
 function getRedisUrl(): string | undefined {
-  return process.env.REDIS_URL;
+  const raw = process.env.REDIS_URL?.trim();
+  const tunnelHostname = process.env.REDIS_TUNNEL_HOSTNAME?.trim();
+  if (!raw || !tunnelHostname) return raw;
+
+  // Cloudflare Access TCP is terminated by cloudflared locally. Preserve the
+  // Redis credentials from REDIS_URL, but route the client to the local bridge.
+  try {
+    const url = new URL(raw);
+    const localPort = parseInt(process.env.REDIS_TUNNEL_LOCAL_PORT ?? "16379", 10) || 16379;
+    url.protocol = "redis:";
+    url.hostname = "127.0.0.1";
+    url.port = String(localPort);
+    url.pathname = "";
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return raw;
+  }
 }
 
 function buildOptions(url: string): RedisOptions {
