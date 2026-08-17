@@ -269,6 +269,9 @@ async function spawnBridge(): Promise<void> {
     "--url", `127.0.0.1:${state.localPort}`,
   ];
 
+  const logLevel = process.env.TUNNEL_LOGLEVEL?.trim();
+  if (logLevel) args.push("--loglevel", logLevel);
+
   // Service token via env (NON in argv → non compare in `ps`).
   // TUNNEL_DNS_UPSTREAM: bypassa il resolver stub di systemd-resolved (127.0.0.53)
   // e colpisce direttamente Cloudflare DoH per le SRV lookup di argotunnel.com.
