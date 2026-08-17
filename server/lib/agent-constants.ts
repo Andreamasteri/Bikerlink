@@ -1,24 +1,24 @@
 /**
- * CANONICAL AGENT LINEUP — BikerLink AI agents (Task #535).
+ * LEGACY DIRECT-PATH MODEL DEFAULTS — BikerLink.
  *
- * Single source of truth for per-agent model defaults, hardware placement and
- * keep_alive policy. Update this table whenever an agent's model or residency
- * changes — all client files reference these constants so a single edit
- * propagates everywhere.
+ * This file preserves existing Ollama defaults for compatibility while the
+ * inactive AI-Hub role registry in server/ai/agent-role-registry.ts defines
+ * functional authority for new wiring.
  *
- * | Agent      | Model             | HW              | keep_alive |
- * |------------|-------------------|-----------------|------------|
- * | Horus      | qwen3:4b          | GPU residente   | -1         |
- * | Bowie      | qwen3:1.7b        | GPU residente   | -1         |
- * (Quebracho unified into Horus — Task #591)
- * | Nadir      | all-minilm        | GPU residente   | -1         |
- * | Ares       | devstral          | On-demand       |  0         |
- * | Coder      | devstral          | On-demand       |  0         |
+ * Functional roles:
+ * - Bowie: chat and invocation only.
+ * - Horus: routing only.
+ * - Ares: matching, diagnostics/review and orchestration.
+ * - Nadir: audio only.
+ * - Quebracho (qq alias): code and deep review.
+ * - Indexing/embeddings: separate technical service, not an AI persona.
+ *
+ * Model/GPU placement is not inferred from this legacy table. AI-Hub runtime
+ * discovery is authoritative and the runtime gate must pass before activation.
  *
  * keep_alive semantics (Ollama):
- *   -1  → never unload (resident agents: Horus, Bowie, Nadir)
- *    0  → unload immediately after the call (on-demand agents: Ares, Coder)
- *  "Xm" → unload after X minutes (legacy default, no longer used)
+ *   -1  -> never unload (resident direct-path agents)
+ *    0  -> unload immediately after the call (on-demand direct-path agents)
  *
  * IMPORTANT: Ollama interprets the value -1 as "never unload" ONLY when it is
  * the NUMBER -1. The STRING "-1" is treated as 0 seconds (unload immediately).
