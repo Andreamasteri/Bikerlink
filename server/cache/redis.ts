@@ -38,6 +38,11 @@ const state: ClientState = {
 let initAttempted = false;
 
 function getRedisUrl(): string | undefined {
+  // WARP/Mesh endpoint takes precedence over the legacy Access WebSocket bridge.
+  // Removing REDIS_PRIVATE_URL re-enables the bridge without a code change.
+  const privateUrl = process.env.REDIS_PRIVATE_URL?.trim();
+  if (privateUrl) return privateUrl;
+
   const raw = process.env.REDIS_URL?.trim();
   const tunnelHostname = process.env.REDIS_TUNNEL_HOSTNAME?.trim();
   if (!raw || !tunnelHostname) return raw;
