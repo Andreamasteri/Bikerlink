@@ -378,6 +378,10 @@ async function spawnBridge(): Promise<void> {
  * reInitRedis non appena la probe Redis passa).
  */
 export async function startRedisTunnel(waitMs = 8_000): Promise<boolean> {
+  if (process.env.REDIS_PRIVATE_URL?.trim()) {
+    console.log("[redis-tunnel] REDIS_PRIVATE_URL impostato — percorso privato WARP/Mesh attivo, bridge Access non avviato");
+    return false;
+  }
   if (startAttempted) {
     return state.running ? probeLocalPort(state.localPort) : false;
   }
