@@ -26,8 +26,13 @@
 
 import { cfAccessHeaders } from "./cf-access";
 
-const AI_HUB_URL = (process.env.AI_HUB_URL ?? "").trim().replace(/\/+$/, "");
-const AI_HUB_GATE_TOKEN = (process.env.AI_HUB_GATE_TOKEN ?? "").trim();
+function getAiHubUrl(): string {
+  return (process.env.AI_HUB_URL ?? "").trim().replace(/\/+$/, "");
+}
+
+function getAiHubGateToken(): string {
+  return (process.env.AI_HUB_GATE_TOKEN ?? "").trim();
+}
 
 /** Timeout di default per ogni chiamata all'hub (endpoint pesanti, es. /files/write). */
 const HUB_TIMEOUT_MS = 8_000;
@@ -102,7 +107,7 @@ let hubProbeRan = false;
 
 /** true se ENTRAMBI i secret (URL + gate token) sono configurati. */
 export function isHubConfigured(): boolean {
-  return AI_HUB_URL.length > 0 && AI_HUB_GATE_TOKEN.length > 0;
+  return getAiHubUrl().length > 0 && getAiHubGateToken().length > 0;
 }
 
 /**
@@ -141,12 +146,12 @@ export function resetHubState(): void {
 
 /** Base URL dell'hub (senza slash finale), o "" se non configurato. */
 export function getHubBaseUrl(): string {
-  return AI_HUB_URL;
+  return getAiHubUrl();
 }
 
 function hubHeaders(extra?: Record<string, string>): Record<string, string> {
   return {
-    "X-Hub-Gate-Token": AI_HUB_GATE_TOKEN,
+    "X-Hub-Gate-Token": getAiHubGateToken(),
     ...cfAccessHeaders(),
     ...(extra ?? {}),
   };
@@ -167,7 +172,7 @@ async function hubFetch<T = unknown>(
     return { ok: false, error: "AI Hub non configurato (AI_HUB_URL / AI_HUB_GATE_TOKEN mancanti)" };
   }
 
-  let url = AI_HUB_URL + normalizePath(path);
+  let url = getAiHubUrl() + normalizePath(path);
   if (init.query) {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(init.query)) {

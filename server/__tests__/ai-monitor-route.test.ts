@@ -11,6 +11,12 @@ vi.mock("../routes/admin/thinkcentre-health-gh-probes", () => ({ probeOllama: pr
 const { httpProbeMock } = vi.hoisted(() => ({ httpProbeMock: vi.fn(async () => ({ ok: true, latencyMs: 10, error: undefined })) }));
 vi.mock("../routes/admin/thinkcentre-health-utils", () => ({ httpProbe: httpProbeMock, sanitizeError: (e: unknown) => String(e) }));
 
+const { hubGetMock, isHubConfiguredMock } = vi.hoisted(() => ({
+  hubGetMock: vi.fn(async () => ({ ok: true, status: 200, data: { ok: true }, error: undefined })),
+  isHubConfiguredMock: vi.fn(() => true),
+}));
+vi.mock("../lib/ai-hub-client", () => ({ hubGet: hubGetMock, isHubConfigured: isHubConfiguredMock, HUB_HEALTH_TIMEOUT_MS: 5000 }));
+
 const { probeAresMock } = vi.hoisted(() => ({
   probeAresMock: vi.fn(async (): Promise<{
     configured: boolean;
@@ -58,6 +64,8 @@ beforeEach(() => {
   probeOllamaMock.mockReset().mockResolvedValue({ configured: true, ok: true, latencyMs: 42, error: undefined });
   httpProbeMock.mockReset().mockResolvedValue({ ok: true, latencyMs: 10, error: undefined });
   probeAresMock.mockReset().mockResolvedValue({ configured: true, online: true, latencyMs: 30, error: undefined });
+  hubGetMock.mockReset().mockResolvedValue({ ok: true, status: 200, data: { ok: true }, error: undefined });
+  isHubConfiguredMock.mockReset().mockReturnValue(true);
   // isQuebrachoConfiguredMock/isQuebrachoReachableMock removed (Task #591)
   getCoordinatorJobsSnapshotMock.mockReset().mockReturnValue([{ state: "running" }, { state: "idle" }]);
   insertValuesMock.mockReset().mockResolvedValue({});
@@ -68,8 +76,10 @@ describe("GET /api/admin/ai-monitor", () => {
   it("aggrega lo stato delle 4 AI", async () => {
     const res = await request(buildApp()).get("/api/admin/ai-monitor");
     expect(res.status).toBe(200);
-    // Task #591: Quebracho removed — now 3 agents (Bowie/Horus/Ares)
-    expect(res.body.agents).toHaveLength(3);
+    // Task #591: Quebracho remains unified into Horus; AI Hub is the shared fourth component.
+    expect(res.body.agents).toHaveLength(4);
+    const aihub = res.body.agents.find((a: { persona: string }) => a.persona === "aihub");
+    expect(aihub.online).toBe(true);
     const horus = res.body.agents.find((a: { persona: string }) => a.persona === "horus");
     expect(horus.activeJobs).toBe(1); // running jobs tracked via Horus coordinator
   });

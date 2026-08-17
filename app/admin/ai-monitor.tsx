@@ -11,7 +11,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
 
-type AgentPersona = "bowie" | "horus" | "ares";
+type AgentPersona = "bowie" | "horus" | "ares" | "aihub";
 
 interface AgentMonitorSnapshot {
   persona: AgentPersona;
@@ -39,12 +39,14 @@ const PERSONA_LABEL: Record<AgentPersona, string> = {
   bowie: "Bowie (assistente)",
   horus: "Horus (routing · coordinator)",
   ares: "Ares (diagnostica)",
+  aihub: "AI Hub (ThinkCentre)",
 };
 
 const PERSONA_ICON: Record<AgentPersona, keyof typeof MaterialCommunityIcons.glyphMap> = {
   bowie: "robot-outline",
   horus: "map-marker-path",
   ares: "cog-outline",
+  aihub: "cloud-outline",
 };
 
 export default function AiMonitorScreen() {
@@ -68,7 +70,7 @@ export default function AiMonitorScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
-      <Text style={styles.subtitle}>Stato in tempo reale delle 4 AI. Tocca una card per lo storico transizioni.</Text>
+      <Text style={styles.subtitle}>Stato in tempo reale delle 4 componenti AI. L’AI Hub è il servizio condiviso sul ThinkCentre. Tocca una card per lo storico transizioni.</Text>
       <View style={styles.grid}>
         {agents.map((agent) => (
           <TouchableOpacity
