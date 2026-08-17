@@ -47,7 +47,7 @@ router.post("/coordinator/jobs/:name/directive", async (req: Request, res: Respo
   if (!parsed.success) { sendError(res, 400, parsed.error.issues[0].message); return; }
   try {
     // Le direttive dell'admin sono SEMPRE issuedBy="admin_manual": rispettate dal
-    // gate anche quando Quebracho è irraggiungibile (vedi job-gate.ts canRunJob).
+    // gate anche quando Horus è irraggiungibile (vedi job-gate.ts canRunJob).
     const result = await applyJobDirective(
       name,
       parsed.data.kind,
@@ -71,7 +71,10 @@ router.post("/coordinator/jobs/:name/reset", async (req: Request, res: Response)
     if (!job) { sendError(res, 404, `Job "${name}" non trovato nel registry`); return; }
     const previousState = job.state;
     resetJobToIdle(name, "reset manuale admin");
-    res.json({ name, previousState, state: "idle", reset: true });
+    // Restituisce lo stato live effettivo: se esiste una direttiva persistente
+    // (pause/throttle), il reset del run zombie non deve mascherarla.
+    const after = getJob(name);
+    res.json({ name, previousState, state: after?.state ?? "idle", reset: true });
   } catch (err) {
     sendError(res, 500, (err as Error).message);
   }

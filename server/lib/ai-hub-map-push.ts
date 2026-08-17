@@ -31,7 +31,7 @@ export async function pushAgentModelMapToHub(): Promise<void> {
     if (await isThinkCentrePoweredOff().catch(() => false)) return;
 
     // Task #535 — Build the canonical model→agent map from env vars and push it.
-    // Canonical lineup: Horus=qwen3:4b, Bowie=qwen3:1.7b, Quebracho=granite4:tiny-h,
+    // Canonical lineup: Horus=qwen3:4b, Bowie=qwen3:1.7b,
     // Nadir=all-minilm, Ares=devstral:latest (on-demand — included for correct
     // attribution in the monitoring breakdown, even if Ares is on a separate machine).
     const modelAgentMap: Record<string, string> = {

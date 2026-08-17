@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "rea
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { getQueryFnWithTimeout } from "@/lib/query-client";
 
 interface ServerMetrics {
   cpu: {
@@ -83,31 +83,15 @@ export function ServerEfficiencyCard() {
 
   const { data, isLoading, error } = useQuery<ServerMetrics>({
     queryKey: ["/api/admin/server-metrics"],
-    queryFn: async ({ signal }) => {
-      const res = await fetch(new URL("/api/admin/server-metrics", getApiUrl()).toString(), {
-        headers: { ...(await authFetchHeaders()) },
-        credentials: "include",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
+    queryFn: getQueryFnWithTimeout<ServerMetrics>(5_000),
     refetchInterval: 5_000,
     staleTime: 4_000,
     refetchOnMount: true,
   });
 
   const { data: logs } = useQuery<ServerLogs>({
-    queryKey: ["/api/admin/server-logs"],
-    queryFn: async ({ signal }) => {
-      const res = await fetch(new URL("/api/admin/server-logs?lines=12", getApiUrl()).toString(), {
-        headers: { ...(await authFetchHeaders()) },
-        credentials: "include",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
+    queryKey: ["/api/admin/server-logs?lines=12"],
+    queryFn: getQueryFnWithTimeout<ServerLogs>(5_000),
     refetchInterval: 15_000,
     staleTime: 10_000,
     refetchOnMount: true,

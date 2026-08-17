@@ -3,7 +3,7 @@ import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { getQueryFnWithTimeout } from "@/lib/query-client";
 import type { ValhallaDetailedHealth, PhotonDetailedHealth } from "./ThinkCentreValhallaPhotonBlocks";
 import { ErrorHistory, ProbeLog } from "./ThinkCentreCardParts";
 
@@ -23,7 +23,6 @@ interface ThinkCentreHealthMinimal {
     graphhopper: string | null;
     valhalla: string | null;
     ollama: string | null;
-    whisper: string | null;
     photon: string | null;
   };
 }
@@ -52,37 +51,10 @@ const PROFILE_LABELS: Record<string, string> = {
   pedestrian: "Pedonale",
 };
 
-async function fetchThinkCentreHealth(signal?: AbortSignal): Promise<ThinkCentreHealthMinimal> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20_000);
-  const combined = signal
-    ? (AbortSignal.any ? AbortSignal.any([signal, controller.signal]) : controller.signal)
-    : controller.signal;
-  try {
-    const res = await fetch(new URL("/api/admin/thinkcentre-health", getApiUrl()).toString(), {
-      headers: { ...(await authFetchHeaders()) },
-      credentials: "include",
-      signal: combined,
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 export function GraphHopperCard() {
   const { data, isLoading, error } = useQuery<GHStatus>({
     queryKey: ["/api/admin/graphhopper-status"],
-    queryFn: async ({ signal }) => {
-      const res = await fetch(new URL("/api/admin/graphhopper-status", getApiUrl()).toString(), {
-        headers: { ...(await authFetchHeaders()) },
-        credentials: "include",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
+    queryFn: getQueryFnWithTimeout<GHStatus>(10_000),
     staleTime: 60_000,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
@@ -160,7 +132,7 @@ export function ValhallaCard() {
 
   const { data, isLoading, error } = useQuery<ThinkCentreHealthMinimal>({
     queryKey: ["/api/admin/thinkcentre-health"],
-    queryFn: ({ signal }) => fetchThinkCentreHealth(signal),
+    queryFn: getQueryFnWithTimeout<ThinkCentreHealthMinimal>(20_000),
     refetchInterval: 30_000,
     staleTime: 20_000,
     refetchOnMount: "always",
@@ -293,7 +265,7 @@ export function PhotonCard() {
 
   const { data, isLoading, error } = useQuery<ThinkCentreHealthMinimal>({
     queryKey: ["/api/admin/thinkcentre-health"],
-    queryFn: ({ signal }) => fetchThinkCentreHealth(signal),
+    queryFn: getQueryFnWithTimeout<ThinkCentreHealthMinimal>(20_000),
     refetchInterval: 30_000,
     staleTime: 20_000,
     refetchOnMount: "always",

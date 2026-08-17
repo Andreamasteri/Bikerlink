@@ -15,7 +15,7 @@ import {
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { apiRequest, getQueryFnWithTimeout } from "@/lib/query-client";
 import {
   Section,
   IntegrityRow,
@@ -27,25 +27,9 @@ import {
 } from "./MatchingMonitorParts";
 import type { MonitorData, LogsData, NotificationCycleStats } from "./MatchingMonitorParts";
 
-async function authGet<T>(path: string): Promise<T> {
-  const res = await fetch(new URL(path, getApiUrl()).toString(), {
-    headers: { ...(await authFetchHeaders()) },
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json() as Promise<T>;
-}
-
 async function authPost<T>(path: string): Promise<T> {
-  const res = await fetch(new URL(path, getApiUrl()).toString(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
-    credentials: "include",
-    body: "{}",
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error((json as { message?: string })?.message ?? `HTTP ${res.status}`);
-  return json as T;
+  const res = await apiRequest("POST", path, {}, { timeoutMs: 20_000 });
+  return (await res.json()) as T;
 }
 
 function NotifStatsRow({ stats }: { stats?: NotificationCycleStats }) {
@@ -100,7 +84,7 @@ export function MatchingMonitorCard({ onStatus }: { onStatus?: (s: "ok" | "degra
 
   const { data: monitor, isLoading: monitorLoading, isError: monitorError } = useQuery<MonitorData>({
     queryKey: ["/api/admin/matching/monitor"],
-    queryFn: () => authGet<MonitorData>("/api/admin/matching/monitor"),
+    queryFn: getQueryFnWithTimeout<MonitorData>(10_000),
     refetchInterval: collapsed ? 60_000 : 15_000,
     staleTime: collapsed ? 55_000 : 10_000,
     enabled: true,
@@ -115,7 +99,7 @@ export function MatchingMonitorCard({ onStatus }: { onStatus?: (s: "ok" | "degra
     refetch: refetchLogs,
   } = useQuery<LogsData>({
     queryKey: ["/api/admin/matching/logs"],
-    queryFn: () => authGet<LogsData>("/api/admin/matching/logs"),
+    queryFn: getQueryFnWithTimeout<LogsData>(10_000),
     refetchInterval: 30_000,
     staleTime: 20_000,
     refetchOnMount: "always",

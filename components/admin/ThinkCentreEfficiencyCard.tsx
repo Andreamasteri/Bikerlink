@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "rea
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { getQueryFnWithTimeout } from "@/lib/query-client";
 import { AdminCardErrorBoundary } from "@/components/admin/AdminCardErrorBoundary";
 
 interface FlatTCMetrics {
@@ -49,14 +49,7 @@ function ThinkCentreEfficiencyCardInner() {
 
   const { data, isLoading, error } = useQuery<MetricsResponse>({
     queryKey: ["/api/admin/thinkcentre-metrics"],
-    queryFn: async ({ signal }) => {
-      const res = await fetch(
-        new URL("/api/admin/thinkcentre-metrics", getApiUrl()).toString(),
-        { headers: { ...(await authFetchHeaders()) }, credentials: "include", signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]) },
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
+    queryFn: getQueryFnWithTimeout<MetricsResponse>(10_000),
     refetchInterval: 10_000,
     staleTime: 8_000,
     refetchOnMount: true,

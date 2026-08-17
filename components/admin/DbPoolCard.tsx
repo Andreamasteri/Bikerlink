@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "rea
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { getQueryFnWithTimeout } from "@/lib/query-client";
 
 interface IdleLeakInfo {
   count: number;
@@ -32,18 +32,7 @@ export function DbPoolCard() {
 
   const { data, isLoading, error } = useQuery<PoolStats>({
     queryKey: ["/api/admin/db-pool-stats"],
-    queryFn: async ({ signal }) => {
-      const res = await fetch(
-        new URL("/api/admin/db-pool-stats", getApiUrl()).toString(),
-        {
-          headers: { ...(await authFetchHeaders()) },
-          credentials: "include",
-          signal: AbortSignal.any([signal, AbortSignal.timeout(4_000)]),
-        }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
+    queryFn: getQueryFnWithTimeout<PoolStats>(4_000),
     refetchInterval: 5_000,
     staleTime: 4_000,
     refetchOnMount: true,

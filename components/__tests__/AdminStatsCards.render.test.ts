@@ -64,6 +64,7 @@ vi.mock("@/constants/colors", () => ({
 vi.mock("@/lib/query-client", () => ({
   getApiUrl:        () => "http://localhost",
   authFetchHeaders: async () => ({}),
+  getQueryFnWithTimeout: () => async () => ({}),
 }));
 
 // ── Mock: ThinkCentreCardParts (ErrorHistory, ProbeLog) ───────────────────

@@ -72,6 +72,23 @@ export { probeThinkCentreStatusSnapshot };
 
 const router = Router();
 
+// Repo-drift è diagnostica accessoria: non deve bloccare l'intero pannello
+// ThinkCentre mentre il TC esegue git fetch o il tunnel è lento. Il resto
+// dell'health check deve comunque restituire i servizi già disponibili.
+async function withHealthDeadline<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /**
  * GET /api/admin/thinkcentre/maintenance
  * Legge il flag "thinkcentre_maintenance_mode". Default: false.
@@ -353,7 +370,18 @@ router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) =>
       probeNginxInfra(),
       probeUptimeKuma(),
       probeAres(),
-      probeRepoDrift(),
+      withHealthDeadline(
+        probeRepoDrift(),
+        2_000,
+        {
+          checked: false,
+          driftDetected: false,
+          behind: null,
+          driftedFiles: [],
+          checkedAt: null,
+          error: "timeout diagnostica repo-drift",
+        } satisfies RepoDriftHealth,
+      ),
       probeAiHub(),
       probeNginxSymlinksInfra(),
     ]);

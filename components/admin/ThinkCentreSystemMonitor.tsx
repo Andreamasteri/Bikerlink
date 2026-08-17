@@ -8,7 +8,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { apiRequest } from "@/lib/query-client";
 import {
   LineChart, DiskBar, VramBar,
   type DiskMount, type XLabel,
@@ -177,13 +177,7 @@ export function ThinkCentreSystemMonitor() {
   // ── Poll live ──────────────────────────────────────────────────────────
   const poll = useCallback(async () => {
     try {
-      const url = new URL("/api/admin/thinkcentre-metrics", getApiUrl()).toString();
-      const res = await fetch(url, {
-        headers: { ...(await authFetchHeaders()) },
-        credentials: "include",
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (!res.ok) { setOnline(false); setReason(`HTTP ${res.status}`); return; }
+      const res = await apiRequest("GET", "/api/admin/thinkcentre-metrics", undefined, { timeoutMs: 5_000 });
       const data: ApiResponse = await res.json();
       if (!data.online) { setOnline(false); setReason(data.reason ?? "non raggiungibile"); return; }
 
@@ -215,9 +209,7 @@ export function ThinkCentreSystemMonitor() {
     setHistLoading(true);
     setHistoryError(false);
     try {
-      const url = new URL(`/api/admin/tc-metrics-history?range=${mode}`, getApiUrl()).toString();
-      const res = await fetch(url, { headers: { ...(await authFetchHeaders()) }, credentials: "include" });
-      if (!res.ok) { setHistoryError(true); return; }
+      const res = await apiRequest("GET", `/api/admin/tc-metrics-history?range=${mode}`, undefined, { timeoutMs: 8_000 });
       const data: HistoryResponse = await res.json();
       setHistoryData(data.samples);
     } catch { setHistoryError(true); }
@@ -228,18 +220,9 @@ export function ThinkCentreSystemMonitor() {
   const fetchGpuPeaks = useCallback(async () => {
     setGpuPeaksLoading(true);
     try {
-      const url = new URL("/api/admin/tc-gpu-peaks", getApiUrl()).toString();
-      const res = await fetch(url, {
-        headers: { ...(await authFetchHeaders()) },
-        credentials: "include",
-        signal: AbortSignal.timeout(6_000),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setGpuPeaks(data);
-      } else {
-        setGpuPeaks(null);
-      }
+      const res = await apiRequest("GET", "/api/admin/tc-gpu-peaks", undefined, { timeoutMs: 6_000 });
+      const data = await res.json();
+      setGpuPeaks(data);
     } catch { setGpuPeaks(null); }
     finally { setGpuPeaksLoading(false); }
   }, []);

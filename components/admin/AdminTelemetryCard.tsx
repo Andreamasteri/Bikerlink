@@ -16,8 +16,23 @@ interface TelemetryStats {
 
 const TELEMETRY_STALE_THRESHOLD_HOURS = 24;
 
-async function fetchWithCause(url: string, options?: RequestInit): Promise<Response> {
-  const res = await fetch(url, options);
+async function fetchWithCause(url: string, options: RequestInit = {}, timeoutMs = 10_000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const parentSignal = options.signal;
+  const onParentAbort = () => controller.abort();
+  if (parentSignal) {
+    if (parentSignal.aborted) controller.abort();
+    else parentSignal.addEventListener("abort", onParentAbort, { once: true });
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+    parentSignal?.removeEventListener("abort", onParentAbort);
+  }
   if (!res.ok) {
     let detail = "";
     try {
@@ -42,7 +57,7 @@ export function TelemetryCard() {
       const res = await fetchWithCause(new URL("/api/admin/telemetry-stats", getApiUrl()).toString(), {
         headers: { ...(await authFetchHeaders()) },
         credentials: "include",
-        signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
+        signal,
       });
       return res.json();
     },

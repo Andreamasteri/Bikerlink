@@ -35,6 +35,7 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "db-debug": { title: "DB Debug" },
   "db-tables": { title: "Dimensioni DB" },
   "motoclubs": { title: "Clubs" },
+  "motoclub/[id]": { title: "Dettaglio Club" },
   "invite-codes": { title: "Codici Invito" },
   "backup": { title: "Backup automatici" },
   "exports": { title: "Export Dati" },
@@ -73,6 +74,7 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "negative-pref-patterns": { title: "Pattern Pref. Negative" },
   "ota": { title: "Controllo OTA" },
   "maps": { title: "Sistema Mappe" },
+  "ai-route-providers": { title: "Provider Routing AI" },
   "routing-hub": { title: "Hub Routing" },
   "routing-control": { title: "Controllo Routing" },
   "routing-health": { title: "Routing Health" },
@@ -91,20 +93,37 @@ const ADMIN_OPTS: Record<string, { title: string } | { headerShown: false }> = {
   "ai-pinned": { title: "AI — Insight Pinnati" },
   "ai-layer": { title: "AI Layer" },
   "ai-hub": { title: "Hub AI" },
+  "ai-monitor": { title: "Monitor 4 AI" },
   "nadir": { title: "Nadir — Ricerca semantica" },
   "horus-scan": { title: "Horus — Scansioni complete" },
   "ares-jobs": { title: "Ares — Job on-demand" },
+  "coordinator-jobs": { title: "Horus — Job Coordinator" },
+  "system-health": { title: "AI System Watchdog" },
   "telemetry-users": { title: "Sessioni Utenti" },
   "telemetry-user/[userId]": { title: "Dettaglio Sessioni" },
   "boot-log": { title: "Boot Log Avvio" },
   "boot-gate": { title: "BootGate — Bisect Avvio" },
   "metro-crashes": { title: "Crash Metro" },
+  "diagnostica": { title: "Diagnostica Avanzata" },
+  "diagnostic": { title: "Diagnostica Locale" },
+  "diagnostic-reports": { title: "Diagnostica Remota" },
+  "diagnostica-device": { title: "Diagnostica Device" },
+  "diagnostica-monitor": { title: "Monitor Diagnostica" },
+  "diagnostica-pipeline": { title: "Pipeline Diagnostica" },
+  "diagnostica-scan": { title: "Scansione Diagnostica" },
+  "diagnostica-types": { title: "Tipi Diagnostica" },
   "ai-assistant": { title: "Bowie" },
   "bowie-standalone": { title: "Bowie · Standalone" },
   "ai-group-chat": { title: "Tavola Rotonda AI" },
   "match-explain": { title: "Explain Matching" },
   "background-location": { title: "Posizione Background" },
   "push-diagnostics": { title: "Diagnostica Notifiche Push" },
+  "push-diagnostics-panel": { title: "Pannello Diagnostica Push" },
+  "backup-preview": { title: "Esplora Backup" },
+  "dr-correction": { title: "Correzione Disaster Recovery" },
+  "legal-docs": { title: "Manualistica" },
+  "road-hazards": { title: "Pericoli stradali" },
+  "telemetry": { title: "Telemetria" },
 } as const;
 
 export default function AdminLayout() {
@@ -125,6 +144,7 @@ export default function AdminLayout() {
         <Stack.Screen name="db-debug" options={ADMIN_OPTS["db-debug"]} />
         <Stack.Screen name="db-tables" options={ADMIN_OPTS["db-tables"]} />
         <Stack.Screen name="motoclubs" options={ADMIN_OPTS["motoclubs"]} />
+        <Stack.Screen name="motoclub/[id]" options={ADMIN_OPTS["motoclub/[id]"]} />
         <Stack.Screen name="invite-codes" options={ADMIN_OPTS["invite-codes"]} />
         <Stack.Screen name="backup" options={ADMIN_OPTS["backup"]} />
         <Stack.Screen name="exports" options={ADMIN_OPTS["exports"]} />
@@ -162,6 +182,7 @@ export default function AdminLayout() {
         <Stack.Screen name="negative-pref-patterns" options={ADMIN_OPTS["negative-pref-patterns"]} />
         <Stack.Screen name="ota" options={ADMIN_OPTS["ota"]} />
         <Stack.Screen name="maps" options={ADMIN_OPTS["maps"]} />
+        <Stack.Screen name="ai-route-providers" options={ADMIN_OPTS["ai-route-providers"]} />
         <Stack.Screen name="routing-hub" options={ADMIN_OPTS["routing-hub"]} />
         <Stack.Screen name="routing-control" options={ADMIN_OPTS["routing-control"]} />
         <Stack.Screen name="routing-health" options={ADMIN_OPTS["routing-health"]} />
@@ -180,14 +201,25 @@ export default function AdminLayout() {
         <Stack.Screen name="ai-pinned" options={ADMIN_OPTS["ai-pinned"]} />
         <Stack.Screen name="ai-layer" options={ADMIN_OPTS["ai-layer"]} />
         <Stack.Screen name="ai-hub" options={ADMIN_OPTS["ai-hub"]} />
+        <Stack.Screen name="ai-monitor" options={ADMIN_OPTS["ai-monitor"]} />
         <Stack.Screen name="nadir" options={ADMIN_OPTS["nadir"]} />
         <Stack.Screen name="horus-scan" options={ADMIN_OPTS["horus-scan"]} />
         <Stack.Screen name="ares-jobs" options={ADMIN_OPTS["ares-jobs"]} />
+        <Stack.Screen name="coordinator-jobs" options={ADMIN_OPTS["coordinator-jobs"]} />
+        <Stack.Screen name="system-health" options={ADMIN_OPTS["system-health"]} />
         <Stack.Screen name="telemetry-users" options={ADMIN_OPTS["telemetry-users"]} />
         <Stack.Screen name="telemetry-user/[userId]" options={ADMIN_OPTS["telemetry-user/[userId]"]} />
         <Stack.Screen name="boot-log" options={ADMIN_OPTS["boot-log"]} />
         <Stack.Screen name="boot-gate" options={ADMIN_OPTS["boot-gate"]} />
         <Stack.Screen name="metro-crashes" options={ADMIN_OPTS["metro-crashes"]} />
+        <Stack.Screen name="diagnostica" options={ADMIN_OPTS["diagnostica"]} />
+        <Stack.Screen name="diagnostic" options={ADMIN_OPTS["diagnostic"]} />
+        <Stack.Screen name="diagnostic-reports" options={ADMIN_OPTS["diagnostic-reports"]} />
+        <Stack.Screen name="diagnostica-device" options={ADMIN_OPTS["diagnostica-device"]} />
+        <Stack.Screen name="diagnostica-monitor" options={ADMIN_OPTS["diagnostica-monitor"]} />
+        <Stack.Screen name="diagnostica-pipeline" options={ADMIN_OPTS["diagnostica-pipeline"]} />
+        <Stack.Screen name="diagnostica-scan" options={ADMIN_OPTS["diagnostica-scan"]} />
+        <Stack.Screen name="diagnostica-types" options={ADMIN_OPTS["diagnostica-types"]} />
         <Stack.Screen name="ai-assistant" options={ADMIN_OPTS["ai-assistant"]} />
         <Stack.Screen name="bowie-standalone" options={ADMIN_OPTS["bowie-standalone"]} />
         <Stack.Screen name="ai-group-chat" options={ADMIN_OPTS["ai-group-chat"]} />
@@ -195,6 +227,12 @@ export default function AdminLayout() {
         <Stack.Screen name="background-location" options={ADMIN_OPTS["background-location"]} />
         <Stack.Screen name="db-monitor" options={ADMIN_OPTS["db-monitor"]} />
         <Stack.Screen name="push-diagnostics" options={ADMIN_OPTS["push-diagnostics"]} />
+        <Stack.Screen name="push-diagnostics-panel" options={ADMIN_OPTS["push-diagnostics-panel"]} />
+        <Stack.Screen name="backup-preview" options={ADMIN_OPTS["backup-preview"]} />
+        <Stack.Screen name="dr-correction" options={ADMIN_OPTS["dr-correction"]} />
+        <Stack.Screen name="legal-docs" options={ADMIN_OPTS["legal-docs"]} />
+        <Stack.Screen name="road-hazards" options={ADMIN_OPTS["road-hazards"]} />
+        <Stack.Screen name="telemetry" options={ADMIN_OPTS["telemetry"]} />
       </Stack>
     </View>
   );

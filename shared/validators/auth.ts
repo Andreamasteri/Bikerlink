@@ -12,12 +12,13 @@ export const RESERVED_EXACT_NICKNAMES = [
   "moderatore",
 ];
 
-// Task #119 — nomi degli agenti AI interni (Ares, Nadir, Bowie, Quebracho,
-// Horus). A differenza della lista sopra, questi vanno bloccati anche come
+// Task #119 — nomi degli agenti AI interni (Ares, Nadir, Bowie, Horus; più
+// l'alias storico Quebracho). A differenza della lista sopra, questi vanno bloccati anche come
 // SOTTOSTRINGA case-insensitive (es. "AresAdmin", "il_bowie99", "nadir@...")
 // per impedire tentativi di impersonificazione/ingegneria sociale in chat,
 // log e pannelli admin dove questi nomi sono riconoscibili.
-// "quebracho" kept in reservation list to prevent username conflicts (Task #591).
+// "quebracho" resta nella lista per evitare conflitti/impersonificazioni dello
+// storico alias, anche se funzionalmente è unificato in Horus (Task #591).
 export const RESERVED_AI_AGENT_NAMES = ["ares", "nadir", "bowie", "quebracho", "horus"];
 
 /** True se il nickname è riservato (match esatto admin/mod, o contiene un nome di agente AI). */

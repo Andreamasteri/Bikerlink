@@ -37,6 +37,8 @@ const ISSUER_COLOR: Record<JobDirective["issuedBy"], string> = {
 interface JobEntry {
   name: string;
   state: JobState;
+  /** Il backend lo calcola usando la soglia zombie (30 min / 2 h). */
+  isZombie?: boolean;
   lastRunAt: number | null;
   lastSuccessAt: number | null;
   lastErrorAt: number | null;
@@ -93,13 +95,43 @@ export default function CoordinatorJobsScreen() {
     },
   });
 
+  // Workaround Task #393: il backend dispone già del reset di un job rimasto
+  // in running dopo un crash/timeout, ma prima non era raggiungibile dalla UI.
+  const resetMutation = useMutation({
+    mutationFn: async (name: string) =>
+      (await apiRequest("POST", `/api/admin/coordinator/jobs/${encodeURIComponent(name)}/reset`)).json(),
+    onSettled: () => {
+      setBusyJob(null);
+      qc.invalidateQueries({ queryKey: ["/api/admin/coordinator/jobs"] });
+    },
+  });
+
   const applyDirective = (name: string, kind: "pause" | "resume" | "force" | "throttle") => {
     setBusyJob(name);
     directiveMutation.mutate({ name, kind });
   };
 
+  const resetZombie = (name: string) => {
+    Alert.alert(
+      "Sbloccare il job?",
+      "Il job verrà riportato a idle e potrà essere rieseguito dal coordinatore. L’ultimo tentativo resterà registrato come errore.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Sblocca",
+          style: "destructive",
+          onPress: () => {
+            setBusyJob(name);
+            resetMutation.mutate(name);
+          },
+        },
+      ],
+    );
+  };
+
   const data = jobsQuery.data;
   const jobs = data?.jobs ?? [];
+  const zombieThresholdMs = 30 * 60_000;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
@@ -178,6 +210,21 @@ export default function CoordinatorJobsScreen() {
               <Text style={styles.metaText}>OK: {job.successCount}</Text>
               <Text style={[styles.metaText, job.failureCount > 0 ? { color: Colors.error } : null]}>Errori: {job.failureCount}</Text>
             </View>
+            {(job.isZombie || (
+              job.state === "running" &&
+              job.lastRunAt != null &&
+              Date.now() - job.lastRunAt >= zombieThresholdMs
+            )) ? (
+              <TouchableOpacity
+                disabled={busyJob === job.name}
+                style={[styles.resetButton, busyJob === job.name && styles.buttonDisabled]}
+                onPress={() => resetZombie(job.name)}
+                testID={`coordinator-job-${job.name}-reset-zombie`}
+              >
+                <MaterialCommunityIcons name="restart-alert" size={16} color="#fff" />
+                <Text style={styles.resetButtonText}>{busyJob === job.name ? "Sblocco…" : "Reset zombie / Sblocca"}</Text>
+              </TouchableOpacity>
+            ) : null}
             <View style={styles.actionsRow}>
               <TouchableOpacity
                 disabled={busyJob === job.name}
@@ -276,4 +323,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   actionButtonText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.text },
+  resetButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: Colors.error,
+  },
+  resetButtonText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#fff" },
+  buttonDisabled: { opacity: 0.55 },
 });

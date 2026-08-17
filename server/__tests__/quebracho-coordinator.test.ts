@@ -25,6 +25,8 @@ vi.mock("../lib/bg-db-limiter", () => ({
   isBgDbLimiterDropError: () => false,
 }));
 
+vi.mock("@shared/db", () => ({ aiCoordinatorJobs: {} }));
+
 const isThinkCentreOfflineMock = vi.hoisted(() => vi.fn(async () => false));
 vi.mock("../lib/thinkcentre-offline", () => ({ isThinkCentreOffline: isThinkCentreOfflineMock }));
 
@@ -50,6 +52,7 @@ import {
   markRunSuccess,
   markRunFailure,
   setNextRun,
+  resetJobToIdle,
   __resetRegistryForTests,
 } from "../ai/coordinator/job-registry";
 import {
@@ -105,6 +108,18 @@ describe("job-registry", () => {
     const t = Date.now() + 5_000;
     setNextRun("job-c", t);
     expect(getJob("job-c")?.nextRunAt).toBe(t);
+  });
+
+  it("resetJobToIdle rimuove una schedulazione residua di un job zombie", () => {
+    registerJob("job-zombie", { intervalMs: 60_000 });
+    markRunStart("job-zombie");
+    setNextRun("job-zombie", Date.now() + 60 * 60_000);
+
+    resetJobToIdle("job-zombie", "reset manuale admin");
+
+    expect(getJob("job-zombie")?.state).toBe("idle");
+    expect(getJob("job-zombie")?.nextRunAt).toBeNull();
+    expect(getJob("job-zombie")?.lastError).toBe("reset manuale admin");
   });
 });
 

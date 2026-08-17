@@ -1,4 +1,4 @@
-// Task #9 (Quebracho b) — Helper di cablaggio "gate/registration only".
+// Task #9 — Helper di cablaggio del coordinatore Horus ("gate/registration only").
 //
 // Non prende il controllo della schedulazione dei ~26 loop esistenti (i loro
 // setInterval/cron/setTimeout restano l'unica fonte di verità del "quando"):

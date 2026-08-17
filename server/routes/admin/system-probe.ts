@@ -10,7 +10,7 @@
  *  - Warm cache: cached snapshot is returned immediately (fast-path) and a
  *    background probe is fired to refresh it for the next caller.
  *
- * ThinkCentre services (graphhopper, valhalla, photon, ollama, whisper,
+ * ThinkCentre services (graphhopper, valhalla, photon, ollama,
  * ufw, dragonfly, nginx, uptimeKuma, thinkcentre overall) →
  *   parallel HTTP probes via probeThinkCentreStatusSnapshot().
  *
@@ -35,9 +35,19 @@ async function runProbe(): Promise<void> {
   if (_probeInFlight) return;
   _probeInFlight = true;
   try {
-    const [tcSnap] = await Promise.all([
-      probeThinkCentreStatusSnapshot(),
-    ]);
+    // Il probe TC è il ramo più esposto a timeout/reti esterne. Se una probe
+    // non gestisce un'eccezione inattesa, non deve impedire l'aggiornamento
+    // indipendente di routing e matching né lasciare il pannello congelato su
+    // tutti i pallini grigi.
+    let tcSnap: Partial<Awaited<ReturnType<typeof probeThinkCentreStatusSnapshot>>> = {};
+    try {
+      tcSnap = await probeThinkCentreStatusSnapshot();
+    } catch (err) {
+      console.warn(
+        "[system-probe] ThinkCentre snapshot fallito (stato precedente mantenuto):",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
 
     const counters = getRoutingCounters();
     const routingTotal = counters.successes + counters.fallbacks + counters.failures;

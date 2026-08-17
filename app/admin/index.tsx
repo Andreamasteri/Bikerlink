@@ -7,7 +7,7 @@ import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-ic
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { getQueryFnWithTimeout } from "@/lib/query-client";
 import { styles } from "@/components/admin/AdminDashboardStyles";
 import { TelemetryCard, GraphHopperCard, ValhallaCard, PhotonCard } from "@/components/admin/AdminStatsCards";
 import { ServerEfficiencyCard } from "@/components/admin/ServerEfficiencyCard";
@@ -108,15 +108,6 @@ const UNKNOWN_STATUSES: SystemStatuses = {
   matching: "unknown",
 };
 
-async function fetchSystemProbe(): Promise<SystemStatuses> {
-  const res = await fetch(new URL("/api/admin/system-probe", getApiUrl()).toString(), {
-    headers: { ...(await authFetchHeaders()) },
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json() as Promise<SystemStatuses>;
-}
-
 const FAST_POLL_DURATION_MS = 30_000;
 const FAST_POLL_INTERVAL_MS = 3_000;
 const NORMAL_POLL_INTERVAL_MS = 30_000;
@@ -144,7 +135,7 @@ export default function AdminDashboard() {
 
   const { data: probeData } = useQuery<SystemStatuses>({
     queryKey: ["/api/admin/system-probe"],
-    queryFn: fetchSystemProbe,
+    queryFn: getQueryFnWithTimeout<SystemStatuses>(10_000),
     refetchInterval: pollInterval,
     staleTime: 25_000,
     refetchOnMount: "always",
@@ -489,4 +480,3 @@ export default function AdminDashboard() {
     </ScrollView>
   );
 }
-

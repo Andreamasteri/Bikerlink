@@ -301,6 +301,11 @@ export function resetJobToIdle(name: string, reason: string): void {
   const e = ensureJob(name);
   const now = Date.now();
   e.state = e.directive ? deriveDirectiveState(e) : "idle";
+  // Un reset zombie deve rendere il job nuovamente eleggibile. Senza azzerare
+  // nextRunAt, un vecchio scheduling rimasto dopo il crash può lasciarlo in
+  // attesa anche se lo stato live è già tornato a idle.
+  e.nextRunAt = null;
+  e.pendingForce = false;
   e.lastErrorAt = now;
   e.lastError = reason;
   e.failureCount += 1;

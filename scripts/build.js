@@ -1,4 +1,5 @@
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 const { Readable } = require("stream");
@@ -30,6 +31,7 @@ function setupSignalHandlers() {
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const STATIC_BUILD_ROOT = path.resolve(PROJECT_ROOT, "static-build");
+const DEFAULT_DEPLOYMENT_DOMAIN = "biker-link.replit.app";
 
 function safePath(baseDir, ...segments) {
   const resolved = path.resolve(baseDir, ...segments);
@@ -62,10 +64,10 @@ function getDeploymentDomain() {
     return stripProtocol(process.env.REPLIT_DEV_DOMAIN);
   }
 
-  console.error(
-    "ERROR: No deployment domain found. Set EXPO_PUBLIC_DOMAIN",
+  console.warn(
+    `EXPO_PUBLIC_DOMAIN non impostato; uso il dominio BikerLink configurato: ${DEFAULT_DEPLOYMENT_DOMAIN}`,
   );
-  process.exit(1);
+  return DEFAULT_DEPLOYMENT_DOMAIN;
 }
 
 function prepareDirectories(timestamp) {
@@ -121,15 +123,27 @@ async function startMetro(expoPublicDomain) {
     return;
   }
 
-  console.log("Starting Metro...");
+  console.log("Starting Metro with local Expo CLI...");
   console.log(`Setting EXPO_PUBLIC_DOMAIN=${expoPublicDomain}`);
+  const expoCommand = path.join(
+    PROJECT_ROOT,
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "expo.cmd" : "expo",
+  );
   const env = {
     ...process.env,
     EXPO_PUBLIC_DOMAIN: expoPublicDomain,
+    CI: "1",
+    EXPO_OFFLINE: "1",
+    EXPO_NO_TELEMETRY: "1",
     EXPO_NO_INSPECTOR_PROXY: "1",
+    EXPO_UNSTABLE_HEADLESS: "1",
+    EXPO_NO_DEPENDENCY_VALIDATION: "1",
+    __UNSAFE_EXPO_HOME_DIRECTORY: path.join(os.tmpdir(), "bikerlink-expo-home"),
     REACT_NATIVE_DEVTOOLS_DISABLE: "1",
   };
-  metroProcess = spawn("npm", ["run", "expo:start:static:build"], {
+  metroProcess = spawn(expoCommand, ["start", "--no-dev", "--minify", "--localhost"], {
     stdio: ["ignore", "pipe", "pipe"],
     detached: false,
     env,

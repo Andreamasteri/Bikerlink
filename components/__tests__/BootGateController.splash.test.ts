@@ -55,14 +55,19 @@ describe("BootGateController — splash", () => {
     mocks.hideAsync.mockClear();
   });
 
-  it("nasconde lo splash nativo al mount", () => {
-    renderer.act(() => {
+  it("nasconde lo splash nativo al mount", async () => {
+    await renderer.act(async () => {
       renderer.create(
         React.createElement(BootGateController, {
           reportClientError: () => undefined,
           renderApp: () => null,
         }),
       );
+      // BootGate auto-passes the initial render step asynchronously. Flush
+      // that ping/state transition inside act so React 19 does not report it
+      // as an update that escaped the test boundary.
+      await Promise.resolve();
+      await Promise.resolve();
     });
     expect(mocks.hideAsync).toHaveBeenCalledTimes(1);
   });

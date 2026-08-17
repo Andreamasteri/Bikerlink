@@ -3,7 +3,7 @@ import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { apiRequest, getQueryFnWithTimeout } from "@/lib/query-client";
 import type { DotStatus } from "./SystemHealthContainer";
 import { styles } from "./RoutingCoordinationCard.styles";
 
@@ -85,15 +85,6 @@ interface CoherenceResponse {
   };
 }
 
-async function authGet<T>(path: string): Promise<T> {
-  const res = await fetch(new URL(path, getApiUrl()).toString(), {
-    headers: { ...(await authFetchHeaders()) },
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json() as Promise<T>;
-}
-
 import { Section, CollapseChevron } from "./RoutingCoordinationCard.parts";
 
 const OUTCOME_COLOR: Record<PipelineOutcome, string> = {
@@ -151,7 +142,7 @@ export function RoutingCoordinationCard({
 
   const { data: status } = useQuery<RoutingStatusResponse>({
     queryKey: ["/api/admin/routing/status"],
-    queryFn: () => authGet<RoutingStatusResponse>("/api/admin/routing/status"),
+    queryFn: getQueryFnWithTimeout<RoutingStatusResponse>(10_000),
     refetchInterval: 30_000,
     staleTime: 20_000,
     refetchOnMount: "always",
@@ -162,7 +153,7 @@ export function RoutingCoordinationCard({
 
   const { data: pipeline, isLoading: pipeLoading } = useQuery<PipelineLogResponse>({
     queryKey: ["/api/admin/routing/pipeline-log"],
-    queryFn: () => authGet<PipelineLogResponse>("/api/admin/routing/pipeline-log"),
+    queryFn: getQueryFnWithTimeout<PipelineLogResponse>(10_000),
     refetchInterval: 15_000,
     staleTime: 10_000,
     refetchOnMount: "always",
@@ -170,8 +161,8 @@ export function RoutingCoordinationCard({
   });
 
   const { data: aiData } = useQuery<{ decisions: AiDecision[] }>({
-    queryKey: ["/api/admin/maps/ai-decisions", 10],
-    queryFn: () => authGet<{ decisions: AiDecision[] }>("/api/admin/maps/ai-decisions?limit=10"),
+    queryKey: ["/api/admin/maps/ai-decisions?limit=10"],
+    queryFn: getQueryFnWithTimeout<{ decisions: AiDecision[] }>(10_000),
     refetchInterval: 30_000,
     staleTime: 20_000,
     refetchOnMount: "always",
@@ -180,15 +171,8 @@ export function RoutingCoordinationCard({
 
   const coherence = useMutation<CoherenceResponse, Error>({
     mutationFn: async () => {
-      const res = await fetch(new URL("/api/admin/routing/coherence-test", getApiUrl()).toString(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
-        credentials: "include",
-        body: "{}",
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`);
-      return json as CoherenceResponse;
+      const res = await apiRequest("POST", "/api/admin/routing/coherence-test", {}, { timeoutMs: 30_000 });
+      return (await res.json()) as CoherenceResponse;
     },
   });
 
@@ -443,4 +427,3 @@ function CoherenceLegView({ name, leg }: { name: string; leg: CoherenceLeg }) {
     </View>
   );
 }
-

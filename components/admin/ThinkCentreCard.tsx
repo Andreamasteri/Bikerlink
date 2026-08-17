@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, ActivityIndicator, TouchableOpacity, Switch, Alert } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { apiRequest, getQueryFnWithTimeout } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { styles } from "./ThinkCentreCardStyles";
 import { GraphHopperBlock } from "./ThinkCentreCardParts";
@@ -210,19 +210,7 @@ export function ThinkCentreCard({
 
   const apkSaveMutation = useMutation({
     mutationFn: async (url: string) => {
-      const res = await fetch(
-        new URL("/api/admin/settings/tc-terminal-apk-url", getApiUrl()).toString(),
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
-          credentials: "include",
-          body: JSON.stringify({ url }),
-        }
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as { message?: string }).message || "Errore salvataggio");
-      }
+      const res = await apiRequest("PUT", "/api/admin/settings/tc-terminal-apk-url", { url }, { timeoutMs: 10_000 });
       return res.json();
     },
     onSuccess: () => {
@@ -251,24 +239,7 @@ export function ThinkCentreCard({
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<ThinkCentreHealth>({
     queryKey: ["/api/admin/thinkcentre-health"],
-    queryFn: async ({ signal }) => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 20_000);
-      const combined = signal
-        ? AbortSignal.any ? AbortSignal.any([signal, controller.signal]) : controller.signal
-        : controller.signal;
-      try {
-        const res = await fetch(new URL("/api/admin/thinkcentre-health", getApiUrl()).toString(), {
-          headers: { ...(await authFetchHeaders()) },
-          credentials: "include",
-          signal: combined,
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<ThinkCentreHealth>;
-      } finally {
-        clearTimeout(timer);
-      }
-    },
+    queryFn: getQueryFnWithTimeout<ThinkCentreHealth>(20_000),
     refetchInterval: 30_000,
     staleTime: 20_000,
     refetchOnMount: "always",
@@ -277,14 +248,7 @@ export function ThinkCentreCard({
 
   const { data: eventsData } = useQuery<HealthEventsResponse>({
     queryKey: ["/api/admin/thinkcentre-events"],
-    queryFn: async () => {
-      const res = await fetch(new URL("/api/admin/thinkcentre-events", getApiUrl()).toString(), {
-        headers: { ...(await authFetchHeaders()) },
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
+    queryFn: getQueryFnWithTimeout<HealthEventsResponse>(10_000),
     refetchInterval: 60_000,
     staleTime: 30_000,
     refetchOnMount: "always",
@@ -300,12 +264,7 @@ export function ThinkCentreCard({
 
   const repoDriftFixMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(new URL("/api/admin/thinkcentre/repo-drift-fix", getApiUrl()).toString(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await apiRequest("POST", "/api/admin/thinkcentre/repo-drift-fix", {}, { timeoutMs: 35_000 });
       return res.json();
     },
     onSuccess: () => { void refetch(); },
@@ -597,4 +556,3 @@ export function ThinkCentreCard({
     </View>
   );
 }
-

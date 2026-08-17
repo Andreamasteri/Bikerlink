@@ -7,10 +7,10 @@
  *
  * Functional roles:
  * - Bowie: chat and invocation only.
- * - Horus: routing only.
+ * - Horus: routing, coordination and deep review.
  * - Ares: matching, diagnostics/review and orchestration.
  * - Nadir: audio only.
- * - Quebracho (qq alias): code and deep review.
+ * - Quebracho: historical alias, unified into Horus (Task #591).
  * - Indexing/embeddings: separate technical service, not an AI persona.
  *
  * Model/GPU placement is not inferred from this legacy table. AI-Hub runtime

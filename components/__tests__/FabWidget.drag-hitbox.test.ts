@@ -250,8 +250,11 @@ const EDGE_MARGIN = 8;
 function posX() { return avStore.slots[0]; }
 function posY() { return avStore.slots[1]; }
 
-// Helper: monta FabWidget con stato pulito.
-function mountFab() {
+// Helper: monta FabWidget con stato pulito e scarica l'effect di bootstrap.
+// AsyncStorage.getItem() è asincrono anche nel mock: senza questo act async,
+// setLoaded(true) arrivava dopo il mount e React 19 segnalava un aggiornamento
+// fuori da act().
+async function mountFab() {
   avStore.clear();
   svStore.clear();
   gestureCapture.reset();
@@ -260,7 +263,10 @@ function mountFab() {
   mockEnv.screen = { width: SCREEN_W, height: SCREEN_H };
   mockEnv.insets = { top: TOP_INSET, bottom: BOT_INSET, left: 0, right: 0 };
   let comp!: ReturnType<typeof renderer.create>;
-  renderer.act(() => { comp = renderer.create(React.createElement(FabWidget)); });
+  await renderer.act(async () => {
+    comp = renderer.create(React.createElement(FabWidget));
+    await Promise.resolve();
+  });
   return comp;
 }
 
@@ -271,9 +277,9 @@ function mountFab() {
 describe("FabWidget — OOM fix: posizione via RN Animated.Value (Android hitbox)", () => {
   let comp: ReturnType<typeof renderer.create>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
-    comp = mountFab();
+    comp = await mountFab();
   });
   afterEach(() => {
     renderer.act(() => { comp.unmount(); });
