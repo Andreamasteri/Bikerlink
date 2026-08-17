@@ -36,7 +36,8 @@ const ALLOWED_TARGETS: Readonly<Partial<Record<WiringCapability, WiringAgent>>> 
 
 function isAllowedTarget(agent: WiringAgent, capability: WiringCapability): boolean {
   const target = ALLOWED_TARGETS[capability];
-  return Boolean(target) && canonicalAgent(agent) === canonicalAgent(target);
+  if (!target) return false;
+  return canonicalAgent(agent) === canonicalAgent(target);
 }
 
 export async function submitAiHubJob(
