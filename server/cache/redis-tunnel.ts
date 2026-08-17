@@ -204,7 +204,8 @@ async function resolveCloudflaredBin(): Promise<string | null> {
 
   // 4. Download on-demand da GitHub releases.
   const arch = process.arch === "arm64" ? "arm64" : "amd64";
-  const tmpPath = `/tmp/cloudflared-${arch}`;
+  const cloudflaredVersion = process.env.CLOUDFLARED_VERSION?.trim() || "2026.5.1";
+  const tmpPath = `/tmp/cloudflared-${cloudflaredVersion}-${arch}`;
 
   // Se già scaricato in una sessione precedente del container, riusa.
   if (existsSync(tmpPath)) {
@@ -213,7 +214,9 @@ async function resolveCloudflaredBin(): Promise<string | null> {
     return tmpPath;
   }
 
-  const url = `https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}`;
+  // Pin a known-good client: cloudflared 2026.6.0 has a regression in
+  // Access TCP service-token authentication (bad WebSocket handshake).
+  const url = `https://github.com/cloudflare/cloudflared/releases/download/${cloudflaredVersion}/cloudflared-linux-${arch}`;
   console.log(`[redis-tunnel] cloudflared non trovato — download da ${url} ...`);
 
   try {
