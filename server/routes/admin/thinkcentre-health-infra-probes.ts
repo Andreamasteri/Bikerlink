@@ -16,6 +16,7 @@
 import Redis from "ioredis";
 import { tcpConnectDetailed } from "../../jobs/thinkcentre-monitor-probes";
 import { hubGet, isHubConfigured, getHubBaseUrl, HUB_HEALTH_TIMEOUT_MS, HUB_VRAM_TIMEOUT_MS } from "../../lib/ai-hub-client";
+import { cfAccessHeaders } from "../../lib/cf-access";
 import {
   sanitizeError,
   maskUrl,
@@ -53,6 +54,13 @@ function classifyAgentAuthError(rawError: string | undefined, agentToken: string
       : `Token ThinkCentre mancante (THINKCENTRE_AGENT_TOKEN) — ${error}`;
   }
   return error;
+}
+
+function thinkcentreAgentHeaders(): { headers: Record<string, string>; token: string } {
+  const token = process.env.THINKCENTRE_AGENT_TOKEN?.trim() ?? "";
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
+  if (token) headers["X-Agent-Token"] = token;
+  return { headers, token };
 }
 
 // ── TCP probe helper ──────────────────────────────────────────────────────────
@@ -266,9 +274,10 @@ export async function probeNginxInfra(): Promise<InfraServiceHealth> {
   if (!base) {
     return { configured: false, ok: false, latencyMs: null, url: null, history: getHistory("nginx"), probeLog: getProbeLog("nginx") };
   }
-  const r = await httpProbe(`${base}/`, {}, (s) => s < 500);
+  const { headers, token } = thinkcentreAgentHeaders();
+  const r = await httpProbe(`${base}/`, headers);
   if (!r.ok) {
-    const error = r.error ?? "HTTP error";
+    const error = classifyAgentAuthError(r.error, token);
     console.error("[thinkcentre-probe] nginx KO", { error });
     recordError("nginx", error);
     recordProbeLog("nginx", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });
@@ -284,9 +293,10 @@ export async function probeUptimeKuma(): Promise<InfraServiceHealth> {
   if (!base) {
     return { configured: false, ok: false, latencyMs: null, url: null, history: getHistory("uptimekuma"), probeLog: getProbeLog("uptimekuma") };
   }
-  const r = await httpProbe(`${base}/`, {}, (s) => s < 500);
+  const { headers, token } = thinkcentreAgentHeaders();
+  const r = await httpProbe(`${base}/`, headers);
   if (!r.ok) {
-    const error = r.error ?? "HTTP error";
+    const error = classifyAgentAuthError(r.error, token);
     console.error("[thinkcentre-probe] uptimekuma KO", { error });
     recordError("uptimekuma", error);
     recordProbeLog("uptimekuma", { timestamp: Date.now(), ok: false, latencyMs: r.latencyMs, detail: error });

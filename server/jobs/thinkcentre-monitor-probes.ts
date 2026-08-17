@@ -177,7 +177,7 @@ async function probeGraphHopperAreaOk(
   headers: Record<string, string>,
 ): Promise<boolean> {
   const areaBase = `${base}${area.path}`;
-  if (await httpProbe(`${areaBase}/health`, headers, (s) => (s >= 200 && s < 300) || s === 401 || s === 403)) {
+  if (await httpProbe(`${areaBase}/health`, headers, (s) => s >= 200 && s < 300)) {
     return true;
   }
   const controller = new AbortController();
@@ -347,13 +347,19 @@ async function probeDragonflyOk(): Promise<boolean | null> {
 async function probeNginxOk(): Promise<boolean | null> {
   const base = process.env.NGINX_MONITOR_URL?.replace(/\/$/, "");
   if (!base) return null;
-  return httpProbe(`${base}/`, {}, (s) => s < 500);
+  const agentToken = process.env.THINKCENTRE_AGENT_TOKEN?.trim() ?? "";
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
+  if (agentToken) headers["X-Agent-Token"] = agentToken;
+  return httpProbe(`${base}/`, headers);
 }
 
 async function probeUptimeKumaOk(): Promise<boolean | null> {
   const base = process.env.UPTIME_KUMA_URL?.replace(/\/$/, "");
   if (!base) return null;
-  return httpProbe(`${base}/`, {}, (s) => s < 500);
+  const agentToken = process.env.THINKCENTRE_AGENT_TOKEN?.trim() ?? "";
+  const headers: Record<string, string> = { ...cfAccessHeaders() };
+  if (agentToken) headers["X-Agent-Token"] = agentToken;
+  return httpProbe(`${base}/`, headers);
 }
 
 export async function runAllProbes(): Promise<AggregateProbeResult> {

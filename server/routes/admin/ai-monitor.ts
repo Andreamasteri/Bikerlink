@@ -14,6 +14,7 @@ import { cfAccessHeaders } from "../../lib/cf-access";
 import { httpProbe } from "./thinkcentre-health-utils";
 import { probeOllama } from "./thinkcentre-health-gh-probes";
 import { probeAres } from "./thinkcentre-health-ares-probe";
+import { hubGet, isHubConfigured, HUB_HEALTH_TIMEOUT_MS } from "../../lib/ai-hub-client";
 // Quebracho removed (Task #591 — unified into Horus); coordinator jobs now tracked via Horus.
 import { getCoordinatorJobsSnapshot } from "../../ai/coordinator/job-gate";
 
@@ -25,7 +26,7 @@ function getHorusActiveJobCount(): number {
 
 const router = Router();
 
-export type AgentPersona = "bowie" | "horus" | "ares";
+export type AgentPersona = "bowie" | "horus" | "ares" | "aihub";
 
 export interface AgentMonitorSnapshot {
   persona: AgentPersona;
@@ -65,6 +66,24 @@ async function probeAresAgent(): Promise<AgentMonitorSnapshot> {
   return { persona: "ares", configured: h.configured, online: h.online, latencyMs: h.latencyMs, activeJobs: null, error: h.error };
 }
 
+async function probeAiHubAgent(): Promise<AgentMonitorSnapshot> {
+  if (!isHubConfigured()) {
+    return { persona: "aihub", configured: false, online: false, latencyMs: null, activeJobs: null, error: "AI Hub non configurato" };
+  }
+  const t0 = Date.now();
+  const health = await hubGet<{ ok?: boolean }>("/health", undefined, HUB_HEALTH_TIMEOUT_MS);
+  const latencyMs = Date.now() - t0;
+  const online = health.ok && health.data?.ok !== false;
+  return {
+    persona: "aihub",
+    configured: true,
+    online,
+    latencyMs: online ? latencyMs : health.status ? latencyMs : null,
+    activeJobs: null,
+    error: online ? undefined : health.error ?? (health.status ? `HTTP ${health.status}` : "AI Hub non raggiungibile"),
+  };
+}
+
 // probeQuebrachoAgent removed — Quebracho unified into Horus (Task #591).
 
 // ── Storico transizioni (persistito, best-effort) ───────────────────────────
@@ -94,12 +113,13 @@ async function recordTransitionIfChanged(persona: AgentPersona, online: boolean)
 
 router.get("/ai-monitor", async (_req: Request, res: Response) => {
   try {
-    const [bowie, horus, ares] = await Promise.all([
+    const [bowie, horus, ares, aihub] = await Promise.all([
       probeBowieAgent(),
       probeHorusAgent(),
       probeAresAgent(),
+      probeAiHubAgent(),
     ]);
-    const agents = [bowie, horus, ares];
+    const agents = [bowie, horus, ares, aihub];
     await Promise.all(agents.map((a) => recordTransitionIfChanged(a.persona, a.online)));
     res.json({ agents, checkedAt: new Date().toISOString() });
   } catch (err) {
