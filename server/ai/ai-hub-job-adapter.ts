@@ -24,7 +24,7 @@ export interface AiHubSubmitResult {
 const CONTROL_URL_ENV = "AI_HUB_CONTROL_URL";
 const BEARER_TOKEN_ENV = "AI_HUB_BEARER_TOKEN";
 
-const ALLOWED_TARGETS: Readonly<Record<WiringCapability, WiringAgent>> = {
+const ALLOWED_TARGETS: Readonly<Partial<Record<WiringCapability, WiringAgent>>> = {
   chat: "bowie",
   route: "horus",
   matching: "ares",
@@ -35,7 +35,8 @@ const ALLOWED_TARGETS: Readonly<Record<WiringCapability, WiringAgent>> = {
 };
 
 function isAllowedTarget(agent: WiringAgent, capability: WiringCapability): boolean {
-  return canonicalAgent(agent) === canonicalAgent(ALLOWED_TARGETS[capability]);
+  const target = ALLOWED_TARGETS[capability];
+  return Boolean(target) && canonicalAgent(agent) === canonicalAgent(target);
 }
 
 export async function submitAiHubJob(
