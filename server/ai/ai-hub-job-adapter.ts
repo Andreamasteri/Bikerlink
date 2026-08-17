@@ -31,7 +31,6 @@ const ALLOWED_TARGETS: Readonly<Record<WiringCapability, WiringAgent>> = {
   diagnostics_review: "ares",
   orchestration: "ares",
   "audio.create_soundtrack": "nadir",
-  "indexing.embeddings": "quebracho",
   code_review: "quebracho",
 };
 
@@ -50,6 +49,9 @@ export async function submitAiHubJob(
   }
 
   const agent = canonicalAgent(request.requested_agent);
+  if (request.capability === "indexing.embeddings") {
+    return { ok: false, status: "error", error: "indexing_service_is_separate" };
+  }
   if (!isAllowedTarget(agent, request.capability)) {
     return { ok: false, status: "error", error: "capability_agent_mismatch" };
   }
