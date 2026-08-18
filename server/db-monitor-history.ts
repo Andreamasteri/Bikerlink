@@ -124,14 +124,13 @@ export async function recordDbMonitorSample(snap: SnapshotLike): Promise<void> {
         !(p.id != null && OVERLOAD_DISPLAY_EXCLUDED_IDS.has(p.id)),
     ).length;
 
-    // Fase 5 — dbOverload include errori DB reali (non derivati) per non perdere
-    // segnali di incidente genuini (circuito aperto, errori di connessione ecc.).
-    // I Problem IDs derivati (overload_sustained, pool.waiting) sono già esclusi
-    // da dbErrorCount via OVERLOAD_DISPLAY_EXCLUDED_IDS → nessun feedback loop.
+    // Fase 5 — dbOverload usa SOLO metriche dirette di pressione (pool/ping).
+    // Gli errori DB restano nel campo diagnostico dbErrorCount e nei segnali
+    // watchdog, ma non possono alimentare il latch di overload: un problema di
+    // integrità o un singolo blip non è prova di saturazione del pool.
     const dbOverload =
       poolActivePct >= thresholds.poolActivePct ||
-      (pingMs != null && pingMs >= thresholds.pingMs) ||
-      dbErrorCount > 0;
+      (pingMs != null && pingMs >= thresholds.pingMs);
 
     const backend = getBackendLoad();
 
