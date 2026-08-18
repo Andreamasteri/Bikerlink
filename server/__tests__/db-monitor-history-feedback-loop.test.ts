@@ -111,6 +111,16 @@ function healthySnapWithIntegrityProblem() {
   };
 }
 
+/** Any DB problem must stay diagnostic-only when pool and ping are healthy. */
+function healthySnapWithUnrelatedDbProblem() {
+  return {
+    problems: [
+      { id: "db.db.some_real_db_error", source: "db", severity: "high" },
+    ] as Array<{ id?: string; source: string; severity: string }>,
+    metrics: { "db.db.ping_ms": 10 },
+  };
+}
+
 /** Snap that triggers genuine pool overload (poolActivePct driven via mock). */
 function overloadSnap() {
   return {
@@ -171,6 +181,16 @@ describe("recordDbMonitorSample — anti-feedback-loop regression (Task #550)", 
 
     for (let i = 0; i < 5; i++) {
       await recordDbMonitorSample(healthySnapWithIntegrityProblem());
+    }
+
+    const state = sustainedTracker.getState().db;
+    expect(state.sustained).toBe(false);
+    expect(state.consecutiveTicks).toBe(0);
+  });
+
+  it("tracker never enters sustained state for any DB problem when pool/ping are healthy", async () => {
+    for (let i = 0; i < 5; i++) {
+      await recordDbMonitorSample(healthySnapWithUnrelatedDbProblem());
     }
 
     const state = sustainedTracker.getState().db;
