@@ -8,7 +8,7 @@
  *   BOWIE_OLLAMA_URL    — URL base del server Ollama (es: https://ollama.biker-link.net)
  *                   Se non impostata, le funzioni lanciano un errore catchable e il
  *                   chiamante ricade sul provider cloud (Gemini/OpenAI).
- *   BOWIE_OLLAMA_TOKEN  — Token per il server self-hosted (header Authorization: Bearer).
+ *   BOWIE_OLLAMA_TOKEN  — Token per il server self-hosted (header X-Ollama-Token).
  *   BOWIE_OLLAMA_MODEL  — Modello locale da usare.
  *                   Default: "qwen3:1.7b" (il modello custom "bikerlink",
  *                   basato su qwen3:1.7b, è il valore consigliato via secret).
@@ -56,7 +56,7 @@ function endpointFor(persona: OllamaPersona): { url?: string; token: string } {
 
 /**
  * Header per le richieste verso il server Ollama self-hosted.
- * Combina il token custom (Authorization: Bearer) con il Service Token
+ * Combina il token custom (X-Ollama-Token) con il Service Token
  * Cloudflare Access (vedi cf-access.ts), così l'edge CF valida la richiesta
  * prima dell'origine. L'URL self-hosted è SEMPRE self-hosted (nessun fallback cloud),
  * quindi gli header CF Access sono sempre appropriati qui.
@@ -67,7 +67,9 @@ function endpointFor(persona: OllamaPersona): { url?: string; token: string } {
  */
 function ollamaHeaders(token: string, persona: OllamaPersona = "bowie"): Record<string, string> {
   const h: Record<string, string> = {};
-  if (token) h["Authorization"] = `Bearer ${token}`;
+  // Nginx sul ThinkCentre autentica Ollama con questo header custom.
+  // Authorization: Bearer è usato da altri servizi TC, ma non da Ollama.
+  if (token) h["X-Ollama-Token"] = token;
   // Task #4 — override CF Access per-agente (fallback alla coppia generica).
   Object.assign(h, cfAccessHeaders(persona));
   return h;
