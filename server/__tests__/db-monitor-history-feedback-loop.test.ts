@@ -101,6 +101,16 @@ function healthySnapWithDerivedProblem() {
   };
 }
 
+/** Snap with a DB-integrity health problem but no DB connectivity pressure. */
+function healthySnapWithIntegrityProblem() {
+  return {
+    problems: [
+      { id: "db.db_integrity.high_violations", source: "db", severity: "high" },
+    ] as Array<{ id?: string; source: string; severity: string }>,
+    metrics: { "db.db.ping_ms": 10 },
+  };
+}
+
 /** Snap that triggers genuine pool overload (poolActivePct driven via mock). */
 function overloadSnap() {
   return {
@@ -152,6 +162,18 @@ describe("recordDbMonitorSample — anti-feedback-loop regression (Task #550)", 
 
     const state = sustainedTracker.getState().db;
     // Should never have counted an overload tick.
+    expect(state.sustained).toBe(false);
+    expect(state.consecutiveTicks).toBe(0);
+  });
+
+  it("tracker never enters sustained state for db-integrity alerts alone", async () => {
+    mockPoolActivePct = 20;
+
+    for (let i = 0; i < 5; i++) {
+      await recordDbMonitorSample(healthySnapWithIntegrityProblem());
+    }
+
+    const state = sustainedTracker.getState().db;
     expect(state.sustained).toBe(false);
     expect(state.consecutiveTicks).toBe(0);
   });
