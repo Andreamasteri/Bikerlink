@@ -333,12 +333,12 @@ export const SITE_TRANSLATIONS_IT1: Record<string, string> = {
   // ── SHARED COMP ───────────────────────────────────────────────────────────
   'comp.eyebrow': 'Confronto funzionalità',
   'comp.title': 'Dove siamo unici.',
-  'comp.lead': 'Tre funzionalità che nessun altro ha. Non aggiunte, non partial — solo BikerLink.',
+  'comp.lead': 'Tracking intelligente, apprendimento personale e continuità di viaggio — la tecnologia che stiamo costruendo per BikerLink.',
   'comp.feat.col': 'Funzionalità',
-  'comp.highlight1.title': 'AI linguaggio naturale',
-  'comp.highlight2.title': 'BikerScore — Indice fun factor',
-  'comp.highlight3.title': 'Matching engine biker',
-  'comp.badge': 'Solo BikerLink',
+  'comp.highlight1.title': 'Dead reckoning adattivo',
+  'comp.highlight2.title': 'Correzione personalizzata Ares',
+  'comp.highlight3.title': 'Impara dal contesto reale',
+  'comp.badge': 'Tecnologia BikerLink',
 
   // ── MATCHING SUBNAV ──────────────────────────────────────────────────────
   'match.nav.overview': 'Overview',
