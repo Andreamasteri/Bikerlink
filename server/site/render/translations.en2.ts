@@ -16,12 +16,12 @@ export const SITE_TRANSLATIONS_EN2: Record<string, string> = {
   'community.life.card6.desc': 'Reports answered within 24 h. Personal block list and mute always available.',
 
   // ── COMP TABLE (missing keys) ─────────────────────────────────────────────
-  'comp.h1.title': 'Natural-language AI',
-  'comp.h1.desc': 'Plan a route by typing "twisty roads in Tuscany, 3 hours, avoid motorways" — the AI understands and builds the ride.',
-  'comp.h2.title': 'BikerScore — Fun-factor index',
-  'comp.h2.desc': 'Every route gets a numeric score based on curviness, elevation, surface and traffic. Pick the most fun ride, not just the fastest.',
-  'comp.h3.title': 'Biker matching engine',
-  'comp.h3.desc': 'Compatibility algorithm that matches bike, riding style and availability. Find the right riding partner, not just the nearest one.',
+  'comp.h1.title': 'Adaptive dead reckoning',
+  'comp.h1.desc': 'When GPS is intermittent, DeviceMotion keeps the ride continuous. After 2–3 coherent yellow/green fixes, the position snaps back to GPS.',
+  'comp.h2.title': 'Ares personal correction',
+  'comp.h2.desc': 'Ares compares GPS and dead reckoning and builds an individual user model plus a phone/sensor model from the first valid ride.',
+  'comp.h3.title': 'Learns from real-world context',
+  'comp.h3.desc': 'City, motorway, mountain: context is inferred from position and map data, then refined with speed, curves and elevation.',
   'comp.table.header': 'Feature',
 
   // ── CONTACT CHANNELS (missing keys) ──────────────────────────────────────
