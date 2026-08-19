@@ -71,6 +71,9 @@ dist-ota/
 # OTA publish token (generato da 'bash scripts/publish-ota.sh setup-token', mai committare)
 .local/ota-token
 
+# Runtime locale del worktree heartbeat e degli export di stato
+.local/
+
 # Compiled server
 server_dist/
 server_dist/index.js

@@ -1,3 +1,5 @@
+import { cfAccessHeaders } from "../server/lib/cf-access";
+
 /**
  * validate-credentials.ts
  *
@@ -44,6 +46,126 @@ async function fetchCheck(
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, status: 0, body: msg };
+  }
+}
+
+/**
+ * Cloudflare Access headers are only safe to attach to our own tunnel hosts.
+ * The validator must follow the same rule as the production callers and must
+ * never disclose the service token to a provider URL accidentally configured in
+ * a secret.
+ */
+function selfHostedHeaders(
+  url: string,
+  extra: Record<string, string> = {},
+): Record<string, string> {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    const isBikerLinkHost =
+      hostname === "biker-link.net" || hostname.endsWith(".biker-link.net");
+    return isBikerLinkHost ? { ...cfAccessHeaders(), ...extra } : extra;
+  } catch {
+    return extra;
+  }
+}
+
+function configuredAccessPair(): { id: string; secret: string } {
+  return {
+    id: process.env.CF_ACCESS_CLIENT_ID?.trim() ?? "",
+    secret: process.env.CF_ACCESS_CLIENT_SECRET?.trim() ?? "",
+  };
+}
+
+function configuredSelfHostedUrls(): string[] {
+  const names = [
+    "GRAPHHOPPER_URL",
+    "VALHALLA_URL",
+    "PHOTON_URL",
+    "NOMINATIM_URL",
+    "BOWIE_OLLAMA_URL",
+    "HORUS_OLLAMA_URL",
+    "ARES_OLLAMA_URL",
+    "DIAG_OLLAMA_URL",
+    "THINKCENTRE_METRICS_URL",
+  ];
+  return [...new Set(
+    names
+      .map((name) => process.env[name]?.trim())
+      .filter((value): value is string => Boolean(value))
+      .filter((value) => {
+        try {
+          const hostname = new URL(value).hostname.toLowerCase();
+          return hostname === "biker-link.net" || hostname.endsWith(".biker-link.net");
+        } catch {
+          return false;
+        }
+      }),
+  )];
+}
+
+async function checkCloudflare() {
+  const { id, secret } = configuredAccessPair();
+  const protectedUrls = configuredSelfHostedUrls();
+  const accessRequired = protectedUrls.length > 0 ? "mandatory" : "optional";
+
+  if (!id && !secret) {
+    record(
+      "Cloudflare Access",
+      "CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET",
+      accessRequired,
+      false,
+      accessRequired === "mandatory" ? false : null,
+      accessRequired === "mandatory"
+        ? "Mancano entrambi: gli endpoint Cloudflare configurati non passeranno Access."
+        : "Non configurati; nessun endpoint *.biker-link.net è attivo in questo ambiente.",
+    );
+  } else if (!id || !secret) {
+    record(
+      "Cloudflare Access",
+      "CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET",
+      accessRequired,
+      true,
+      false,
+      "Coppia incompleta: servono contemporaneamente client ID e client secret.",
+    );
+  } else {
+    const idShapeOk = id.endsWith(".access");
+    record(
+      "Cloudflare Access",
+      "CF_ACCESS_CLIENT_ID + CF_ACCESS_CLIENT_SECRET",
+      accessRequired,
+      true,
+      idShapeOk,
+      idShapeOk
+        ? `Coppia presente e client ID nel formato atteso; endpoint da verificare: ${protectedUrls.length}.`
+        : "Client ID con formato inatteso: atteso il suffisso .access.",
+    );
+  }
+
+  const apiToken = process.env.CF_API_TOKEN?.trim();
+  if (!apiToken) {
+    record(
+      "Cloudflare API",
+      "CF_API_TOKEN",
+      "optional",
+      false,
+      null,
+      "Non impostato; serve solo allo script amministrativo di provisioning del tunnel Redis.",
+    );
+  } else {
+    const r = await fetchCheck("https://api.cloudflare.com/client/v4/user/tokens/verify", {
+      headers: { Authorization: `Bearer ${apiToken}` },
+    });
+    record(
+      "Cloudflare API",
+      "CF_API_TOKEN",
+      "optional",
+      true,
+      r.ok,
+      r.ok
+        ? "Token verificato dall'endpoint ufficiale /user/tokens/verify."
+        : `Verifica fallita: HTTP ${r.status} — ${r.body.slice(0, 100)}`,
+    );
   }
 }
 
@@ -127,26 +249,57 @@ async function checkGemini() {
 }
 
 async function checkOllama() {
-  const url = process.env.BOWIE_OLLAMA_URL;
-  const token = process.env.BOWIE_OLLAMA_TOKEN;
+  const endpoints = [
+    ["BOWIE_OLLAMA_URL", "BOWIE_OLLAMA_TOKEN"],
+    ["HORUS_OLLAMA_URL", "HORUS_OLLAMA_TOKEN"],
+    ["ARES_OLLAMA_URL", "ARES_OLLAMA_TOKEN"],
+    ["DIAG_OLLAMA_URL", "DIAG_OLLAMA_TOKEN"],
+  ] as const;
+
   const model = process.env.BOWIE_OLLAMA_MODEL;
+  record(
+    "Ollama",
+    "BOWIE_OLLAMA_MODEL",
+    "optional",
+    !!model,
+    null,
+    model ? `Configurato: ${model}` : "Non configurato (default: qwen3:1.7b)",
+  );
 
-  record("Ollama", "BOWIE_OLLAMA_URL", "optional", !!url, null,
-    url ? `Configurata: ${url}` : "Non configurata (opzionale — usa cloud AI come fallback)");
+  const checked = new Set<string>();
+  for (const [urlName, tokenName] of endpoints) {
+    const url = process.env[urlName]?.trim();
+    const token = process.env[tokenName]?.trim();
+    if (!url || checked.has(url)) continue;
+    checked.add(url);
 
-  record("Ollama", "BOWIE_OLLAMA_TOKEN", "optional", !!token, null,
-    token ? `Presente (${token.length} char)` : "Non configurata");
+    record("Ollama", urlName, "optional", true, null, `Configurata: ${url}`);
+    record(
+      "Ollama",
+      tokenName,
+      "optional",
+      !!token,
+      null,
+      token ? `Presente (${token.length} char)` : "Non configurata",
+    );
 
-  record("Ollama", "BOWIE_OLLAMA_MODEL", "optional", !!model, null,
-    model ? `Configurato: ${model}` : "Non configurato (default: qwen3:1.7b)");
+    const r = await fetchCheck(`${url.replace(/\/$/, "")}/api/tags`, {
+      headers: selfHostedHeaders(url, token ? { "X-Ollama-Token": token } : {}),
+    });
+    record(
+      "Ollama health",
+      `${urlName} + ${tokenName}`,
+      "optional",
+      true,
+      r.ok,
+      r.ok ? "HTTP 200 — server raggiungibile" : `HTTP ${r.status} — ${r.body.slice(0, 80)}`,
+    );
+  }
 
-  if (!url) return;
-
-  const r = await fetchCheck(`${url}/api/tags`, {
-    headers: token ? { "X-Ollama-Token": token } : {},
-  });
-  record("Ollama health", "BOWIE_OLLAMA_URL + BOWIE_OLLAMA_TOKEN", "optional", true, r.ok,
-    r.ok ? "HTTP 200 — server raggiungibile" : `HTTP ${r.status} — ${r.body.slice(0, 80)}`);
+  if (checked.size === 0) {
+    record("Ollama", "BOWIE_OLLAMA_URL", "optional", false, null,
+      "Non configurata (opzionale — usa cloud AI come fallback)");
+  }
 }
 
 // ── Routing ───────────────────────────────────────────────────────────────────
@@ -163,7 +316,9 @@ async function checkGraphHopper() {
     token ? `Presente (${token.length} char) — header X-GH-Token` : "Non configurato");
 
   if (ghUrl) {
-    const r = await fetchCheck(`${ghUrl}/health`);
+    const r = await fetchCheck(`${ghUrl.replace(/\/$/, "")}/health`, {
+      headers: selfHostedHeaders(ghUrl, token ? { "X-GH-Token": token } : {}),
+    });
     record("GraphHopper self-hosted health", "GRAPHHOPPER_URL", "optional", true, r.ok,
       r.ok ? "Health OK" : `HTTP ${r.status} — ${r.body.slice(0, 80)}`);
   }
@@ -192,6 +347,120 @@ async function checkValhalla() {
 
   record("Valhalla", "VALHALLA_API_KEY", "optional", !!key, null,
     key ? "Presente" : "Non configurata (non necessaria con VALHALLA_URL vuota)");
+
+  if (url?.trim()) {
+    const r = await fetchCheck(`${url.trim().replace(/\/$/, "")}/status`, {
+      headers: selfHostedHeaders(
+        url,
+        key ? { "X-Valhalla-Key": key } : {},
+      ),
+    });
+    record(
+      "Valhalla health",
+      "VALHALLA_URL + VALHALLA_API_KEY",
+      "optional",
+      true,
+      r.ok,
+      r.ok ? "HTTP 200 — status OK" : `HTTP ${r.status} — ${r.body.slice(0, 80)}`,
+    );
+  }
+}
+
+async function checkPhoton() {
+  const url = process.env.PHOTON_URL?.trim();
+  const token = process.env.PHOTON_TOKEN?.trim();
+  record(
+    "Photon self-hosted",
+    "PHOTON_URL",
+    "optional",
+    !!url,
+    null,
+    url ? `Configurata: ${url}` : "Non configurata",
+  );
+  record(
+    "Photon self-hosted",
+    "PHOTON_TOKEN",
+    "optional",
+    !!token,
+    null,
+    token ? `Presente (${token.length} char)` : "Non configurato",
+  );
+  if (!url) return;
+
+  const r = await fetchCheck(
+    `${url.replace(/\/$/, "")}/api/?q=Roma&limit=1&lang=default`,
+    { headers: selfHostedHeaders(url, token ? { "X-Photon-Token": token } : {}) },
+  );
+  record(
+    "Photon health",
+    "PHOTON_URL + PHOTON_TOKEN",
+    "optional",
+    true,
+    r.ok,
+    r.ok ? "Query geocoding OK" : `HTTP ${r.status} — ${r.body.slice(0, 80)}`,
+  );
+}
+
+async function checkR2() {
+  const names = [
+    "R2_ENDPOINT",
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+    "R2_PUBLIC_BUCKET",
+    "R2_PRIVATE_BUCKET",
+    "R2_PUBLIC_BASE_URL",
+  ] as const;
+  const present = names.filter((name) => Boolean(process.env[name]?.trim()));
+  if (present.length === 0) {
+    record("Cloudflare R2", "R2_*", "optional", false, null, "Non configurato");
+    return;
+  }
+  const missing = names.filter((name) => !process.env[name]?.trim());
+  if (missing.length > 0) {
+    record(
+      "Cloudflare R2",
+      "R2_*",
+      "mandatory",
+      true,
+      false,
+      `Configurazione incompleta; mancanti: ${missing.join(", ")}`,
+    );
+    return;
+  }
+
+  const endpoint = process.env.R2_ENDPOINT!.trim();
+  const publicBaseUrl = process.env.R2_PUBLIC_BASE_URL!.trim();
+  const publicBucket = process.env.R2_PUBLIC_BUCKET!.trim();
+  const privateBucket = process.env.R2_PRIVATE_BUCKET!.trim();
+  const errors: string[] = [];
+  try {
+    if (new URL(endpoint).protocol !== "https:") errors.push("R2_ENDPOINT non HTTPS");
+  } catch {
+    errors.push("R2_ENDPOINT non valido");
+  }
+  try {
+    if (new URL(publicBaseUrl).protocol !== "https:") errors.push("R2_PUBLIC_BASE_URL non HTTPS");
+  } catch {
+    errors.push("R2_PUBLIC_BASE_URL non valido");
+  }
+  if (publicBucket === privateBucket) errors.push("bucket pubblico e privato uguali");
+  if (errors.length > 0) {
+    record("Cloudflare R2", "R2_*", "mandatory", true, false, errors.join("; "));
+    return;
+  }
+
+  try {
+    const { objectExists } = await import("../server/objectStorage");
+    // HEAD su due chiavi sentinella: nessuna scrittura o modifica di dati.
+    await objectExists("__bikerlink_cloudflare_audit__/missing-object");
+    await objectExists("private/__bikerlink_cloudflare_audit__/missing-object");
+    record("Cloudflare R2", "R2_*", "mandatory", true, true,
+      "Endpoint, firma SigV4 e accesso HEAD verificati su entrambi i bucket.");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    record("Cloudflare R2", "R2_*", "mandatory", true, false,
+      `Round-trip read-only fallito: ${msg.slice(0, 120)}`);
+  }
 }
 
 async function checkTomTom() {
@@ -447,6 +716,9 @@ async function main() {
     checkGraphHopper(),
     checkTomTom(),
     checkMapbox(),
+    checkCloudflare(),
+    checkR2(),
+    checkPhoton(),
     checkGmail(),
     checkLastFm(),
     checkRedis(),

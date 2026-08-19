@@ -10,6 +10,7 @@ googleServices {
     disableVersionCheck = true
 }
 
+
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
 /**
@@ -100,8 +101,8 @@ android {
         applicationId 'com.bikerlink.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 83
-        versionName "83.11.242"
+        versionCode 84
+        versionName "84.11.242"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
 
@@ -216,4 +217,3 @@ dependencies {
         implementation jscFlavor
     }
 }
-

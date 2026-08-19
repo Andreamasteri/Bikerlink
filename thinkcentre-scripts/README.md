@@ -42,7 +42,7 @@ persistente al reboot).
 | `01.sh`   | Monitor CPU + RAM + disco (aggiorna ogni 2s)                             |
 | `02.sh`   | Monitor build Valhalla: container, tiles, log (ogni 5s)                  |
 | `03.sh`   | Pulizia Valhalla: ferma container, rimuove tiles e log                   |
-| `04.sh`   | Check pre-build: PBF, Docker, disco, **RAM + swap** (OK/WARN/FAIL)       |
+| `04.sh`   | **Preflight HULK read-only**: hardware, NVIDIA, rete, OS/systemd/log e Valhalla (OK/WARN/FAIL/SKIP) |
 | `05.sh`   | Avvia build grafo Valhalla in background (screen), `--shm-size=16g`      |
 | `06.sh`   | Verifica post-build: tiles, container, test HTTP /status                 |
 | `07.sh`   | Prepara workspace Nominatim + crea docker-compose.yml                    |
@@ -58,6 +58,18 @@ persistente al reboot).
 | `diag-system.sh` | **Diagnostica sistema post-crash**: RAM, swap, disco, carico CPU, container Docker, temperatura CPU |
 | `diag-build.sh`  | **Diagnostica build post-crash**: causa del crash, conteggio errori, durata, ultime righe log, stato container |
 | `recover.sh`     | **Recovery guidato post-crash**: esegue entrambe le diagnostiche, interpreta i `[FAIL]` e propone/esegue le azioni correttive passo-passo |
+
+### Preflight HULK
+
+`04.sh` è il gate read-only prima della build: esegue sempre tutte le sezioni
+hardware, NVIDIA, rete, sistema operativo/systemd/log e Valhalla. Un controllo
+mancante o fallito non viene nascosto: produce `[SKIP]`, `[WARN]` o `[FAIL]` e
+il riepilogo finale è `READY_WITH_WARNINGS` oppure `BLOCKED`.
+
+Il default è volutamente severo per il ThinkCentre: NVIDIA e i servizi attesi
+(`docker`, `ollama`, `cloudflared`, `tailscaled`) sono richiesti. Per un test
+offline locale si può usare soltanto `PREFLIGHT_LIVE_NETWORK=0`; sul TC non va
+impostato, così DNS/HTTPS/ICMP restano verificati realmente.
 
 ---
 
@@ -124,7 +136,7 @@ config-valhalla.sh  ← (verifica) parametri di serve: porta 8002, tiles/data di
 usb.sh              ← monta la USB raw, copia europe-latest.osm.pbf, smonta
 swap.sh             ← crea/verifica swapfile 16 GB (consigliato su 32 GB)
 cpu.sh              ← governor performance (opzionale ma consigliato)
-04.sh               ← check pre-build (PBF, Docker, disco, RAM + swap)
+04.sh               ← preflight HULK completo (hardware, NVIDIA, rete, OS/systemd/log + PBF/Docker)
 05.sh               ← avvia build (dura ore)
 02.sh               ← monitora (in un'altra sessione SSH)
 06.sh               ← verifica quando il monitor mostra "TERMINATO"
