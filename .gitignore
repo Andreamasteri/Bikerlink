@@ -124,3 +124,13 @@ logs/*.md
 # Neon migration artifacts — contengono dati prod, mai committare
 scripts/neon-migration/*.sql
 scripts/neon-migration/*.txt
+
+
+# ThinkCentre self-host runtime: generated routing data and local diagnostics.
+# These paths are operational state, never source code.
+/infra/self-host/data/
+/infra/self-host/graphs/
+/infra/self-host/elevation-download.log
+/infra/self-host/tile-extract-for-elevation.log
+/scripts/thinkcentre/stats-server.js.bak
+/thinkcentre-agent/server.js.bak-task153
