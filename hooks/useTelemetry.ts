@@ -31,6 +31,7 @@ import {
   FLUSH_MAX_SAMPLES,
   STOP_RETRY_DELAY_MS,
   CHECKPOINT_INTERVAL_MS,
+  UPLOAD_INTERVAL_MS,
 } from "@/hooks/useTelemetryUpload";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -71,6 +72,7 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
   const accelSubRef         = useRef<ReturnType<typeof Accelerometer.addListener> | null>(null);
   const sensorTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const checkpointTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const uploadTimerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastKnownLocRef = useRef<{ lat: number; lon: number } | null>(null);
   const lastGpsTsRef    = useRef<number>(0);
 
@@ -105,6 +107,7 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
   const teardown = useCallback(() => {
     if (sensorTimerRef.current)     { clearInterval(sensorTimerRef.current); sensorTimerRef.current = null; }
     if (checkpointTimerRef.current) { clearInterval(checkpointTimerRef.current); checkpointTimerRef.current = null; }
+    if (uploadTimerRef.current)     { clearInterval(uploadTimerRef.current); uploadTimerRef.current = null; }
     if (locationSubRef.current)     { locationSubRef.current.remove(); locationSubRef.current = null; }
     if (accelSubRef.current)        { accelSubRef.current.remove(); accelSubRef.current = null; }
     if (motionSubRef.current)       { motionSubRef.current.remove(); motionSubRef.current = null; }
@@ -245,6 +248,12 @@ export function useTelemetry(isActive: boolean, externalGps = false) {
     checkpointTimerRef.current = setInterval(() => {
       checkpointBuffer().catch(() => {});
     }, CHECKPOINT_INTERVAL_MS);
+
+    // Distance is not the only flush condition: in slow traffic or during a
+    // short test, persist at least once a minute so the total counter advances.
+    uploadTimerRef.current = setInterval(() => {
+      void flush(true);
+    }, UPLOAD_INTERVAL_MS);
   }, [flush, buildSample, buildSensorSample, maybeUploadByDistance, canRecordForeground, checkpointBuffer]);
 
   // ── begin session ───────────────────────────────────────────────────────────

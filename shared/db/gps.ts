@@ -185,8 +185,8 @@ export type InsertUserTelemetryProfile = typeof userTelemetryProfile.$inferInser
  *                          (nessun filtro velocità) → alimenta `track_km` per le
  *                          sessioni `ideal_lap`.
  *  - `distSpeedFiltered`  = come sopra ma solo per i segmenti con velocità NULL o
- *                          >= 20 km/h → alimenta `km_collected` (tutte le sessioni)
- *                          e `ideal_lap_km` (sessioni `ideal_lap`).
+ *                          >= 20 km/h; resta disponibile per analisi di guida,
+ *                          ma non governa il contatore generale.
  *  - `lastLat/lastLon/lastTs` = ultimo campione (per ts) della sessione: àncora
  *                          per collegare il primo segmento del batch successivo,
  *                          replicando la semantica di LAG(...) OVER (ORDER BY ts).

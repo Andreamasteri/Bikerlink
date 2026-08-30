@@ -62,15 +62,13 @@ function AutoTelemetryInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => registerTrackingActiveCallback(setCanonicalTrackingActive), []);
 
-  // ── Auto-detect only when all conditions are met ─────────────────────────
-  // Suppressed while the canonical route tracker is active to avoid two
-  // concurrent ride sessions inflating km_collected. Ideal lap recording does
-  // not claim the ride-tracking lease, so it can remain independent.
+  // ── General telemetry is primary and independent of optional lap modes. ───
+  // Suppressed only while the canonical route tracker owns the telemetry lease.
   const isEnabled = !!user && alwaysActive && isCalibrated && !canonicalTrackingActive;
 
   const { isRiding } = useMotorcycleDetector({ enabled: isEnabled, relaxedMode });
 
-  useTelemetry(isRiding && isEnabled);
+  useTelemetry(isEnabled);
 
   const isAutoRiding = isRiding && isEnabled;
 

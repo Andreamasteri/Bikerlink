@@ -35,7 +35,7 @@ function buildApp(): express.Application {
 // `telemetry_session_stats` con UNA sola aggregazione (SUM/COUNT), non più le
 // due query (counts + Haversine window function) su ride_telemetry. Ogni mock
 // restituisce quindi la singola riga aggregata attesa dall'endpoint.
-describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed filter applied", () => {
+describe("GET /api/telemetry/stats — Giro Ideale separato dal contatore generale", () => {
   let app: express.Application;
 
   beforeEach(() => {
@@ -76,19 +76,19 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     expect(res.body.track_km).toBe(0);
   });
 
-  it("km_collected reflects ideal_lap km — combined total (ride + ideal_lap)", async () => {
+  it("Giro Ideale espone i propri km senza creare km generali", async () => {
     const dbExecute = vi.mocked(db.execute);
     dbExecute.mockResolvedValueOnce({
-      rows: [{ km_collected: "18.5", track_km: "8.5", ideal_lap_km: "6.2", sample_count: "300", session_count: "3", sensor_only_count: "0" }],
+      rows: [{ km_collected: "12.3", track_km: "8.5", ideal_lap_km: "8.5", sample_count: "300", session_count: "3", sensor_only_count: "0" }],
     } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
     expect(res.status).toBe(200);
-    expect(res.body.km_collected).toBe(18.5);
+    expect(res.body.km_collected).toBe(12.3);
     expect(res.body.track_km).toBe(8.5);
-    expect(res.body.ideal_lap_km).toBe(6.2);
-    expect(res.body.progress_pct).toBe(2);
+    expect(res.body.ideal_lap_km).toBe(8.5);
+    expect(res.body.progress_pct).toBe(1);
   });
 
   it("adding more km increases progress_pct correctly", async () => {
@@ -105,18 +105,18 @@ describe("GET /api/telemetry/stats — km_collected includes ideal_lap, speed fi
     expect(res.body.track_km).toBe(0);
   });
 
-  it("ideal_lap_km uses speed >= 20 filter — distinct from track_km", async () => {
+  it("ideal_lap_km retains the unfiltered lap distance", async () => {
     const dbExecute = vi.mocked(db.execute);
     dbExecute.mockResolvedValueOnce({
-      rows: [{ km_collected: "200", track_km: "12.5", ideal_lap_km: "10.3", sample_count: "300", session_count: "4", sensor_only_count: "0" }],
+      rows: [{ km_collected: "202.5", track_km: "12.5", ideal_lap_km: "12.5", sample_count: "300", session_count: "4", sensor_only_count: "0" }],
     } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
     expect(res.status).toBe(200);
-    expect(res.body.km_collected).toBe(200);
+    expect(res.body.km_collected).toBe(202.5);
     expect(res.body.track_km).toBe(12.5);
-    expect(res.body.ideal_lap_km).toBe(10.3);
+    expect(res.body.ideal_lap_km).toBe(12.5);
     expect(res.body.progress_pct).toBe(20);
   });
 

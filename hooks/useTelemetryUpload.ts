@@ -4,7 +4,7 @@
  *
  * Owns:
  *  - flush()                      — POST foreground buffer to server
- *  - maybeUploadByDistance()      — fire-and-forget 5-km upload trigger
+ *  - maybeUploadByDistance()      — fire-and-forget 500 m upload trigger
  *  - drainAndFlushBackgroundBuffer() — drain AsyncStorage bg buffer on resume
  *  - persistUnsentSamples()       — save unsent samples on stop failure
  *  - drainUnsentStorage()         — recover samples from previous failed flush
@@ -25,7 +25,10 @@ import type { TelemetrySample } from "@shared/tracking-fusion";
 
 // ─── Constants (shared with useTelemetry) ─────────────────────────────────────
 export const FLUSH_MAX_SAMPLES        = 200;
-export const UPLOAD_EVERY_KM          = 5;
+// The UI counter must not wait kilometres before becoming durable. 500 m keeps
+// requests modest while making a live ride visible quickly.
+export const UPLOAD_EVERY_KM          = 0.5;
+export const UPLOAD_INTERVAL_MS       = 60_000;
 export const STOP_RETRY_DELAY_MS      = 1_500;
 export const BG_DRAIN_BUDGET_MS       = 12_000;
 export const BG_DRAIN_REQUEST_TIMEOUT = 8_000;
@@ -171,6 +174,7 @@ export function useTelemetryUpload(
       kmAtLastUploadRef.current,
       () => flush(true),
       (at) => { kmAtLastUploadRef.current = at; },
+      UPLOAD_EVERY_KM,
     );
   }, [flush, totalKmRef, kmAtLastUploadRef]);
 

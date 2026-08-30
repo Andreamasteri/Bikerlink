@@ -250,15 +250,16 @@ router.get("/stats", async (req: Request, res: Response) => {
     // POST /batch). I totali utente sono una semplice SUM/COUNT su poche righe:
     // niente più scansione Haversine con window function su tutti i campioni.
     //
-    //   km_collected  = SUM(dist_speed_filtered) su TUTTE le sessioni (incl. ideal_lap)
+    //   km_collected  = SUM(dist_all) sulle sessioni generali: un Giro Ideale
+    //                   non può creare km generali al momento del salvataggio.
     //   track_km      = SUM(dist_all)            solo sessioni 'ideal_lap'
-    //   ideal_lap_km  = SUM(dist_speed_filtered) solo sessioni 'ideal_lap'
+    //   ideal_lap_km  = SUM(dist_all)            solo sessioni 'ideal_lap'
     //   sample_count / session_count / sensor_only_count escludono 'ideal_lap'
     const statsResult = await withDbRetry(() => db.execute(sql`
       SELECT
-        COALESCE(SUM(dist_speed_filtered), 0) AS km_collected,
+        COALESCE(SUM(dist_all) FILTER (WHERE session_type <> 'ideal_lap'), 0) AS km_collected,
         COALESCE(SUM(dist_all) FILTER (WHERE session_type = 'ideal_lap'), 0) AS track_km,
-        COALESCE(SUM(dist_speed_filtered) FILTER (WHERE session_type = 'ideal_lap'), 0) AS ideal_lap_km,
+        COALESCE(SUM(dist_all) FILTER (WHERE session_type = 'ideal_lap'), 0) AS ideal_lap_km,
         COALESCE(SUM(sample_count) FILTER (WHERE session_type <> 'ideal_lap'), 0) AS sample_count,
         COUNT(*) FILTER (WHERE session_type <> 'ideal_lap') AS session_count,
         COALESCE(SUM(sensor_only_count) FILTER (WHERE session_type <> 'ideal_lap'), 0) AS sensor_only_count
