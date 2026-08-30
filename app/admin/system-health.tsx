@@ -8,6 +8,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter, type Href } from "expo-router";
 import { apiRequest, getQueryFnWithTimeout, ServerBusyError } from "@/lib/query-client";
 import { ErrorRetryCard } from "@/components/admin/shared/ErrorRetryCard";
 import Colors from "@/constants/colors";
@@ -67,6 +68,7 @@ function formatHeartbeatAge(sec: number): string {
 
 export default function SystemHealthScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const qc = useQueryClient();
   const [busyProposalId, setBusyProposalId] = useState<string | null>(null);
 
@@ -110,14 +112,6 @@ export default function SystemHealthScreen() {
 
   const pendingProposals = (proposalsQ.data?.logs ?? []).filter((p) => p.status === "pending");
 
-  // Task #923 — insieme di signalId che hanno già proposte pending: usato da
-  // ProblemsList per mostrare "⏳ Pending" invece di "Fix ⚡".
-  const pendingSignalIds = new Set(
-    pendingProposals
-      .map((p) => (p.details as { signalId?: string } | null)?.signalId)
-      .filter((id): id is string => typeof id === "string" && id.length > 0),
-  );
-
   const toggle = useMutation({
     mutationFn: async (enabled: boolean) => {
       await apiRequest("POST", "/api/admin/watchdog/enabled", { enabled });
@@ -157,32 +151,20 @@ export default function SystemHealthScreen() {
     },
   });
 
-  // Task #902 — "Fix ⚡" su ogni riga HIGH/CRITICAL: chiama propose-now con un
-  // filtro signalId così l'AI si concentra sul singolo problema.
-  // Task #923 — restituisce il conteggio proposte generate (0 = nessuna) così
-  // ProblemsList può mostrare il banner inline corretto.
-  const onQuickPropose = async (signalId: string): Promise<number> => {
-    try {
-      const res = await apiRequest(
-        "POST",
-        "/api/admin/watchdog/propose-now",
-        { signalId },
-        { timeoutMs: 90_000 },
-      );
-      const data = await res.json() as { proposals?: Array<unknown> };
-      await qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"] });
-      return data.proposals?.length ?? 0;
-    } catch (err) {
-      const e = err as Error;
-      const isTimeout = e.name === "AbortError" || e.message.includes("timeout");
-      Alert.alert(
-        isTimeout ? "Timeout generazione" : "Errore",
-        isTimeout
-          ? "L'AI ha impiegato troppo tempo a rispondere (>90s). Riprova o verifica che il ThinkCentre sia online."
-          : e.message,
-      );
-      throw err; // propaga così ProblemsList resetta actingId via finally
-    }
+  const openProblem = (problem: Problem) => {
+    const id = problem.id;
+    const destination: Href = id.startsWith("db.db_integrity.")
+      ? "/admin/db-integrity"
+      : id.startsWith("db.")
+      ? "/admin/db-monitor"
+      : id.startsWith("latency.")
+      ? "/admin/performance"
+      : id.startsWith("telemetry.")
+      ? "/admin/telemetry"
+      : id.startsWith("matching.") || id.startsWith("scheduler.")
+      ? "/admin/matching-hub"
+      : "/admin/diagnostica";
+    router.push(destination);
   };
 
   // Task #154 — Svuota lista: azzera i contatori interni dei collector lato
@@ -423,8 +405,7 @@ export default function SystemHealthScreen() {
           <SectionTitle icon="alert-circle-outline">Problemi rilevati</SectionTitle>
           <ProblemsList
             problems={snap.problems}
-            onQuickPropose={onQuickPropose}
-            pendingSignalIds={pendingSignalIds}
+            onOpenProblem={openProblem}
           />
 
           <SectionTitle icon="chart-box-outline">Metriche</SectionTitle>
