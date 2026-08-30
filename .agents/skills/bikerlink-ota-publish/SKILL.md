@@ -29,7 +29,7 @@ Attivare questa skill quando l'utente dice una delle seguenti (o varianti):
 | `versionCode` APK | **84** |
 | `versionName` | **84.11.242** |
 | `runtimeVersion` | **11.0.0** |
-| Ultima OTA pubblicata | **84.11.244** (OTA-244, ciclo 11) |
+| Ultima OTA pubblicata | **84.11.245** (OTA-245, ciclo 11) |
 
 > ⚠️ Aggiornare questa tabella ad ogni nuovo APK (e dopo ogni OTA pubblicata), in lockstep con la tabella storica in `bikerlink-versioning/SKILL.md`.
 > I valori correnti sono sempre la fonte di verità: `node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode, a.expo.runtimeVersion, a.expo.version)"`
