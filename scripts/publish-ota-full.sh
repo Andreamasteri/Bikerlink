@@ -177,6 +177,10 @@ log_info "Messaggio EAS: ${EAS_MESSAGE}"
 
 # ── 3b. Aggiorna APPLIED_OTA_NUMBER PRIMA del bundle (così è incluso nel bundle) ──
 BUILD_INFO="constants/buildInfo.ts"
+
+# Un bundle OTA deve usare le stesse versioni JS dei moduli nativi presenti
+# nell'APK. Non permettere che npm abbia risolto versioni semver più nuove.
+npm run check:native-abi
 OLD_OTA_NUMBER=$(grep -oP 'APPLIED_OTA_NUMBER: number \| null = \K[0-9]+' "$BUILD_INFO" 2>/dev/null || echo "null")
 sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${NEXT_OTA};/" "$BUILD_INFO"
 log_ok "APPLIED_OTA_NUMBER pre-impostato → ${NEXT_OTA} (sarà incluso nel bundle; rollback a ${OLD_OTA_NUMBER} se EAS fallisce)"
