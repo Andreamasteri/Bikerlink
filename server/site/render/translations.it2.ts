@@ -21,12 +21,12 @@ export const SITE_TRANSLATIONS_IT2: Record<string, string> = {
   'community.life.card6.desc': 'Segnalazioni con risposta entro 24h. Block list e mute personali sempre disponibili.',
 
   // ── COMP TABLE (chiavi mancanti) ──────────────────────────────────────────
-  'comp.h1.title': 'AI linguaggio naturale',
-  'comp.h1.desc': 'Pianifica un percorso scrivendo "strade curve in Toscana, 3 ore, evita autostrade" — l\'AI capisce e costruisce il giro.',
-  'comp.h2.title': 'BikerScore — Indice fun factor',
-  'comp.h2.desc': 'Ogni percorso ha un punteggio numerico basato su curvosità, dislivello, fondo e traffico. Scegli il giro più divertente, non solo il più veloce.',
-  'comp.h3.title': 'Matching engine biker',
-  'comp.h3.desc': 'Algoritmo di compatibilità che abbina moto, stile di guida e disponibilità. Trova il compagno di viaggio giusto, non solo il più vicino.',
+  'comp.h1.title': 'Dead reckoning adattivo',
+  'comp.h1.desc': 'Quando il GPS è intermittente, DeviceMotion mantiene la continuità del percorso. Dopo 2–3 fix gialli/verdi coerenti, la posizione si riallinea subito al GPS.',
+  'comp.h2.title': 'Correzione personalizzata Ares',
+  'comp.h2.desc': 'Ares confronta GPS e dead reckoning e costruisce dal primo giro un modello dell’utente e uno del telefono/sensori.',
+  'comp.h3.title': 'Impara dal contesto reale',
+  'comp.h3.desc': 'Città, autostrada, montagna: il contesto viene riconosciuto da posizione e mappa e può essere raffinato da velocità, curve e pendenza.',
   'comp.table.header': 'Funzionalità',
 
   // ── CONTATTI CANALI (chiavi mancanti) ─────────────────────────────────────
