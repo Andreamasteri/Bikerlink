@@ -27,6 +27,7 @@ import {
   buildMatchingPrivacy,
   buildMatchingInvestors,
 } from "./pages";
+import { BLOG_POSTS, buildBlogIndex, buildBlogPost, findBlogPost } from "./pages-blog";
 
 // Cache for landing images (recomputed every 5 min so changes propagate quickly).
 let landingImagesCache: { ts: number; images: LandingImages } | null = null;
@@ -77,6 +78,7 @@ const PAGES: { route: string; build: Builder; sitemap: { priority: number; chang
   { route: "/about", build: buildAbout, sitemap: { priority: 0.6, changefreq: "monthly" } },
   { route: "/faq", build: buildFaq, sitemap: { priority: 0.6, changefreq: "monthly" } },
   { route: "/contact", build: buildContact, sitemap: { priority: 0.6, changefreq: "yearly" } },
+  { route: "/blog", build: buildBlogIndex, sitemap: { priority: 0.8, changefreq: "weekly" } },
   { route: "/matching", build: buildMatchingOverview, sitemap: { priority: 0.9, changefreq: "monthly" } },
   { route: "/matching/come-funziona", build: buildMatchingHowItWorks, sitemap: { priority: 0.8, changefreq: "monthly" } },
   { route: "/matching/tipi-di-match", build: buildMatchingTypes, sitemap: { priority: 0.8, changefreq: "monthly" } },
@@ -201,7 +203,7 @@ export function registerSiteRoutes(app: Express) {
     // Expo client manifest fetch: ha sempre l'header expo-platform.
     if (req.header("expo-platform")) return next();
     const p = req.path || "";
-    if (!TRACKABLE_PATHS.has(p)) return next();
+    if (!TRACKABLE_PATHS.has(p) && !p.startsWith("/blog/")) return next();
     try {
       const vid = ensureVisitorId(req, res);
       recordVisit({ req, visitorId: vid, event: "view", path: p });
@@ -264,6 +266,21 @@ export function registerSiteRoutes(app: Express) {
       }
     });
   }
+
+  app.get("/blog/:slug", (req: Request, res: Response, next) => {
+    const post = findBlogPost(req.params.slug);
+    if (!post) return next();
+    try {
+      const baseUrl = getBaseUrl(req);
+      const pageResult = buildBlogPost(baseUrl, post);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=300");
+      return res.status(200).send(renderPage(pageResult.meta, pageResult.body, baseUrl));
+    } catch (err) {
+      console.error(`[site] error rendering blog post ${req.params.slug}:`, err);
+      return next(err);
+    }
+  });
 
   // Matching PDF — printable version of the investors tech deep-dive.
   app.get("/matching/pdf", (req: Request, res: Response) => {
@@ -414,8 +431,8 @@ code{background:#f0f0f0;padding:1px 5px;border-radius:2px;font-size:11px;font-fa
   }
   registerStaticLegalPages(app, STATIC_HTML_PAGES, staticTemplates);
 
-  registerRobotsAndSitemap(app, PAGES, STATIC_HTML_PAGES);
-  registerLlmGuide(app);
+  registerRobotsAndSitemap(app, PAGES, STATIC_HTML_PAGES, BLOG_POSTS);
+  registerLlmGuide(app, BLOG_POSTS);
 
   // Fallback /docs index (dynamic).
 }

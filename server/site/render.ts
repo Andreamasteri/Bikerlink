@@ -83,6 +83,7 @@ function footer(): string {
         <li><a href="/sos" data-i18n="footer.sos">SOS Biker</a></li>
         <li><a href="/motoclub" data-i18n="footer.motoclub">MotoClub</a></li>
         <li><a href="/community" data-i18n="footer.community">Community</a></li>
+        <li><a href="/blog">Blog</a></li>
         <li><a href="/download" data-i18n="footer.dl">Scarica l'app</a></li>
       </ul>
     </div>

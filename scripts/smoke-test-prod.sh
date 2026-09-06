@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BikerLink — Smoke test produzione: verifica che /api/health restituisca JSON valido
+# BikerLink — Smoke test produzione: verifica API e landing pubblica con GET
 #
 # Exit 0  → OK
 # Exit 1  → anomalia (probe leak, risposta non-JSON, campo status assente)
@@ -64,4 +64,22 @@ if [ "$STATUS_FIELD" = "__MISSING__" ]; then
 fi
 
 log "✅ OK — /api/health risponde JSON valido, status='$STATUS_FIELD'"
+
+# ── Guard 5: landing pubblica ────────────────────────────────────────────────
+# Una richiesta HEAD non rappresenta il comportamento di un browser: qui usiamo
+# esplicitamente GET e controlliamo che l'HTML della landing sia davvero servito.
+LANDING_RESPONSE=$(curl -s --max-time "$MAX_TIME" \
+  -H "Accept: text/html" \
+  -w "\n__HTTP_STATUS__:%{http_code}" \
+  "$PROD_URL/" 2>/dev/null || true)
+
+LANDING_BODY=$(echo "$LANDING_RESPONSE" | sed '/^__HTTP_STATUS__:/d')
+LANDING_STATUS=$(echo "$LANDING_RESPONSE" | grep '^__HTTP_STATUS__:' | cut -d: -f2)
+
+if [ "$LANDING_STATUS" != "200" ] || ! echo "$LANDING_BODY" | grep -qi "BIKER.*LINK"; then
+  log "❌ ERRORE: landing pubblica non valida (HTTP ${LANDING_STATUS:-???})"
+  exit 1
+fi
+
+log "✅ OK — landing pubblica risponde con HTML BikerLink"
 exit 0

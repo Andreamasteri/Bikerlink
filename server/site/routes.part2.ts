@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { getBaseUrl } from "./render";
+import type { BlogPost } from "./pages-blog";
 
 export function registerLegacyRedirects(app: Express, PERMANENT_REDIRECTS: Record<string, string>) {
   for (const [from, to] of Object.entries(PERMANENT_REDIRECTS)) {
@@ -24,7 +25,7 @@ export function registerStaticLegalPages(app: Express, STATIC_HTML_PAGES: Record
   }
 }
 
-export function registerRobotsAndSitemap(app: Express, PAGES: { route: string; sitemap: { priority: number; changefreq: string } }[], _STATIC_HTML_PAGES: Record<string, string>) {
+export function registerRobotsAndSitemap(app: Express, PAGES: { route: string; sitemap: { priority: number; changefreq: string } }[], _STATIC_HTML_PAGES: Record<string, string>, blogPosts: BlogPost[] = []) {
   // robots.txt — dynamic, references the current host.
   app.get("/robots.txt", (req: Request, res: Response) => {
     const baseUrl = getBaseUrl(req);
@@ -60,6 +61,11 @@ export function registerRobotsAndSitemap(app: Express, PAGES: { route: string; s
         priority: p.sitemap.priority,
         changefreq: p.sitemap.changefreq,
       })),
+      ...blogPosts.map((post) => ({
+        loc: `${baseUrl}/blog/${post.slug}`,
+        priority: 0.7,
+        changefreq: "monthly",
+      })),
       { loc: `${baseUrl}/docs`, priority: 0.7, changefreq: "monthly" },
       { loc: `${baseUrl}/docs/matching`, priority: 0.6, changefreq: "monthly" },
       { loc: `${baseUrl}/docs/sos`, priority: 0.6, changefreq: "monthly" },
@@ -87,7 +93,7 @@ export function registerRobotsAndSitemap(app: Express, PAGES: { route: string; s
   });
 }
 
-export function registerLlmGuide(app: Express) {
+export function registerLlmGuide(app: Express, blogPosts: BlogPost[] = []) {
   // llms.txt — machine-readable site guide for AI crawlers.
   app.get("/llms.txt", (req: Request, res: Response) => {
     const baseUrl = getBaseUrl(req);
@@ -111,6 +117,8 @@ export function registerLlmGuide(app: Express) {
         `- Chi siamo: ${baseUrl}/about`,
         `- FAQ: ${baseUrl}/faq`,
         `- Contatti: ${baseUrl}/contact`,
+        `- Blog: ${baseUrl}/blog`,
+        ...blogPosts.map((post) => `- Blog — ${post.title}: ${baseUrl}/blog/${post.slug}`),
         "",
         "## Matching AI",
         "",

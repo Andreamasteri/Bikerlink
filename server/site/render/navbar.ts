@@ -17,6 +17,7 @@ export function navbar(currentPath: string): string {
       ${link("/sos", "SOS", "nav.sos")}
       ${link("/motoclub", "MotoClub", "nav.motoclub")}
       ${link("/community", "Community", "nav.community")}
+      ${link("/blog", "Blog", "nav.blog")}
       ${link("/about", "About", "nav.about")}
       ${link("/faq", "FAQ", "nav.faq")}
       <a href="/accedi?next=/pianifica" id="navPlannerLink" class="nav-planner-link" data-i18n="nav.planner">🤖 Pianifica Giro</a>
