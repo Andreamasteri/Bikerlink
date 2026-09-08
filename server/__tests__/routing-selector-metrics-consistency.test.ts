@@ -10,18 +10,16 @@
  * - guard engine archiviati = normalizzazione di config, NON fallback (niente
  *   header, niente campione fallback, pipeline outcome "ok" su graphhopper).
  *
- * Mock: valhalla/mapbox/tomtom/graphhopper client, quota guard, kill-switch,
+ * Mock: valhalla/graphhopper client, kill-switch,
  *       area mode/resolver, thinkcentre-offline, ai-engine-decider, geo, score.
  * Reali: routing-metrics, routing-pipeline-log, ai-decision-log (ring buffer).
  */
-import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Response } from "express";
 
 const mocks = vi.hoisted(() => ({
   valhallaCalculateRoute: vi.fn(),
   routeViaGraphHopper: vi.fn(),
-  mapboxCalculateRoute: vi.fn(),
-  tomtomCalculateRoute: vi.fn(),
   decideEngineWithAI: vi.fn(),
   isRoutingEnabled: vi.fn(),
   isAreaRoutingActive: vi.fn(),
@@ -30,14 +28,10 @@ const mocks = vi.hoisted(() => ({
   isThinkCentrePoweredOff: vi.fn(),
   scoreRoute: vi.fn(),
   haversineKm: vi.fn(),
-  checkMapboxQuota: vi.fn(),
-  checkTomTomQuota: vi.fn(),
 }));
 
 vi.mock("../routing/valhalla-client", () => ({ calculateRoute: mocks.valhallaCalculateRoute }));
 vi.mock("../routing/graphhopper-adapter", () => ({ routeViaGraphHopper: mocks.routeViaGraphHopper }));
-vi.mock("../routing/mapbox-directions-client", () => ({ calculateRoute: mocks.mapboxCalculateRoute }));
-vi.mock("../routing/tomtom-routing-client", () => ({ calculateRoute: mocks.tomtomCalculateRoute }));
 vi.mock("../routing/ai-engine-decider", () => ({ decideEngineWithAI: mocks.decideEngineWithAI }));
 vi.mock("../routing/routing-kill-switch", () => ({ isRoutingEnabled: mocks.isRoutingEnabled }));
 vi.mock("../routing/routing-area-mode", () => ({ isAreaRoutingActive: mocks.isAreaRoutingActive }));
@@ -46,14 +40,11 @@ vi.mock("../lib/thinkcentre-offline", () => ({ isThinkCentreOffline: mocks.isThi
 vi.mock("../lib/thinkcentre-powered-off", () => ({ isThinkCentrePoweredOff: mocks.isThinkCentrePoweredOff }));
 vi.mock("../routing/route-quality-score", () => ({ scoreRoute: mocks.scoreRoute }));
 vi.mock("../geo", () => ({ haversineKm: mocks.haversineKm }));
-vi.mock("../routing/mapbox/quota-guard", () => ({ checkQuota: mocks.checkMapboxQuota }));
-vi.mock("../routing/tomtom/quota-guard", () => ({ checkQuota: mocks.checkTomTomQuota }));
 
 import {
   getActiveRouter,
   aiOverride,
   RoutingDisabledError,
-  AutoCurvyOfflineError,
   CrossGroupRoutingError,
   type RouterSelectorOptions,
 } from "../routing/router-selector";
@@ -88,8 +79,6 @@ function makeRoute(distanceM: number): RouteResult {
 
 const GH_ROUTE = makeRoute(80_000);
 const VALHALLA_ROUTE = makeRoute(75_000);
-const MAPBOX_ROUTE = makeRoute(78_000);
-const TOMTOM_ROUTE = makeRoute(79_000);
 
 /** Res finto con header store — basta per setHeader/getHeader/headersSent. */
 function makeRes(): Response {
@@ -105,21 +94,6 @@ function counters() {
   return getRoutingCounters(60_000);
 }
 
-const ORIG_MAPBOX_TOKEN = process.env.MAPBOX_ACCESS_TOKEN;
-const ORIG_TOMTOM_KEY = process.env.TOMTOM_API_KEY;
-
-beforeAll(() => {
-  delete process.env.MAPBOX_ACCESS_TOKEN;
-  delete process.env.TOMTOM_API_KEY;
-});
-
-afterAll(() => {
-  if (ORIG_MAPBOX_TOKEN !== undefined) process.env.MAPBOX_ACCESS_TOKEN = ORIG_MAPBOX_TOKEN;
-  else delete process.env.MAPBOX_ACCESS_TOKEN;
-  if (ORIG_TOMTOM_KEY !== undefined) process.env.TOMTOM_API_KEY = ORIG_TOMTOM_KEY;
-  else delete process.env.TOMTOM_API_KEY;
-});
-
 beforeEach(() => {
   _resetRoutingMetricsForTests();
   _resetPipelineLogForTests();
@@ -130,10 +104,6 @@ beforeEach(() => {
   mocks.isThinkCentreOffline.mockResolvedValue(false);
   mocks.isThinkCentrePoweredOff.mockResolvedValue(false);
   mocks.haversineKm.mockReturnValue(50);
-  mocks.checkMapboxQuota.mockResolvedValue({ ok: true });
-  mocks.checkTomTomQuota.mockResolvedValue({ ok: true });
-  delete process.env.MAPBOX_ACCESS_TOKEN;
-  delete process.env.TOMTOM_API_KEY;
 });
 
 // ---------------------------------------------------------------------------
@@ -192,150 +162,29 @@ describe("engine=valhalla — fallback runtime a GraphHopper", () => {
 });
 
 // ---------------------------------------------------------------------------
-// engine=tomtom (routeViaTomTomWithFallback + quota)
+// ThinkCentre offline — nessun fallback cloud
 // ---------------------------------------------------------------------------
 
-describe("engine=tomtom — quota e fallback runtime", () => {
-  const OPTS: RouterSelectorOptions = { ...BASE_OPTS, engine: "tomtom" };
-
-  it("successo diretto: success attribuito SOLO a tomtom", async () => {
-    mocks.tomtomCalculateRoute.mockResolvedValue(TOMTOM_ROUTE);
-    const res = makeRes();
-
-    const out = await getActiveRouter(FAKE_REQ, OPTS, res, true);
-
-    expect(out).toBe(TOMTOM_ROUTE);
-    const c = counters();
-    expect(c.byEngine["tomtom"]?.success).toBe(1);
-    expect(c.fallbacks).toBe(0);
-  });
-
-  it("quota esaurita (fallback preventivo) → fallback(tomtom) registrato + success a graphhopper", async () => {
-    mocks.checkTomTomQuota.mockResolvedValue({ ok: false, used: 100, limit: 100 });
-    mocks.routeViaGraphHopper.mockResolvedValue(GH_ROUTE);
-    const res = makeRes();
-
-    const out = await getActiveRouter(FAKE_REQ, OPTS, res, true);
-
-    expect(out).toBe(GH_ROUTE);
-    expect(mocks.tomtomCalculateRoute).not.toHaveBeenCalled();
-    const c = counters();
-    expect(c.byEngine["tomtom"]?.fallback).toBe(1);
-    expect(c.byEngine["graphhopper"]?.success).toBe(1);
-    expect(c.byEngine["tomtom"]?.success ?? 0).toBe(0);
-    const ev = getPipelineEvents(1)[0];
-    expect(ev.outcome).toBe("fallback");
-    expect(ev.engineUsed).toBe("graphhopper");
-  });
-
-  it("errore runtime tomtom → fallback(tomtom) + success a graphhopper", async () => {
-    mocks.tomtomCalculateRoute.mockRejectedValue(new Error("TomTom Routing error 500"));
-    mocks.routeViaGraphHopper.mockResolvedValue(GH_ROUTE);
-    const res = makeRes();
-
-    const out = await getActiveRouter(FAKE_REQ, OPTS, res, true);
-
-    expect(out).toBe(GH_ROUTE);
-    const c = counters();
-    expect(c.byEngine["tomtom"]?.fallback).toBe(1);
-    expect(c.byEngine["graphhopper"]?.success).toBe(1);
-    expect(c.byEngine["tomtom"]?.success ?? 0).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// ThinkCentre offline — catena cloud Mapbox → TomTom
-// ---------------------------------------------------------------------------
-
-describe("ThinkCentre offline — catena cloud mapbox → tomtom", () => {
+describe("ThinkCentre offline — routing indisponibile", () => {
   beforeEach(() => {
     mocks.isThinkCentreOffline.mockResolvedValue(true);
   });
 
-  it("mapbox ok → fallback(graphhopper→mapbox) + success attribuito a mapbox", async () => {
-    process.env.MAPBOX_ACCESS_TOKEN = "test-token";
-    mocks.mapboxCalculateRoute.mockResolvedValue(MAPBOX_ROUTE);
+  it("non tenta fallback e non registra metriche", async () => {
     const res = makeRes();
 
-    const out = await getActiveRouter(FAKE_REQ, BASE_OPTS, res, true);
-
-    expect(out).toBe(MAPBOX_ROUTE);
-    const c = counters();
-    expect(c.byEngine["graphhopper"]?.fallback).toBe(1);
-    expect(c.byEngine["mapbox"]?.success).toBe(1);
-    expect(c.byEngine["graphhopper"]?.success ?? 0).toBe(0);
-    const ev = getPipelineEvents(1)[0];
-    expect(ev.outcome).toBe("fallback");
-    expect(ev.engineUsed).toBe("mapbox");
-  });
-
-  it("mapbox fallisce → failure(mapbox) + fallback(mapbox→tomtom) + success attribuito a tomtom", async () => {
-    process.env.MAPBOX_ACCESS_TOKEN = "test-token";
-    process.env.TOMTOM_API_KEY = "test-key"; // pragma: allowlist secret
-    mocks.mapboxCalculateRoute.mockRejectedValue(new Error("Mapbox Directions error 500"));
-    mocks.tomtomCalculateRoute.mockResolvedValue(TOMTOM_ROUTE);
-    const res = makeRes();
-
-    const out = await getActiveRouter(FAKE_REQ, BASE_OPTS, res, true);
-
-    expect(out).toBe(TOMTOM_ROUTE);
-    const c = counters();
-    expect(c.byEngine["graphhopper"]?.fallback).toBe(1); // gh → mapbox
-    expect(c.byEngine["mapbox"]?.failure).toBe(1);
-    expect(c.byEngine["mapbox"]?.fallback).toBe(1); // mapbox → tomtom (secondo salto)
-    expect(c.byEngine["tomtom"]?.success).toBe(1);
-    expect(c.byEngine["mapbox"]?.success ?? 0).toBe(0);
-  });
-
-  it("mapbox non configurato → salto diretto gh→tomtom (nessun campione mapbox)", async () => {
-    process.env.TOMTOM_API_KEY = "test-key"; // pragma: allowlist secret
-    mocks.tomtomCalculateRoute.mockResolvedValue(TOMTOM_ROUTE);
-    const res = makeRes();
-
-    const out = await getActiveRouter(FAKE_REQ, BASE_OPTS, res, true);
-
-    expect(out).toBe(TOMTOM_ROUTE);
-    const c = counters();
-    expect(c.byEngine["graphhopper"]?.fallback).toBe(1);
-    expect(c.byEngine["tomtom"]?.success).toBe(1);
-    expect(c.byEngine["mapbox"]).toBeUndefined();
-  });
-
-  it("auto_curvy con TC offline → AutoCurvyOfflineError, ZERO campioni metrics", async () => {
-    const req: RouteRequest = { ...FAKE_REQ, profile: "auto_curvy" };
-    const res = makeRes();
-
-    await expect(getActiveRouter(req, BASE_OPTS, res, true)).rejects.toThrow(AutoCurvyOfflineError);
+    await expect(getActiveRouter(FAKE_REQ, BASE_OPTS, res, true)).rejects.toThrow("ThinkCentre spento");
 
     const c = counters();
     expect(c.successes + c.failures + c.fallbacks).toBe(0);
     expect(getPipelineEvents(1)[0]?.outcome).toBe("error");
   });
 });
-
 // ---------------------------------------------------------------------------
 // Guard engine archiviati — normalizzazione config, NON fallback
 // ---------------------------------------------------------------------------
 
 describe("engine archiviato — config guard, non fallback runtime", () => {
-  it("engine=mapbox-directions: niente header, niente fallback metric, success a graphhopper, pipeline ok", async () => {
-    mocks.routeViaGraphHopper.mockResolvedValue(GH_ROUTE);
-    const res = makeRes();
-    const opts: RouterSelectorOptions = { ...BASE_OPTS, engine: "mapbox-directions" };
-
-    const out = await getActiveRouter(FAKE_REQ, opts, res, true);
-
-    expect(out).toBe(GH_ROUTE);
-    expect(res.getHeader("X-Routing-Fallback")).toBeUndefined();
-    const c = counters();
-    expect(c.fallbacks).toBe(0);
-    expect(c.byEngine["graphhopper"]?.success).toBe(1);
-    const ev = getPipelineEvents(1)[0];
-    expect(ev.outcome).toBe("ok");
-    expect(ev.engineSelected).toBe("mapbox-directions");
-    expect(ev.engineUsed).toBe("graphhopper");
-  });
-
   it("aiMode con engine 'ai' archiviato: AI non chiamata, servito da GH, pipeline ok su graphhopper", async () => {
     mocks.routeViaGraphHopper.mockResolvedValue(GH_ROUTE);
     const res = makeRes();

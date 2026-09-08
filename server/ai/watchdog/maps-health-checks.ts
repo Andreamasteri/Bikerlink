@@ -26,11 +26,9 @@ export interface HealthCheckResult {
   statusCode?: number;
   error?: string;
   severity?: "warn" | "high" | "critical";
-  /** true per engine cloud supplementari (TomTom, Mapbox) — non bloccanti. */
-  cloudEngine?: boolean;
 }
 
-interface Target { kind: "tile" | "engine"; id: string; url: string; headers?: Record<string, string>; cloudEngine?: boolean; }
+interface Target { kind: "tile" | "engine"; id: string; url: string; headers?: Record<string, string>; }
 
 /**
  * Classifica un errore di rete in un messaggio leggibile (italiano).
@@ -72,18 +70,6 @@ function engineTargets(): Target[] {
     const vHeaders: Record<string, string> = { ...cfAccessHeaders() };
     if (process.env.VALHALLA_API_KEY) vHeaders["X-Valhalla-Key"] = process.env.VALHALLA_API_KEY;
     out.push({ kind: "engine", id: "valhalla", url: `${valhalla.replace(/\/$/, "")}/status`, headers: vHeaders });
-  }
-  if (process.env.MAPBOX_ACCESS_TOKEN) {
-    out.push({ kind: "engine", id: "mapbox", url: "https://api.mapbox.com/", cloudEngine: true });
-  }
-  if (process.env.TOMTOM_API_KEY) {
-    // Routing minimale: verifica anche l'autenticazione, non solo la raggiungibilità del dominio.
-    const key = process.env.TOMTOM_API_KEY;
-    out.push({
-      kind: "engine", id: "tomtom",
-      url: `https://api.tomtom.com/routing/1/calculateRoute/0,0:1,1/json?key=${key}&routeType=fastest&travelMode=motorcycle`,
-      cloudEngine: true,
-    });
   }
   return out;
 }
@@ -139,21 +125,17 @@ async function pingOne(t: Target): Promise<HealthCheckResult> {
     });
     const latencyMs = Date.now() - started;
     const ok = resp.status < 500 && (t.kind === "engine" || resp.status < 400);
-    const failSeverity: "high" | "critical" =
-      t.kind !== "engine" ? "high" : t.cloudEngine ? "high" : "critical";
+    const failSeverity: "high" | "critical" = t.kind !== "engine" ? "high" : "critical";
     return {
       kind: t.kind, id: t.id, url: t.url, ok, latencyMs, statusCode: resp.status,
       severity: !ok ? failSeverity : undefined,
-      cloudEngine: t.cloudEngine,
     };
   } catch (err) {
-    const failSeverity: "high" | "critical" =
-      t.kind !== "engine" ? "high" : t.cloudEngine ? "high" : "critical";
+    const failSeverity: "high" | "critical" = t.kind !== "engine" ? "high" : "critical";
     return {
       kind: t.kind, id: t.id, url: t.url, ok: false, latencyMs: null,
       error: classifyNetworkError(err),
       severity: failSeverity,
-      cloudEngine: t.cloudEngine,
     };
   } finally {
     clearTimeout(timer);
@@ -235,7 +217,7 @@ export async function runMapsHealthChecks(force = false): Promise<HealthCheckRes
   }
   const tiles = tileTargets();
   // Quando powered-off O manutenzione, si saltano i target self-hosted
-  // (graphhopper, valhalla, aree); i target cloud (mapbox, tomtom, tile) continuano.
+  // (graphhopper, valhalla, aree); i tile continuano a essere controllati.
   const skipSelfHosted = poweredOff || inMaintenance;
   const engines = engineTargets().filter(
     (t) => !skipSelfHosted || (t.id !== "graphhopper" && t.id !== "valhalla"),

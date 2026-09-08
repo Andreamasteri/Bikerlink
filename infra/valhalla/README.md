@@ -3,7 +3,7 @@
 ## Panoramica
 
 Valhalla è il secondo routing engine di BikerLink, affiancato a GraphHopper.  
-È lo stesso engine che gira sotto Mapbox Directions (licenza MIT).  
+È un engine open-source con licenza MIT.
 Viene attivato dall'admin tramite il pannello Admin → Mappe → Routing Engine.
 
 **Copertura tile attuale**: Italia + paesi limitrofi (Francia, Svizzera, Austria, Slovenia, Croazia).  

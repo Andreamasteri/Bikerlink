@@ -7,19 +7,10 @@ import {
   DEFAULT_RENDERER, DEFAULT_TILE, DEFAULT_ENGINE, DEFAULT_PROFILE,
 } from "./options";
 import type { MapsRendererId, MapsTileId, RoutingEngineId, RoutingProfileId, MapsRollout } from "@shared/maps-config";
-import { checkQuota } from "../../../routing/mapbox/quota-guard";
 import { getDemSource } from "../../../../lib/maplibre/style-3d";
 import { getPhotonHealthSnapshot } from "../../../lib/photon-client";
 
 const router = Router();
-
-/**
- * Mapbox è non-stub (implementato) quando compare in AVAILABLE_ENGINES con implemented:true.
- * La quota viene sempre inclusa nel payload config perché Mapbox è sempre disponibile.
- */
-function isMapboxAvailable(): boolean {
-  return AVAILABLE_ENGINES.some((e) => e.id === "mapbox-directions" && e.implemented);
-}
 
 router.get("/config", async (_req: Request, res: Response) => {
   try {
@@ -49,20 +40,6 @@ router.get("/config", async (_req: Request, res: Response) => {
     };
 
 
-    let mapbox_quota: object | undefined;
-    if (isMapboxAvailable()) {
-      const quota = await checkQuota().catch(() => null);
-      if (quota) {
-        mapbox_quota = {
-          used: quota.used,
-          limit: quota.limit,
-          percent: quota.percent,
-          warning_threshold: quota.warning_threshold,
-          resets_at: quota.resets_at,
-        };
-      }
-    }
-
     const maplibreKey = process.env.MAPLIBRE_API_KEY;
     const tileSourceStatus: "maptiler" | "demo" =
       maplibreKey && maplibreKey.length > 4 ? "maptiler" : "demo";
@@ -88,10 +65,6 @@ router.get("/config", async (_req: Request, res: Response) => {
       tester_can_customize: testerCustomizeSetting?.value === "true",
       photon: photonHealth,
     };
-
-    if (mapbox_quota !== undefined) {
-      payload.mapbox_quota = mapbox_quota;
-    }
 
     return res.json(payload);
   } catch (err) {

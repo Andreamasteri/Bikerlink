@@ -575,7 +575,7 @@ $(bold "File generati")
                Variabili ${PLACEHOLDER_VALUE} da compilare manualmente:
                GRAPHHOPPER_URL (URL base del proxy nginx), GRAPHHOPPER_TOKEN,
                ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY,
-               MAPBOX_ACCESS_TOKEN, SESSION_SECRET, OSM_UPDATE_SECRET
+               SESSION_SECRET, OSM_UPDATE_SECRET
 
 $(bold "Comandi utili")
   docker compose ps --all                        stato di tutti i container

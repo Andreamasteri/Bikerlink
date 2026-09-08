@@ -231,11 +231,7 @@ export function deriveProblems(signals: Signal[]): Problem[] {
     } else if (s.metric.startsWith("routing.engine_down.")) {
       const engine = s.metric.split(".")[2];
       title = `Routing engine ${engine} down da ${s.value} min`;
-      suggestion = `Verifica salute ${engine} e quota. Fallback su GraphHopper attivo.`;
-    } else if (s.metric === "quota.mapbox" || s.metric === "quota.tomtom") {
-      const provider = s.metric.split(".")[1];
-      title = `Quota ${provider} al ${s.value}%`;
-      suggestion = "Considera passare a engine self-hosted per il resto del mese.";
+      suggestion = `Verifica salute ${engine} e fallback su GraphHopper.`;
     } else if (s.metric.startsWith("health.tile.")) {
       const tile = s.metric.split(".")[2];
       title = `Tile provider ${tile} non raggiungibile`;
@@ -423,9 +419,7 @@ export function deriveProblems(signals: Signal[]): Problem[] {
 // guasti indipendenti):
 //  - DragonflyDB non raggiungibile (self-hosted sul ThinkCentre);
 //  - backlog map-matching che cresce perché GraphHopper non risponde;
-//  - routing engine SELF-HOSTED down (graphhopper/valhalla). I cloud engine
-//    (mapbox/tomtom) sono ESCLUSI: un loro down è indipendente dal ThinkCentre
-//    e deve restare azionabile;
+//  - routing engine self-hosted down (graphhopper/valhalla);
 //  - pressione del pool conseguente (event-loop ingolfato dalle chiamate lente
 //    verso il ThinkCentre → SELECT 1 non ottiene slot, limiter bg in coda);
 //  - instabilità di rete (N engine irraggiungibili): con TC spento i self-hosted
@@ -433,7 +427,6 @@ export function deriveProblems(signals: Signal[]): Problem[] {
 //  - DB ping lento (db.db.ping_ms): i job di map-matching girano a vuoto senza
 //    GH/Valhalla e saturano il pool → il ping rallenta come effetto collaterale.
 // NON inclusi (restano allarmi pieni anche a ThinkCentre spento):
-//  - maps.routing.engine_down.mapbox/tomtom (cloud, indipendenti dall'outage);
 //  - db.db.circuit_breaker (DB realmente giù — sempre azionabile).
 const OUTAGE_DOWNSTREAM_IDS = new Set<string>([
   "dragonfly.dragonfly.unreachable",

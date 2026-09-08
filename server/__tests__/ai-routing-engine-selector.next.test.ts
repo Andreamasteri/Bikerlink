@@ -36,10 +36,6 @@ const mocks = vi.hoisted(() => ({
   resolveRoutingArea: vi.fn(),
   scoreRoute: vi.fn(),
   haversineKm: vi.fn().mockReturnValue(70),
-  checkMapboxQuota: vi.fn().mockResolvedValue({ ok: true }),
-  checkTomTomQuota: vi.fn().mockResolvedValue({ ok: true }),
-  mapboxCalculateRoute: vi.fn(),
-  tomtomCalculateRoute: vi.fn(),
 
   // Storage
   getAppSetting: vi.fn(),
@@ -99,21 +95,6 @@ vi.mock("../geo", () => ({
   haversineKm: mocks.haversineKm,
 }));
 
-vi.mock("../routing/mapbox-directions-client", () => ({
-  calculateRoute: mocks.mapboxCalculateRoute,
-}));
-
-vi.mock("../routing/tomtom-routing-client", () => ({
-  calculateRoute: mocks.tomtomCalculateRoute,
-}));
-
-vi.mock("../routing/mapbox/quota-guard", () => ({
-  checkQuota: mocks.checkMapboxQuota,
-}));
-
-vi.mock("../routing/tomtom/quota-guard", () => ({
-  checkQuota: mocks.checkTomTomQuota,
-}));
 
 vi.mock("../routing/routing-pipeline-log", () => ({
   recordPipelineEvent: mocks.recordPipelineEvent,
@@ -201,8 +182,6 @@ beforeEach(() => {
   mocks.getServerInfo.mockResolvedValue({ status: "ok", graph_loaded: true, version: "9.x" });
   mocks.getValhallaInfo.mockResolvedValue({ status: "ok" });
   mocks.getAppSetting.mockResolvedValue(null);
-  mocks.checkMapboxQuota.mockResolvedValue({ ok: true });
-  mocks.checkTomTomQuota.mockResolvedValue({ ok: true });
   mocks.buildAiRoutingContext.mockReturnValue(FAKE_CTX);
 });
 

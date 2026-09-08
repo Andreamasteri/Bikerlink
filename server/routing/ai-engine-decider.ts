@@ -15,7 +15,7 @@ import { getRoutingCounters, getRecentLatencies, getBboxEngineQuality, bboxKeyOf
 import { withRoutingAiPriority } from "../ai/ai-priority-gate";
 
 // Engine candidati per la selezione AI: solo i due self-hosted. Gli engine cloud
-// (mapbox/tomtom) restano fuori dalla scelta automatica.
+// e non introduce provider cloud nella scelta automatica.
 export const AI_CANDIDATE_ENGINES = ["graphhopper", "valhalla"] as const;
 export type AiCandidateEngine = (typeof AI_CANDIDATE_ENGINES)[number];
 

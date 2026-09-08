@@ -73,7 +73,7 @@ describe("GET /api/settings/all", () => {
       { key: "paypal_email", value: "payments@example.test" },
       { key: "sos_enabled", value: "false" },
       { key: "maps_enabled", value: "false" },
-      { key: "maps_provider", value: "mapbox" },
+      { key: "maps_provider", value: "maplibre" },
       { key: "units_preference_enabled", value: "true" },
     ]);
 
@@ -89,7 +89,7 @@ describe("GET /api/settings/all", () => {
       paypalEmail: "payments@example.test",
       sosEnabled: false,
       mapsEnabled: false,
-      mapsProvider: "mapbox",
+      mapsProvider: "maplibre",
       unitsPrefEnabled: true,
     });
   });

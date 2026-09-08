@@ -137,16 +137,6 @@ export async function runPhase5Schedulers(): Promise<void> {
     scheduleDailyUserTimeProfileJob();
   });
 
-  await arm("mapbox-quota-reset", async () => {
-    const { scheduleMonthlyReset: scheduleMapboxQuotaReset } = await import("./routing/mapbox/quota-guard");
-    scheduleMapboxQuotaReset(); console.log("[INIT] Mapbox quota monthly reset scheduled");
-  });
-
-  await arm("tomtom-quota-reset", async () => {
-    const { scheduleDailyReset: scheduleTomTomQuotaReset } = await import("./routing/tomtom/quota-guard");
-    scheduleTomTomQuotaReset(); console.log("[INIT] TomTom quota daily reset scheduled");
-  });
-
   setImmediate(() => void import("./routing/valhalla-startup").then(m => m.validateValhallaStartup()).catch((e) => console.warn("[INIT][BG] validateValhallaStartup error:", e)));
 
   // Boot-time DB jobs scaglionati: evita saturazione pool (total=10) nei primi

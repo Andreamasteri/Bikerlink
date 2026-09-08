@@ -1,6 +1,5 @@
 // Task #2686 — Maps collector. Produce Signal[] da:
 //  - aggregato eventi telemetria client ultimi 5 min (maps_telemetry_events)
-//  - quota Mapbox/TomTom (vicina al limite)
 //  - stats map-matching job (last run lontano nel tempo / errori)
 //  - health-check tile servers + routing engines (HEAD ping ogni ciclo, lazy)
 //  - routing fallback rate (counter in-process da router-selector)
@@ -8,8 +7,6 @@ import type { Signal } from "../types";
 import { aggregateMapsTelemetry } from "../maps-telemetry-store";
 import { isMapsFlagEnabled } from "../maps-kill-switch";
 import { getBgDbLimiterStats } from "../../../lib/bg-db-limiter";
-import { checkQuota as checkMapboxQuota } from "../../../routing/mapbox/quota-guard";
-import { checkQuota as checkTomTomQuota } from "../../../routing/tomtom/quota-guard";
 import { getMatchingBacklogEstimate, MAP_MATCHING_LAST_ATTEMPT_KEY } from "../../../map-matching-job";
 import { readJobAttempt } from "../../../lib/scheduler-retry";
 import { getRoutingCounters } from "../../../routing/routing-metrics";
@@ -48,8 +45,6 @@ const TH = {
   mapInitFailCritical: 10,
   gpsLostCritical: 100,
   gpsLostHigh: 30,
-  quotaWarn: 0.85,
-  quotaCritical: 0.97,
   mapMatchingStaleHours: 36,
 };
 
@@ -173,39 +168,7 @@ export async function collectMaps(): Promise<Signal[]> {
     });
   }
 
-  // ─── 3. Quota Mapbox/TomTom ───────────────────────────────────────────
-  try {
-    const [mbx, ttm] = await Promise.allSettled([checkMapboxQuota(), checkTomTomQuota()]);
-    if (mbx.status === "fulfilled") {
-      const pct = mbx.value.percent / 100;
-      signals.push({
-        source: "maps", metric: "quota.mapbox", value: Math.round(pct * 1000) / 10,
-        unit: "percent",
-        severity: pct >= TH.quotaCritical ? "critical"
-                : pct >= TH.quotaWarn ? "high"
-                : pct >= 0.5 ? "warn" : "info",
-        details: { used: mbx.value.used, limit: mbx.value.limit, resets_at: mbx.value.resets_at },
-      });
-    }
-    if (ttm.status === "fulfilled") {
-      const pct = ttm.value.percent / 100;
-      signals.push({
-        source: "maps", metric: "quota.tomtom", value: Math.round(pct * 1000) / 10,
-        unit: "percent",
-        severity: pct >= TH.quotaCritical ? "critical"
-                : pct >= TH.quotaWarn ? "high"
-                : pct >= 0.5 ? "warn" : "info",
-        details: { used: ttm.value.used, limit: ttm.value.limit },
-      });
-    }
-  } catch (err) {
-    signals.push({
-      source: "maps", metric: "collector.error", severity: "warn",
-      details: { stage: "quota", error: (err as Error).message?.slice(0, 200) },
-    });
-  }
-
-  // ─── 4. Map-matching backlog (stima economica) ────────────────────────
+  // ─── 3. Map-matching backlog (stima economica) ────────────────────────
   // Task #4706: NON usare getMapMatchingStats() qui (GROUP BY su tutta la tabella
   // ad ogni tick a 60s, contende il pool). getMatchingBacklogEstimate conta solo
   // pending+retry via indice parziale, sotto budget bg + statement_timeout breve,

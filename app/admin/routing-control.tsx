@@ -25,8 +25,6 @@ import type { RoutingStatus, RoutingTestResult } from "@/components/admin/routin
 const ENGINES: { id: string; label: string }[] = [
   { id: "graphhopper", label: "GraphHopper" },
   { id: "valhalla", label: "Valhalla" },
-  { id: "mapbox-directions", label: "Mapbox" },
-  { id: "tomtom", label: "TomTom" },
 ];
 
 export default function RoutingControlScreen() {

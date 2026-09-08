@@ -47,20 +47,6 @@ export const limiters = {
     reservoirRefreshAmount: Number(process.env.GROQ_RPM_LIMIT ?? 30),
     reservoirRefreshInterval: 60 * 1000,
   }),
-  mapbox: make({
-    maxConcurrent: 10,
-    minTime: 50,
-    reservoir: 600,
-    reservoirRefreshAmount: 600,
-    reservoirRefreshInterval: 60 * 1000,
-  }),
-  tomtom: make({
-    maxConcurrent: 5,
-    minTime: 200,
-    reservoir: 5,
-    reservoirRefreshAmount: 5,
-    reservoirRefreshInterval: 1000,
-  }),
 } as const;
 
 export type LimiterName = keyof typeof limiters;

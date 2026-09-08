@@ -12,7 +12,6 @@ interface RoutingCardProps {
   engine: RoutingEngineId;
   profile: RoutingProfileId;
   routingNotes: string;
-  mapboxQuota?: { used: number; limit: number; percent: number; resets_at: string; warning_threshold: number };
   isPending: boolean;
   onRoutingChange: (engine: RoutingEngineId, profile: RoutingProfileId) => void;
 }
@@ -62,7 +61,7 @@ function OptionRow<T extends string>({
 
 const SELF_HOSTED_ENGINES: RoutingEngineId[] = ["graphhopper", "valhalla"];
 
-export function RoutingCard({ engine, profile, routingNotes, mapboxQuota, isPending, onRoutingChange }: RoutingCardProps) {
+export function RoutingCard({ engine, profile, routingNotes, isPending, onRoutingChange }: RoutingCardProps) {
   const [expanded, setExpanded] = React.useState(false);
   const [localProfile, setLocalProfile] = React.useState<RoutingProfileId>(profile);
 
@@ -90,10 +89,6 @@ export function RoutingCard({ engine, profile, routingNotes, mapboxQuota, isPend
     if (!isPending) onRoutingChange(engine, p);
   };
 
-  const quotaPercent = mapboxQuota?.percent ?? 0;
-  const quotaWarning = mapboxQuota && mapboxQuota.used >= mapboxQuota.warning_threshold;
-  const quotaFull = mapboxQuota && mapboxQuota.used >= mapboxQuota.limit;
-
   return (
     <View style={styles.card}>
       <TouchableOpacity style={styles.header} onPress={() => setExpanded((v) => !v)} activeOpacity={0.7}>
@@ -116,19 +111,6 @@ export function RoutingCard({ engine, profile, routingNotes, mapboxQuota, isPend
         <View style={styles.notesBox}>
           <Ionicons name="information-circle-outline" size={13} color={Colors.textSecondary} />
           <Text style={styles.notesText}>{routingNotes}</Text>
-        </View>
-      )}
-
-      {mapboxQuota && (
-        <View style={[styles.quotaBox, quotaWarning ? styles.quotaBoxWarning : null, quotaFull ? styles.quotaBoxFull : null]}>
-          <Ionicons
-            name={quotaFull ? "alert-circle" : quotaWarning ? "warning-outline" : "checkmark-circle-outline"}
-            size={13}
-            color={quotaFull ? Colors.error : quotaWarning ? "#f59e0b" : Colors.success}
-          />
-          <Text style={styles.quotaText}>
-            Mapbox: {mapboxQuota.used.toLocaleString("it-IT")} / {mapboxQuota.limit.toLocaleString("it-IT")} req ({quotaPercent}%)
-          </Text>
         </View>
       )}
 
@@ -184,10 +166,6 @@ const styles = StyleSheet.create({
   currentValue: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.accent },
   notesBox: { flexDirection: "row", gap: 4, backgroundColor: Colors.background, padding: 8, borderRadius: 6, marginBottom: 8 },
   notesText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, flex: 1 },
-  quotaBox: { flexDirection: "row", gap: 6, alignItems: "center", backgroundColor: Colors.background, padding: 8, borderRadius: 6, marginBottom: 8, borderWidth: 1, borderColor: Colors.border },
-  quotaBoxWarning: { borderColor: "#f59e0b" },
-  quotaBoxFull: { borderColor: Colors.error },
-  quotaText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
   sectionLabel: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textSecondary, marginBottom: 8, marginTop: 8, textTransform: "uppercase", letterSpacing: 0.5 },
   option: {
     flexDirection: "row",

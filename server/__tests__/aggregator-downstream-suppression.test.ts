@@ -106,9 +106,6 @@ describe("suppressDownstreamWhenPoweredOff — problemi a valle", () => {
   it("NON tocca gli allarmi indipendenti dal ThinkCentre", () => {
     const independent: Problem[] = [
       // Engine cloud: un loro down è indipendente dal ThinkCentre.
-      prob("maps.routing.engine_down.mapbox", "critical", "maps"),
-      prob("maps.routing.engine_down.tomtom", "high", "maps"),
-      prob("maps.health.engine.mapbox", "high", "maps"),
       // Tile CDN pubblici.
       prob("maps.health.tile.osm-standard", "high", "maps"),
       // DB realmente giù — sempre azionabile indipendentemente dal TC.

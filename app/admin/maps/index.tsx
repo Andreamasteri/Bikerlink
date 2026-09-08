@@ -27,13 +27,6 @@ interface AdminMapsConfig {
   dem_source?: "custom" | "aws-free";
   osm_last_updated_at: string | null;
   tester_can_customize?: boolean;
-  mapbox_quota?: {
-    used: number;
-    limit: number;
-    percent: number;
-    resets_at: string;
-    warning_threshold: number;
-  };
   photon?: PhotonHealth;
 }
 
@@ -175,7 +168,6 @@ export default function AdminMapsPage() {
         engine={data.routing}
         profile={data.profile}
         routingNotes={data.routing_notes}
-        mapboxQuota={data.mapbox_quota}
         isPending={routingMutation.isPending}
         onRoutingChange={(engine, profile) => routingMutation.mutate({ engine, profile })}
       />
