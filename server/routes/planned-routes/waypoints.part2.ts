@@ -28,6 +28,51 @@ import {
   type WeatherSample,
 } from "./weather-helper";
 
+const DIRECTION_DEGREES: Record<string, number> = {
+  N: 0, NE: 45, E: 90, SE: 135, S: 180, SO: 225, O: 270, NO: 315,
+};
+
+const ROUND_TRIP_AVG_KMH: Record<string, number> = {
+  direct: 80,
+  fast: 85,
+  balanced: 65,
+  curvy: 55,
+  extra_curvy: 50,
+};
+
+function sameWaypoint(a: { lat: number; lng: number }, b: { lat: number; lng: number }): boolean {
+  return Math.abs(a.lat - b.lat) < 0.00001 && Math.abs(a.lng - b.lng) < 0.00001;
+}
+
+/**
+ * Il client conserva start→start per compatibilità col form a due campi. Se
+ * non sono presenti tappe vere, GH può generare direttamente un anello: non
+ * inventiamo più un punto intermedio geometrico. Gli eventuali waypoint reali
+ * restano invece vincoli espliciti e vengono trattati come una rotta normale.
+ */
+function nativeRoundTripRequest(
+  waypoints: Array<{ lat: number; lng: number }>,
+  isRoundTrip: boolean | undefined,
+  hours: number | undefined,
+  style: string,
+  headingDeg: number | undefined,
+  roundTripDirection: string | undefined,
+): { point: { lat: number; lng: number }; distance: number; seed: number; heading?: number } | null {
+  if (!isRoundTrip || waypoints.length < 2) return null;
+  const start = waypoints[0];
+  const hasExplicitAnchor = waypoints.slice(1).some((point) => !sameWaypoint(point, start));
+  if (hasExplicitAnchor) return null;
+
+  const targetHours = Math.max(1, Math.min(12, hours ?? 3));
+  const distance = Math.round(targetHours * (ROUND_TRIP_AVG_KMH[style] ?? 65) * 1000);
+  const heading = headingDeg ?? DIRECTION_DEGREES[roundTripDirection ?? ""];
+  // Stesso punto/opzioni => stesso anello anche dopo un ricalcolo automatico.
+  const seedText = `${start.lat.toFixed(5)}:${start.lng.toFixed(5)}:${targetHours}:${style}:${heading ?? "any"}`;
+  let seed = 0;
+  for (let i = 0; i < seedText.length; i += 1) seed = ((seed * 31) + seedText.charCodeAt(i)) >>> 0;
+  return { point: start, distance, seed: seed || 1, ...(heading !== undefined ? { heading } : {}) };
+}
+
 export async function handleCalculateRoute(req: Request, res: Response) {
   const userId = requireAuth(req, res);
   if (!userId) return;
@@ -68,36 +113,19 @@ export async function handleCalculateRoute(req: Request, res: Response) {
     ? routingProfile
     : ACTIVE_PROFILE;
 
-  const DIRECTION_DEGREES: Record<string, number> = {
-    N: 0, NE: 45, E: 90, SE: 135, S: 180, SO: 225, O: 270, NO: 315,
-  };
+  const nativeRoundTrip = nativeRoundTripRequest(
+    waypoints,
+    isRoundTrip,
+    roundTripHours,
+    normStyle,
+    headingDeg,
+    roundTripDirection,
+  );
+  const effectiveWaypoints = nativeRoundTrip ? [nativeRoundTrip.point] : waypoints;
 
-  let effectiveWaypoints = waypoints;
-  if (isRoundTrip && roundTripDirection && DIRECTION_DEGREES[roundTripDirection] !== undefined) {
-    const headingDeg = DIRECTION_DEGREES[roundTripDirection];
-    const headingRad = headingDeg * Math.PI / 180;
-    const start = waypoints[0];
-    const styleAvgSpeed: Record<string, number> = { direct: 80, curvy: 55, balanced: 65, fast: 85, extra_curvy: 50 };
-    const avgKmh = styleAvgSpeed[normStyle] ?? 65;
-    const offsetKm = (roundTripHours ?? 2) * avgKmh * 0.4;
-    const deltaLat = offsetKm / 111.32;
-    const deltaLng = offsetKm / (111.32 * Math.cos(start.lat * Math.PI / 180));
-    const midLat = start.lat + deltaLat * Math.cos(headingRad);
-    const midLng = start.lng + deltaLng * Math.sin(headingRad);
-    const last = waypoints[waypoints.length - 1];
-    const otherWps = waypoints.slice(1, -1);
-    effectiveWaypoints = [
-      start,
-      { lat: midLat, lng: midLng },
-      ...otherWps,
-      last,
-    ];
-  }
-
-  // Gli intenti descrivono i tratti richiesti dal client. Un round-trip con
-  // direzione inserisce ancora un'ancora artificiale: finché la Fase 3 non lo
-  // sostituisce con un anello nativo, non accettiamo una mappa intenti ambigua.
-  if (segmentIntents && segmentIntents.length !== effectiveWaypoints.length - 1) {
+  // Gli intenti descrivono tratti espliciti. Un anello nativo non ha ancora
+  // sezioni semanticamente selezionabili: arriveranno con le ancore Fase 4.
+  if (segmentIntents && (nativeRoundTrip || segmentIntents.length !== effectiveWaypoints.length - 1)) {
     return sendError(res, 400, "Gli intenti di sezione non sono compatibili con questo giro ad anello");
   }
 
@@ -149,8 +177,19 @@ export async function handleCalculateRoute(req: Request, res: Response) {
       elevation: true,
     };
 
-    if (isRoundTrip && headingDeg !== undefined && headingDeg !== null) {
-      body.heading = headingDeg;
+    if (nativeRoundTrip) {
+      body.algorithm = "round_trip";
+      body.roundTrip = {
+        distance: nativeRoundTrip.distance,
+        seed: nativeRoundTrip.seed,
+      };
+    }
+
+    const effectiveHeading = nativeRoundTrip?.heading
+      ?? headingDeg
+      ?? DIRECTION_DEGREES[roundTripDirection ?? ""];
+    if (effectiveHeading !== undefined) {
+      body.heading = effectiveHeading;
     }
 
     // Strato geometrico (base stabile per tutti i profili) + regole di avoidance.

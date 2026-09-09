@@ -58,6 +58,31 @@ beforeEach(() => {
 });
 
 describe("/calculate — intenti per sezione", () => {
+  it("usa l'algoritmo nativo round_trip per un anello senza tappe esplicite", async () => {
+    mocks.getActiveRouter.mockResolvedValueOnce({
+      paths: [makePath([[9, 45], [9.2, 45.2], [9, 45]], 165_000, 10_800_000)],
+    });
+
+    const response = await request(buildApp())
+      .post("/api/planned-routes/calculate")
+      .send({
+        waypoints: [{ lat: 45, lng: 9 }, { lat: 45, lng: 9 }],
+        style: "curvy",
+        isRoundTrip: true,
+        roundTripHours: 3,
+        roundTripDirection: "NE",
+      });
+
+    expect(response.status).toBe(200);
+    expect(mocks.getActiveRouter).toHaveBeenCalledTimes(1);
+    expect(mocks.getActiveRouter.mock.calls[0][0]).toMatchObject({
+      points: [[9, 45]],
+      algorithm: "round_trip",
+      roundTrip: { distance: 165_000 },
+      heading: 45,
+    });
+  });
+
   it("calcola ogni tratta con l'intento risolto e restituisce un solo percorso continuo", async () => {
     mocks.getActiveRouter
       .mockResolvedValueOnce({ paths: [makePath([[9, 45], [9.1, 45.1]], 10_000, 600_000)] })

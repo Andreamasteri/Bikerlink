@@ -335,6 +335,10 @@ export interface RouteRequest {
   custom_model?: Record<string, unknown>;
   optimize?: boolean;
   heading?: number;
+  /** Algoritmo nativo GH per generare un anello a partire da un solo punto. */
+  algorithm?: "round_trip";
+  /** Parametri dell'algoritmo round_trip (metri e seed deterministico). */
+  roundTrip?: { distance: number; seed: number };
   language?: string;
 }
 
@@ -484,6 +488,11 @@ export async function calculateRoute(
   if (req.custom_model) body.custom_model = req.custom_model;
   if (req.optimize !== undefined) body.optimize = req.optimize;
   if (req.heading !== undefined) body.heading = req.heading;
+  if (req.algorithm) body.algorithm = req.algorithm;
+  if (req.roundTrip) {
+    body["round_trip.distance"] = req.roundTrip.distance;
+    body["round_trip.seed"] = req.roundTrip.seed;
+  }
 
   const extraHeaders: Record<string, string> = {};
   if (req.language) extraHeaders["Accept-Language"] = req.language;
