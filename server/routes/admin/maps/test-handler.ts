@@ -78,15 +78,11 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
     message = "Valhalla (ThinkCentre) OFFLINE — fallback automatico a GraphHopper.";
   } else if (ghDown) {
     if (errorType === "tunnel_down") {
-      message = snap.cloudFallbackAvailable
-        ? "Tunnel Cloudflare non raggiungibile — routing servito dalla Cloud API (profilo car)."
-        : "Tunnel Cloudflare non raggiungibile — nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY).";
+      message = "Tunnel Cloudflare non raggiungibile — routing BikerLink non disponibile.";
     } else if (errorType === "profile_missing") {
       message = "Profilo motorcycle non disponibile sul server GH.";
     } else {
-      message = snap.cloudFallbackAvailable
-        ? "ThinkCentre OFFLINE — routing servito dalla Cloud API (profilo car)."
-        : "ThinkCentre OFFLINE — nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY).";
+      message = "ThinkCentre OFFLINE — routing BikerLink non disponibile.";
     }
   } else {
     message = "Server di routing operativo.";
@@ -118,8 +114,6 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
       down: valhallaDown,
       version: valhallaInfo.version,
     },
-    cloud_fallback_available: snap.cloudFallbackAvailable,
-    cloud_fallback_active: snap.cloudFallbackActive,
     routing_disabled: routingDisabled,
     // Riepilogo per banner admin — riflette l'engine attivo
     degraded: activeEngineDown,

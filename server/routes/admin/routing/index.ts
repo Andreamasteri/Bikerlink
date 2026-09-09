@@ -167,10 +167,6 @@ router.get("/status", async (_req: Request, res: Response) => {
         ? profilesResult.profiles
         : null,
     },
-    cloudFallback: {
-      available: snap.cloudFallbackAvailable,
-      active: snap.cloudFallbackActive,
-    },
     valhalla: {
       status: valhallaInfo.status,
       ok: valhallaOk,

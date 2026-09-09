@@ -20,6 +20,7 @@ import {
   normalizeDrivingProfile,
 } from "../../routing/route-weights";
 import type { TelemetryCoverage } from "../../routing/route-weights";
+import { calculateSegmentedRoute } from "../../routing/segment-route-planner";
 import {
   fetchWeatherForWaypoints,
   samplePointsAlongPath,
@@ -45,6 +46,7 @@ export async function handleCalculateRoute(req: Request, res: Response) {
     avoidFerries = false,
     avoidUnpaved = false,
     avoidWeather = false,
+    segmentIntents,
     roundTripHours,
     isRoundTrip,
     roundTripDirection,
@@ -92,10 +94,51 @@ export async function handleCalculateRoute(req: Request, res: Response) {
     ];
   }
 
+  // Gli intenti descrivono i tratti richiesti dal client. Un round-trip con
+  // direzione inserisce ancora un'ancora artificiale: finché la Fase 3 non lo
+  // sostituisce con un anello nativo, non accettiamo una mappa intenti ambigua.
+  if (segmentIntents && segmentIntents.length !== effectiveWaypoints.length - 1) {
+    return sendError(res, 400, "Gli intenti di sezione non sono compatibili con questo giro ad anello");
+  }
+
   let myStyleWarning: string | null = null;
   let telemetryCoverage: TelemetryCoverage | null = null;
 
   try {
+    const geocodingOk = clientGeocodingOk ?? true;
+    if (segmentIntents) {
+      const segmented = await calculateSegmentedRoute({
+        waypoints: effectiveWaypoints,
+        segmentIntents,
+        globalIntent: {
+          style: normStyle,
+          drivingProfile: normProfile,
+          avoidHighways,
+          avoidTolls,
+          avoidFerries,
+          avoidUnpaved,
+          avoidWeather,
+        },
+        routingProfile,
+        userId,
+        response: res,
+        geocodingOk,
+      });
+      const path = segmented.path;
+      return res.json({
+        encoded: path.points,
+        distanceKm: Math.round(path.distance / 100) / 10,
+        durationMinutes: Math.round(path.time / 60000),
+        instructions: path.instructions ?? [],
+        bikerScore: 0.8,
+        elevation: extractElevationProfile(path.points as string, (path as { points_encoded?: boolean; points?: { coordinates?: number[][] } }).points_encoded === false ? (path.points as { coordinates?: number[][] })?.coordinates : undefined),
+        warning: segmented.warning,
+        weatherWarning: segmented.weatherWarning,
+        telemetryCoverage: segmented.telemetryCoverage,
+        segmentResults: segmented.segments,
+      });
+    }
+
     const body: Record<string, unknown> = {
       points: effectiveWaypoints.map((wp) => [wp.lng, wp.lat]),
       profile: isAutoCurvy ? "auto_curvy" : ghProfile,
@@ -124,8 +167,6 @@ export async function handleCalculateRoute(req: Request, res: Response) {
     // geocodingOk: il client informa il server se il geocoding è andato a buon
     // fine per tutti i waypoint (es. Photon disponibile). Se assente, si
     // assume true (coordinate già risolte o fornite direttamente via GPS/mappa).
-    const geocodingOk = clientGeocodingOk ?? true;
-
     const runRoute = (
       priorityRules: Array<{ if: string; multiply_by: number }>,
       areas?: Record<string, unknown>,

@@ -5,14 +5,14 @@
  * `thinkcentre_maintenance_mode=true`. In entrambi i casi il sistema deve
  * smettere immediatamente di interagire con i servizi self-hosted del
  * ThinkCentre (Ollama, Whisper, routing, map-matching, Photon): niente
- * timeout di rete da attendere, niente retry, fallback cloud istantaneo.
+ * timeout di rete da attendere o degradazioni silenziose del routing.
  *
  * Le due AppSetting vengono lette con cache in-memory TTL 3 minuti: così le
  * letture su `app_settings` avvengono al massimo ogni 3 minuti invece di ogni
  * ciclo (~65s), e quando il pool è saturo le letture fallite NON cambiano il
  * comportamento (si riusa l'ultimo valore valido in cache).
  *
- * `ignore_for_tests` resta separato (non attiva il fallback cloud — serve solo
+ * `ignore_for_tests` resta separato (non attiva alcun routing alternativo — serve solo
  * a silenziare gli alert in dev/CI).
  */
 import { db, withDbRetry } from "../db";
