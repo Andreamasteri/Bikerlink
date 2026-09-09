@@ -28,12 +28,9 @@ export const isSelfHosted = Boolean(SELF_HOSTED_URL);
 export const SELF_HOSTED_BASE_URL = SELF_HOSTED_URL ?? "";
 
 /**
- * Quando il routing è self-hosted (PC di casa esposto via tunnel/Nginx) ma è
- * configurata anche una GRAPHHOPPER_API_KEY, l'app può degradare con grazia
- * verso la Cloud API se il server di casa è offline (timeout/5xx/errore di rete)
- * invece di restituire 502 ai client.
+ * Una API key Cloud può esistere per installazioni esplicitamente cloud-only,
+ * ma non viene mai usata come fallback del routing self-hosted BikerLink.
  */
-export const canFallbackToCloud = isSelfHosted && Boolean(CLOUD_API_KEY);
 
 /**
  * KILL-SWITCH ROUTING — BikerLink (Task #2824)
@@ -165,10 +162,6 @@ export interface RoutingHealthSnapshot {
   error: string | null;
   /** Fallimenti consecutivi del server self-hosted. */
   consecutiveFailures: number;
-  /** true se la Cloud API è disponibile come fallback automatico. */
-  cloudFallbackAvailable: boolean;
-  /** true se l'ultima richiesta è stata servita dalla Cloud per fallback. */
-  cloudFallbackActive: boolean;
 }
 
 const selfHostHealth = {
@@ -178,7 +171,6 @@ const selfHostHealth = {
   latencyMs: null as number | null,
   error: null as string | null,
   consecutiveFailures: 0,
-  cloudFallbackActive: false,
 };
 
 export function recordSelfHostSuccess(latencyMs: number): void {
@@ -188,7 +180,6 @@ export function recordSelfHostSuccess(latencyMs: number): void {
   selfHostHealth.latencyMs = latencyMs;
   selfHostHealth.error = null;
   selfHostHealth.consecutiveFailures = 0;
-  selfHostHealth.cloudFallbackActive = false;
 
   if (lastEventType !== "up") {
     const duration_ms = downSince != null ? now - downSince : undefined;
@@ -198,7 +189,7 @@ export function recordSelfHostSuccess(latencyMs: number): void {
   }
 }
 
-export function recordSelfHostFailure(error: string, fellBackToCloud: boolean): void {
+export function recordSelfHostFailure(error: string): void {
   const now = Date.now();
   selfHostHealth.ok = false;
   selfHostHealth.lastCheckAt = now;
@@ -206,7 +197,6 @@ export function recordSelfHostFailure(error: string, fellBackToCloud: boolean): 
   selfHostHealth.latencyMs = null;
   selfHostHealth.error = error.slice(0, 300);
   selfHostHealth.consecutiveFailures += 1;
-  selfHostHealth.cloudFallbackActive = fellBackToCloud;
 
   if (lastEventType !== "down") {
     downSince = now;
@@ -233,8 +223,6 @@ export function getRoutingHealthSnapshot(): RoutingHealthSnapshot {
     latencyMs: selfHostHealth.latencyMs,
     error: selfHostHealth.error,
     consecutiveFailures: selfHostHealth.consecutiveFailures,
-    cloudFallbackAvailable: canFallbackToCloud,
-    cloudFallbackActive: selfHostHealth.cloudFallbackActive,
   };
 }
 
@@ -322,8 +310,8 @@ export function classifyGHError(
 
 /**
  * Determina se un errore/risposta del server self-hosted è "transitorio" e
- * giustifica il fallback Cloud: timeout (AbortError), errore di rete (TypeError),
- * o risposta HTTP 5xx (incl. 502/504 tipici di tunnel/Nginx con backend giù).
+ * segnala l'indisponibilità del self-hosted: timeout (AbortError), errore di
+ * rete (TypeError), o risposta HTTP 5xx (incl. 502/504 tipici di tunnel/Nginx).
  */
 export function isSelfHostDown(err: unknown): boolean {
   if (err instanceof Error) {
@@ -347,6 +335,10 @@ export interface RouteRequest {
   custom_model?: Record<string, unknown>;
   optimize?: boolean;
   heading?: number;
+  /** Algoritmo nativo GH per generare un anello a partire da un solo punto. */
+  algorithm?: "round_trip";
+  /** Parametri dell'algoritmo round_trip (metri e seed deterministico). */
+  roundTrip?: { distance: number; seed: number };
   language?: string;
 }
 
@@ -460,7 +452,7 @@ export async function mapMatch(
     return out;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (isSelfHosted) recordSelfHostFailure(msg, false);
+    if (isSelfHosted) recordSelfHostFailure(msg);
     if (isSelfHosted && isSelfHostDown(err)) {
       throw new Error(`Map-matching non disponibile: server di routing self-hosted offline. Dettaglio: ${msg.slice(0, 200)}`);
     }
@@ -496,6 +488,11 @@ export async function calculateRoute(
   if (req.custom_model) body.custom_model = req.custom_model;
   if (req.optimize !== undefined) body.optimize = req.optimize;
   if (req.heading !== undefined) body.heading = req.heading;
+  if (req.algorithm) body.algorithm = req.algorithm;
+  if (req.roundTrip) {
+    body["round_trip.distance"] = req.roundTrip.distance;
+    body["round_trip.seed"] = req.roundTrip.seed;
+  }
 
   const extraHeaders: Record<string, string> = {};
   if (req.language) extraHeaders["Accept-Language"] = req.language;
@@ -530,7 +527,7 @@ export async function calculateRoute(
   } catch (firstErr: unknown) {
     const firstMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
     if (!isSelfHostDown(firstErr)) {
-      recordSelfHostFailure(firstMsg, false);
+      recordSelfHostFailure(firstMsg);
       throw firstErr instanceof Error ? firstErr : new Error(firstMsg);
     }
     console.warn(`[GraphHopper] Self-hosted: errore transitorio (${firstMsg}), retry in 400ms…`);
@@ -539,22 +536,9 @@ export async function calculateRoute(
       return await attemptSelf();
     } catch (retryErr: unknown) {
       const msg = retryErr instanceof Error ? retryErr.message : String(retryErr);
-      const canFallbackToCloudNow = isSelfHosted && Boolean(CLOUD_API_KEY);
-      if (canFallbackToCloudNow && isSelfHostDown(retryErr)) {
-        console.warn(`[GraphHopper] Self-hosted ancora offline dopo retry (${msg}) — fallback Cloud API (profilo car).`);
-        try {
-          const out = await doFetch(true);
-          recordSelfHostFailure(msg, true);
-          return out;
-        } catch (cloudErr: unknown) {
-          const cloudMsg = cloudErr instanceof Error ? cloudErr.message : String(cloudErr);
-          recordSelfHostFailure(`self-host: ${msg} | cloud: ${cloudMsg}`, false);
-          throw new Error(`GraphHopper non disponibile (self-hosted offline e fallback Cloud fallito): ${cloudMsg.slice(0, 200)}`);
-        }
-      }
-      recordSelfHostFailure(msg, false);
+      recordSelfHostFailure(msg);
       if (isSelfHostDown(retryErr)) {
-        throw new Error(`Server di routing self-hosted offline e nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY). Dettaglio: ${msg.slice(0, 200)}`);
+        throw new Error(`Server di routing self-hosted offline. Dettaglio: ${msg.slice(0, 200)}`);
       }
       throw retryErr instanceof Error ? retryErr : new Error(msg);
     }
@@ -598,7 +582,7 @@ export async function getServerInfo(): Promise<GHServerInfo> {
       };
     }
     const msg = "nessuna area risponde su /areas/<code>/info";
-    recordSelfHostFailure(msg, false);
+    recordSelfHostFailure(msg);
     return {
       status: "error",
       graph_loaded: false,

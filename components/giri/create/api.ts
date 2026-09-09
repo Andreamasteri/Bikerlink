@@ -1,7 +1,7 @@
 import { getApiUrl } from "@/lib/query-client";
 import { Ionicons } from "@expo/vector-icons";
 import { AiKeyMissingError, isAiKeyMissingResponse } from "@/lib/ai-errors";
-import { Waypoint, Style, DrivingProfile, RoutingProfile, RouteResult, WeatherWaypoint } from "./types";
+import { Waypoint, Style, DrivingProfile, RoutingProfile, RouteResult, SegmentRouteIntent, WeatherWaypoint } from "./types";
 
 // Re-export per i consumatori che importano da questo modulo.
 export { AiKeyMissingError } from "@/lib/ai-errors";
@@ -30,6 +30,7 @@ export async function calcRoute(
   language?: string,
   routingProfile?: RoutingProfile,
   geocodingOk?: boolean,
+  segmentIntents?: SegmentRouteIntent[],
 ): Promise<RouteResult> {
   const url = new URL("/api/planned-routes/calculate", getApiUrl());
   const resp = await fetch(url.toString(), {
@@ -41,6 +42,7 @@ export async function calcRoute(
       ...(headingDeg !== null && headingDeg !== undefined ? { headingDeg } : {}),
       ...(routingProfile ? { routingProfile } : {}),
       ...(geocodingOk === false ? { geocodingOk: false } : {}),
+      ...(segmentIntents ? { segmentIntents } : {}),
     }),
   });
   if (!resp.ok) {

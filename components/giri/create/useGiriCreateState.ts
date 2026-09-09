@@ -10,7 +10,7 @@ import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 import { 
   Waypoint, Style, DrivingProfile, VehicleProfile, Mode, RouteResult, 
   WeatherWaypoint, AiPreviewState,
-  ResolvedPoiStop, PoiResult, GeoResult
+  ResolvedPoiStop, PoiResult, GeoResult, SegmentRouteIntent
 } from "./types";
 import { calcRoute } from "./api";
 import { handleImportGpxHelper, autoLoadWeatherHelper } from "./useGiriCreateState.part2";
@@ -53,6 +53,7 @@ export function useGiriCreateState(language?: string) {
   const [avoidFerries, setAvoidFerries] = useState(false);
   const [avoidUnpaved, setAvoidUnpaved] = useState(false);
   const [avoidWeather, setAvoidWeather] = useState(false);
+  const [segmentIntents, setSegmentIntents] = useState<SegmentRouteIntent[] | null>(null);
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [selectedMotoId, _setSelectedMotoId] = useState<string | null>(null);
 
@@ -145,12 +146,35 @@ export function useGiriCreateState(language?: string) {
     });
   }, []);
 
-  const handleConfirmPreview = () => handleConfirmPreviewHelper(
+  const handleConfirmPreview = () => {
+    setSegmentIntents(null);
+    return handleConfirmPreviewHelper(
     aiPreview, resolvedPoiStops, setTitle, setStyle, setIsRoundTrip, setHeadingDeg,
     setIsMultiDay, setDaysCount, setAvoidHighways, setWaypoints, setWpInputs,
     setMode, setCalculating, setRouteResult, setWeatherPreview, setDismissedWarnings,
     logFetch, drivingProfile, language, vehicleProfile, maxHoursPerDay, autoLoadWeather
-  );
+    );
+  };
+
+  const enableSegmentIntents = () => {
+    setSegmentIntents(Array.from({ length: Math.max(0, waypoints.length - 1) }, () => ({ kind: "inherit" })));
+    setRouteResult(null);
+  };
+
+  const disableSegmentIntents = () => {
+    setSegmentIntents(null);
+    setRouteResult(null);
+  };
+
+  const updateSegmentIntent = (index: number, intent: SegmentRouteIntent) => {
+    setSegmentIntents((current) => {
+      if (!current || !current[index]) return current;
+      const next = [...current];
+      next[index] = intent;
+      return next;
+    });
+    setRouteResult(null);
+  };
 
   const handleWpInput = (text: string, index: number) => {
     const newInputs = [...wpInputs]; newInputs[index] = text; setWpInputs(newInputs);
@@ -205,6 +229,13 @@ export function useGiriCreateState(language?: string) {
     const insertAt = waypoints.length - 1;
     const newWps = [...waypoints]; newWps.splice(insertAt, 0, { lat: 0, lng: 0, name: "" }); setWaypoints(newWps);
     const newInputs = [...wpInputs]; newInputs.splice(insertAt, 0, ""); setWpInputs(newInputs);
+    setSegmentIntents((current) => {
+      if (!current) return null;
+      const next = [...current];
+      const copiedIntent = { ...(current[Math.max(0, insertAt - 1)] ?? { kind: "inherit" }) };
+      next.splice(insertAt - 1, 0, copiedIntent);
+      return next;
+    });
     setRouteResult(null);
   };
 
@@ -212,6 +243,12 @@ export function useGiriCreateState(language?: string) {
     if (waypoints.length <= 2) return;
     setWaypoints(waypoints.filter((_, i) => i !== index));
     setWpInputs(wpInputs.filter((_, i) => i !== index));
+    setSegmentIntents((current) => {
+      if (!current) return null;
+      const next = [...current];
+      next.splice(index, 1);
+      return next;
+    });
     setRouteResult(null);
   };
 
@@ -226,7 +263,7 @@ export function useGiriCreateState(language?: string) {
     setWeatherPreview(null);
     try {
       const ghRoutingProfile = vehicleProfile === "auto_curvy" ? "auto_curvy" : vehicleProfile === "moto_fast" ? "motorcycle_fast" : vehicleProfile === "car" ? "car" : undefined;
-      const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language, ghRoutingProfile, true);
+      const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language, ghRoutingProfile, true, isRoundTrip ? undefined : segmentIntents ?? undefined);
       setRouteResult(result);
       setDismissedWarnings(new Set());
       if (result.durationMinutes > 480 && !isMultiDay) {
@@ -283,6 +320,7 @@ export function useGiriCreateState(language?: string) {
       metadata: {
         avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, daysCount, maxHoursPerDay,
         isRoundTrip, roundTripHours, headingDeg,
+        segmentIntents,
         motorcycleId: selectedMotoId, fuelStopsNeeded,
         ...(aiProviderUsed ? { provider_used: aiProviderUsed } : {}),
       }
@@ -326,6 +364,13 @@ export function useGiriCreateState(language?: string) {
       const insertAt = Math.max(1, newWps.length - 1);
       newWps.splice(insertAt, 0, { lat, lng, name });
       newInputs.splice(insertAt, 0, name);
+      setSegmentIntents((current) => {
+        if (!current) return null;
+        const next = [...current];
+        const copiedIntent = { ...(current[Math.max(0, insertAt - 1)] ?? { kind: "inherit" }) };
+        next.splice(insertAt - 1, 0, copiedIntent);
+        return next;
+      });
     }
     setWaypoints(newWps);
     setWpInputs(newInputs);
@@ -349,6 +394,7 @@ export function useGiriCreateState(language?: string) {
     avoidTolls, setAvoidTolls, avoidFerries, setAvoidFerries,
     avoidUnpaved, setAvoidUnpaved, avoidWeather, setAvoidWeather,
     visibility, setVisibility, waypoints, setWaypoints, wpInputs, setWpInputs,
+    segmentIntents, enableSegmentIntents, disableSegmentIntents, updateSegmentIntent,
     wpSuggestions, setWpSuggestions, wpLoading, routeResult, calculating,
     routeError, weatherPreview, weatherLoading, handleAiParse,
     updatePreviewItemName, regeocodePillItem, selectPreviewItemSuggestion, handleConfirmPreview, handleWpInput,

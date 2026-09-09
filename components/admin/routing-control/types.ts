@@ -45,10 +45,6 @@ export interface RoutingStatus {
     areasTotal?: number | null;
     motorcycleProfileAvailable: boolean | null;
   };
-  cloudFallback: {
-    available: boolean;
-    active: boolean;
-  };
   valhalla: {
     status: string;
     ok: boolean;

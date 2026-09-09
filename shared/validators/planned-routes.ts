@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ROUTE_INTENT_KINDS } from "@shared/route-intents";
 
 export const savePlannedRouteSchema = z.object({
   title: z.string().min(1, "Titolo obbligatorio").max(200),
@@ -126,12 +127,31 @@ export const calculateRouteRequestSchema = z.object({
   avoidFerries: z.boolean().optional(),
   avoidUnpaved: z.boolean().optional(),
   avoidWeather: z.boolean().optional(),
+  /** Un intento per ogni tratto waypoint[i] → waypoint[i + 1]. */
+  segmentIntents: z.array(z.object({
+    kind: z.enum(ROUTE_INTENT_KINDS).optional(),
+    style: z.enum(["direct", "fast", "balanced", "curvy", "extra_curvy"]).optional(),
+    drivingProfile: z.enum(["geometric", "real", "my_style"]).optional(),
+    avoidHighways: z.boolean().optional(),
+    avoidTolls: z.boolean().optional(),
+    avoidFerries: z.boolean().optional(),
+    avoidUnpaved: z.boolean().optional(),
+    avoidWeather: z.boolean().optional(),
+  })).optional(),
   roundTripHours: z.number().positive().optional(),
   isRoundTrip: z.boolean().optional(),
   roundTripDirection: z.string().optional(),
   headingDeg: z.number().optional(),
   language: z.string().optional(),
   geocodingOk: z.boolean().optional(),
+}).superRefine((value, ctx) => {
+  if (value.segmentIntents && value.segmentIntents.length !== value.waypoints.length - 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["segmentIntents"],
+      message: "Serve un intento per ogni tratto tra waypoint consecutivi",
+    });
+  }
 });
 export type CalculateRouteRequestInput = z.infer<typeof calculateRouteRequestSchema>;
 

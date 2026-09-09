@@ -23,7 +23,6 @@ export interface RoutingHealth {
   routing_disabled: boolean;
   degraded: boolean;
   message?: string;
-  cloud_fallback_active?: boolean;
   graphhopper: {
     healthy: boolean;
     error_type?: string;
@@ -301,7 +300,6 @@ export function SelfHostStatus() {
         {gh.latency_ms != null && !down ? ` · ${gh.latency_ms}ms` : ""}
         {down && (gh.consecutive_failures ?? 0) > 0 ? ` · ${gh.consecutive_failures} fallimenti consecutivi` : ""}
         {down && gh.last_failure_at ? ` · ultimo errore: ${lastFailure}` : ""}
-        {data.cloud_fallback_active ? " · fallback Cloud attivo" : ""}
       </Text>
 
       {data.self_hosted && (
@@ -318,4 +316,3 @@ export function SelfHostStatus() {
     </View>
   );
 }
-

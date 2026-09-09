@@ -2,7 +2,7 @@
  * Task #2824 — Health Sistema Routing.
  *
  * Stato di salute per ogni engine/componente del routing: GraphHopper
- * (self-hosted), Cloud fallback, Valhalla e tiles. Pull-to-refresh manuale.
+ * (self-hosted), Valhalla e tiles. Pull-to-refresh manuale.
  */
 import React, { useState } from "react";
 import {
@@ -17,7 +17,6 @@ import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { RoutingCloudBanner } from "@/components/admin/RoutingCloudBanner";
 import type { RoutingStatus } from "@/components/admin/routing-control/types";
 import { copyLogToClipboard } from "@/lib/copyAdminLog";
 
@@ -105,7 +104,6 @@ export default function RoutingHealthScreen() {
 
   const gh = data?.graphhopper;
   const valhalla = data?.valhalla;
-  const cloud = data?.cloudFallback;
   const tiles = data?.tiles;
   const photon = data?.photon;
   const photonTimeout = photon?.error === "timeout";
@@ -145,7 +143,6 @@ export default function RoutingHealthScreen() {
                   `Rollout: ${data.rollout}`,
                   "",
                   `GraphHopper: ${gh?.down ? "DOWN" : gh?.ok ? "OK" : "—"} · Latenza: ${gh?.latencyMs != null ? `${gh.latencyMs}ms` : "—"} · Fallimenti: ${gh?.consecutiveFailures ?? 0}`,
-                  `Cloud Fallback: ${cloud?.active ? "ATTIVO" : cloud?.available ? "PRONTO" : "N/D"}`,
                   `Valhalla: ${!valhalla?.configured ? "N/D" : valhalla?.down ? "DOWN" : valhalla?.ok ? "OK" : "—"}`,
                   `Tiles: ${tiles?.selfHosted ? "SELF-HOSTED" : "ESTERNI"}`,
                   `Photon: ${!photon ? "—" : !photon.configured ? "NON CONFIGURATO" : photon.ok ? "OK" : photonTimeout ? "TIMEOUT SONDA" : "DOWN"} · Latenza: ${photon?.latencyMs != null ? `${photon.latencyMs}ms` : "—"}`,
@@ -188,24 +185,16 @@ export default function RoutingHealthScreen() {
         <Text style={styles.copiedHint}>Copiato!</Text>
       )}
 
-      {data && gh?.down && cloud?.active && (
-        <RoutingCloudBanner />
-      )}
-
       {data && (
         <>
           <EngineCard
             title="GraphHopper (self-hosted)"
             icon="server"
             color={
-              gh?.down && cloud?.active
-                ? Colors.warning
-                : statusColor(gh?.ok ?? null, gh?.down ?? false)
+              statusColor(gh?.ok ?? null, gh?.down ?? false)
             }
             statusLabel={
-              gh?.down && cloud?.active
-                ? "DOWN → CLOUD"
-                : gh?.down ? "DOWN" : gh?.ok ? "OK" : "—"
+              gh?.down ? "DOWN" : gh?.ok ? "OK" : "—"
             }
             motorcycleProfileAvailable={gh?.selfHosted ? (gh?.motorcycleProfileAvailable ?? null) : undefined}
             rows={[
@@ -218,21 +207,7 @@ export default function RoutingHealthScreen() {
               { label: "Latenza", value: gh?.latencyMs != null ? `${gh.latencyMs} ms` : "—" },
               { label: "Ultimo check", value: formatDate(gh?.lastCheckAt ?? null) },
               { label: "Fallimenti consec.", value: String(gh?.consecutiveFailures ?? 0) },
-              ...(gh?.down && cloud?.active
-                ? [{ label: "Copertura", value: "Cloud fallback attivo (profilo car)" }]
-                : []),
               ...(gh?.error ? [{ label: "Errore", value: gh.error }] : []),
-            ]}
-          />
-
-          <EngineCard
-            title="Cloud Fallback"
-            icon="cloud-outline"
-            color={cloud?.active ? Colors.warning : cloud?.available ? Colors.success : Colors.textSecondary}
-            statusLabel={cloud?.active ? "ATTIVO" : cloud?.available ? "PRONTO" : "N/D"}
-            rows={[
-              { label: "Disponibile", value: cloud?.available ? "Sì" : "No" },
-              { label: "In uso ora", value: cloud?.active ? "Sì (profilo car)" : "No" },
             ]}
           />
 

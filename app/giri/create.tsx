@@ -23,6 +23,7 @@ import { DrivingProfileSection } from "@/components/giri/create/DrivingProfileSe
 import { VehicleProfileSection } from "@/components/giri/create/VehicleProfileSection";
 import { RouteMapSection } from "@/components/giri/create/RouteMapSection";
 import { RouteTitleSection } from "@/components/giri/create/RouteTitleSection";
+import { SegmentIntentsSection } from "@/components/giri/create/SegmentIntentsSection";
 import { ActionButtonsSection } from "@/components/giri/create/ActionButtonsSection";
 import { ModeSelector } from "@/components/giri/create/ModeSelector";
 import { AiFallbackBanner } from "@/components/giri/create/AiFallbackBanner";
@@ -67,6 +68,7 @@ export default function GiriCreateScreen() {
     avoidWeather, setAvoidWeather,
     visibility, setVisibility, selectedMotoId, setSelectedMotoId,
     fuelLevel, setFuelLevel, waypoints,
+    segmentIntents, enableSegmentIntents, disableSegmentIntents, updateSegmentIntent,
     wpInputs, wpSuggestions, wpLoading,
     routeResult, setRouteResult, calculating, setCalculating,
     routeError,
@@ -171,7 +173,7 @@ export default function GiriCreateScreen() {
       setCalculating(true);
       try {
         const ghRoutingProfile = vehicleProfile === "auto_curvy" ? "auto_curvy" : vehicleProfile === "moto_fast" ? "motorcycle_fast" : vehicleProfile === "car" ? "car" : undefined;
-        const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language, ghRoutingProfile, true);
+        const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language, ghRoutingProfile, true, isRoundTrip ? undefined : segmentIntents ?? undefined);
         setRouteResult(result);
         setDismissedWarnings(new Set());
       } catch {
@@ -181,7 +183,7 @@ export default function GiriCreateScreen() {
       }
     }, 500);
     return () => { if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current); };
-  }, [waypoints, style, drivingProfile, vehicleProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, isRoundTrip, roundTripHours, headingDeg, mode, language, setRouteResult, setCalculating, setDismissedWarnings]);
+  }, [waypoints, style, drivingProfile, vehicleProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, isRoundTrip, roundTripHours, headingDeg, mode, language, segmentIntents, setRouteResult, setCalculating, setDismissedWarnings]);
 
   const avgKmPerLiter = 18;
   const tankEstimateL = 15;
@@ -276,6 +278,14 @@ export default function GiriCreateScreen() {
               wpLoading={wpLoading} isImportingGpx={isImportingGpx} onWpInputChange={handleWpInput}
               onSelectSuggestion={selectSuggestion} onRemoveWaypoint={removeWaypoint}
               onAddWaypoint={addWaypoint} onImportGpx={handleImportGpx}
+            />
+            <SegmentIntentsSection
+              waypoints={waypoints}
+              segmentIntents={segmentIntents}
+              onEnable={enableSegmentIntents}
+              onDisable={disableSegmentIntents}
+              onChange={updateSegmentIntent}
+              disabled={isRoundTrip}
             />
             <RouteMapSection plannerMapHtml={plannerMapHtml} webviewRef={webviewRef} onMapTap={handleMapTap} isApproxRoute={isApproxRoute} calculating={calculating} renderer={renderer} waypoints3D={waypoints.map((w: { lat: number; lng: number }) => ({ lat: w.lat, lng: w.lng }))} />
           </>

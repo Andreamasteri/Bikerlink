@@ -14,7 +14,6 @@ import { ServerEfficiencyCard } from "@/components/admin/ServerEfficiencyCard";
 import { ThinkCentreCard } from "@/components/admin/ThinkCentreCard";
 import { ThinkCentreEfficiencyCard } from "@/components/admin/ThinkCentreEfficiencyCard";
 import { RoutingCoordinationCard } from "@/components/admin/RoutingCoordinationCard";
-import { RoutingCloudBanner } from "@/components/admin/RoutingCloudBanner";
 import { MatchingMonitorCard } from "@/components/admin/MatchingMonitorCard";
 import { DbPoolCard } from "@/components/admin/DbPoolCard";
 import { SystemHealthContainer } from "@/components/admin/SystemHealthContainer";
@@ -349,7 +348,6 @@ export default function AdminDashboard() {
 
       {!isSearching && (
         <>
-          <RoutingCloudBanner onPress={() => router.push("/admin/routing-health" as never)} />
           <SystemHealthContainer statuses={systemStatuses} onDotPress={handleDotPress}>
             <ServerEfficiencyCard />
             <DbPoolCard />
@@ -489,4 +487,3 @@ export default function AdminDashboard() {
     </ScrollView>
   );
 }
-

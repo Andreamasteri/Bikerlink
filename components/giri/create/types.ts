@@ -7,6 +7,25 @@ export type VehicleProfile = "moto" | "moto_fast" | "car" | "auto_curvy";
 // Profilo inviato al server: i profili GH ("motorcycle", "motorcycle_fast", "car")
 // vengono instradati a GraphHopper; "auto_curvy" viene instradato a Valhalla.
 export type RoutingProfile = "auto_curvy" | "motorcycle" | "motorcycle_fast" | "car";
+export type RouteIntentKind = "inherit" | "urban_exit" | "guided" | "scenic" | "transfer" | "quick_return";
+export interface SegmentRouteIntent {
+  kind?: RouteIntentKind;
+  style?: Style;
+  drivingProfile?: DrivingProfile;
+  avoidHighways?: boolean;
+  avoidTolls?: boolean;
+  avoidFerries?: boolean;
+  avoidUnpaved?: boolean;
+  avoidWeather?: boolean;
+}
+export const ROUTE_INTENT_OPTIONS: Array<{ key: RouteIntentKind; label: string; icon: string }> = [
+  { key: "inherit", label: "Come il giro", icon: "git-branch-outline" },
+  { key: "urban_exit", label: "Uscita città", icon: "business-outline" },
+  { key: "guided", label: "Guidato", icon: "trail-sign-outline" },
+  { key: "scenic", label: "Panoramico", icon: "image-outline" },
+  { key: "transfer", label: "Trasferimento", icon: "navigate-outline" },
+  { key: "quick_return", label: "Rientro rapido", icon: "return-down-back-outline" },
+];
 export type Mode = "ai" | "ai-preview" | "manual";
 export type CompassDir = "N" | "NE" | "E" | "SE" | "S" | "SO" | "O" | "NO";
 
@@ -44,6 +63,15 @@ export interface RouteResult {
   elevationGainM?: number | null;
   altitudeMinM?: number | null;
   altitudeMaxM?: number | null;
+  segmentResults?: Array<{
+    index: number;
+    intent: Required<SegmentRouteIntent>;
+    distanceKm: number;
+    durationMinutes: number;
+    warning: string | null;
+    weatherWarning: string | null;
+    telemetryCoverage: TelemetryCoverage | null;
+  }>;
 }
 
 export interface WeatherWaypoint {
