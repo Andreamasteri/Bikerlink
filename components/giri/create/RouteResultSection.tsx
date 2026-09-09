@@ -1,7 +1,7 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import { RouteResultCard } from "./RouteResultCard";
-import ElevationProfile from "@/components/ElevationProfile";
+import type { Waypoint } from "./types";
 
 interface RouteResultSectionProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- route result from API
@@ -18,10 +18,12 @@ interface RouteResultSectionProps {
   fuelStopsNeeded: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Animated.Value
   bikerScoreAnim: any;
+  waypoints: Waypoint[];
 }
 
 export const RouteResultSection: React.FC<RouteResultSectionProps> = ({
   routeResult,
+  isRoundTrip,
   isMultiDay,
   daysCount,
   dismissedWarnings,
@@ -31,8 +33,19 @@ export const RouteResultSection: React.FC<RouteResultSectionProps> = ({
   selectedMotoId,
   fuelStopsNeeded,
   bikerScoreAnim,
+  waypoints,
 }) => {
   if (!routeResult) return null;
+
+  const resolvedWaypoints = waypoints.filter((waypoint) => waypoint.lat !== 0 || waypoint.lng !== 0);
+  const segmentLabels = (routeResult.segmentResults ?? []).map((_: unknown, index: number) => {
+    const from = resolvedWaypoints[index]?.name || (index === 0 ? "Partenza" : `Ancora ${index}`);
+    const toWaypoint = resolvedWaypoints[index + 1];
+    const to = toWaypoint?.name || (index + 1 >= resolvedWaypoints.length
+      ? (isRoundTrip ? resolvedWaypoints[0]?.name || "Partenza" : "Arrivo")
+      : `Ancora ${index + 1}`);
+    return `${from} → ${to}`;
+  });
 
   return (
     <View style={styles.container}>
@@ -47,9 +60,8 @@ export const RouteResultSection: React.FC<RouteResultSectionProps> = ({
         daysCount={daysCount}
         selectedMotoId={selectedMotoId}
         fuelStopsNeeded={fuelStopsNeeded}
+        segmentLabels={segmentLabels}
       />
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- elevation profile from route result */}
-      <ElevationProfile profile={(routeResult.elevationProfile || []) as any} />
     </View>
   );
 };

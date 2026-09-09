@@ -76,7 +76,7 @@ export default function GiriCreateScreen() {
     weatherPreview, weatherLoading,
     lastFittedWaypointSig, bikerScoreAnim,
     updatePreviewItemName, regeocodePillItem, selectPreviewItemSuggestion, handleConfirmPreview,
-    handleWpInput, selectSuggestion, addWaypoint, removeWaypoint,
+    handleWpInput, selectSuggestion, addWaypoint, removeWaypoint, moveWaypoint,
     handleCalculate, handleSave, saveMutationPending,
     handleMapTap,
     resolvedPoiStops, selectPoiOption, clearPoiOption,
@@ -166,7 +166,7 @@ export default function GiriCreateScreen() {
   useEffect(() => {
     if (mode !== "manual") return;
     const resolved = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-    if (resolved.length < 2) return;
+    if (resolved.length < (isRoundTrip ? 1 : 2)) return;
     if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current);
     autoCalcTimeout.current = setTimeout(async () => {
       const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
@@ -274,9 +274,10 @@ export default function GiriCreateScreen() {
               <DrivingProfileSection drivingProfile={drivingProfile} setDrivingProfile={setDrivingProfile} myStyleProfile={myStyleProfile} />
             )}
             <WaypointsSection
-              waypoints={waypoints} wpInputs={wpInputs} wpSuggestions={wpSuggestions}
+              waypoints={waypoints} isRoundTrip={isRoundTrip} wpInputs={wpInputs} wpSuggestions={wpSuggestions}
               wpLoading={wpLoading} isImportingGpx={isImportingGpx} onWpInputChange={handleWpInput}
               onSelectSuggestion={selectSuggestion} onRemoveWaypoint={removeWaypoint}
+              onMoveWaypoint={moveWaypoint}
               onAddWaypoint={addWaypoint} onImportGpx={handleImportGpx}
             />
             <SegmentIntentsSection
@@ -334,7 +335,7 @@ export default function GiriCreateScreen() {
           daysCount={daysCount} dismissedWarnings={dismissedWarnings}
           setDismissedWarnings={setDismissedWarnings} weatherLoading={weatherLoading}
           weatherPreview={weatherPreview} selectedMotoId={selectedMotoId}
-          fuelStopsNeeded={fuelStopsNeeded} bikerScoreAnim={bikerScoreAnim}
+          fuelStopsNeeded={fuelStopsNeeded} bikerScoreAnim={bikerScoreAnim} waypoints={waypoints}
         />
       </ScrollView>
 
@@ -342,6 +343,7 @@ export default function GiriCreateScreen() {
 
       <MapTapConfirmModal
         visible={!!pendingMapTap}
+        isRoundTrip={isRoundTrip}
         address={pendingMapTap?.name ?? ""}
         geocoding={mapTapGeocoding}
         onSetStart={() => confirmMapTap("start")}

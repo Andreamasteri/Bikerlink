@@ -4,46 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import ElevationProfile from "@/components/ElevationProfile";
 import { useColors } from "@/hooks/useColors";
 import type { ThemeColors } from "@/constants/colors";
-
-type TelemetryCoverageReason =
-  | "not_applicable"
-  | "no_community_data"
-  | "route_coverage_insufficient"
-  | "user_km_below_target"
-  | "engine_unsupported"
-  | "applied";
-
-interface TelemetryCoverage {
-  reason: TelemetryCoverageReason;
-  coveredSegments: number;
-  requiredSegments: number;
-  routeSegments: number;
-  userKm: number | null;
-  targetKm: number | null;
-}
-
-interface RouteResult {
-  encoded?: string | null;
-  rawPoints?: Array<{ lat: number; lng: number }> | null;
-  distanceKm: number;
-  durationMinutes: number;
-  bikerScore: number;
-  approximate?: boolean;
-  warning?: string | null;
-  telemetryCoverage?: TelemetryCoverage | null;
-  weatherWarning?: string | null;
-  navigationSteps?: Array<{ sign: number; text: string; distance: number; interval: [number, number]; streetName?: string }> | null;
-  elevationProfile?: Array<{ distanceKm: number; altitudeM: number }> | null;
-  elevationGainM?: number | null;
-  altitudeMinM?: number | null;
-  altitudeMaxM?: number | null;
-}
-
-interface WeatherWaypoint {
-  lat: number; lng: number; name: string;
-  tempNow: number | null; precipProb: number; weatherCode: number;
-  weatherDesc: string; isSuitable: boolean;
-}
+import { ROUTE_INTENT_OPTIONS, type LoopQuality, type RouteResult, type TelemetryCoverage, type WeatherWaypoint } from "./types";
 
 interface RouteResultCardProps {
   routeResult: RouteResult;
@@ -56,6 +17,7 @@ interface RouteResultCardProps {
   daysCount: number;
   selectedMotoId: string | null;
   fuelStopsNeeded: number;
+  segmentLabels?: string[];
 }
 
 export const RouteResultCard: React.FC<RouteResultCardProps> = ({
@@ -69,6 +31,7 @@ export const RouteResultCard: React.FC<RouteResultCardProps> = ({
   daysCount,
   selectedMotoId,
   fuelStopsNeeded,
+  segmentLabels = [],
 }) => {
   const colors = useColors();
   const s = styles(colors);
@@ -138,6 +101,33 @@ export const RouteResultCard: React.FC<RouteResultCardProps> = ({
           }]} />
         </View>
       </View>
+
+      {routeResult.loopQuality && (
+        <LoopQualityBanner quality={routeResult.loopQuality} s={s} />
+      )}
+
+      {!!routeResult.segmentResults?.length && (
+        <View style={s.segmentSummary}>
+          <Text style={s.segmentSummaryTitle}>Sezioni calcolate</Text>
+          {routeResult.segmentResults.map((segment, index) => {
+            const intent = ROUTE_INTENT_OPTIONS.find((option) => option.key === segment.intent.kind);
+            const duration = `${Math.floor(segment.durationMinutes / 60)}h ${segment.durationMinutes % 60}m`;
+            return (
+              <View key={segment.index} style={s.segmentRow}>
+                <View style={s.segmentInfo}>
+                  <Text style={s.segmentRoute} numberOfLines={1}>
+                    {index + 1}. {segmentLabels[index] ?? `Tratta ${index + 1}`}
+                  </Text>
+                  <Text style={s.segmentIntent}>{intent?.label ?? "Come il giro"}</Text>
+                  {!!segment.warning && <Text style={s.segmentWarning}>Avviso: {segment.warning}</Text>}
+                  {!!segment.weatherWarning && <Text style={s.segmentWarning}>Meteo: {segment.weatherWarning}</Text>}
+                </View>
+                <Text style={s.segmentMetrics}>{segment.distanceKm} km{`\n`}{duration}</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       {routeResult.elevationProfile && routeResult.elevationProfile.length > 2 && (
         <View style={{ marginTop: 12 }}>
@@ -292,6 +282,33 @@ const TelemetryCoverageBanner: React.FC<{
   );
 };
 
+const LoopQualityBanner: React.FC<{ quality: LoopQuality; s: CardStyles }> = ({ quality, s }) => {
+  if (quality.totalWayCount === 0) return null;
+
+  if (quality.warning === "high_retracing") {
+    const percentage = Math.round((quality.repeatedWayFraction ?? 0) * 100);
+    return (
+      <View style={s.loopWarning}>
+        <Ionicons name="repeat-outline" size={16} color="#f59e0b" />
+        <Text style={s.loopWarningText}>
+          Il rientro condivide ancora circa il {percentage}% delle strade con l’andata. Prova a spostare o aggiungere un’ancora.
+        </Text>
+      </View>
+    );
+  }
+
+  if (quality.returnRerouted) {
+    return (
+      <View style={s.loopImproved}>
+        <Ionicons name="git-branch-outline" size={16} color="#22c55e" />
+        <Text style={s.loopImprovedText}>Rientro ricalcolato per evitare le strade già percorse.</Text>
+      </View>
+    );
+  }
+
+  return null;
+};
+
 const styles = (colors: ThemeColors) => StyleSheet.create({
   resultCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: colors.border },
   warningRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#ef444422", borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#ef444444", marginBottom: 4 },
@@ -317,6 +334,18 @@ const styles = (colors: ThemeColors) => StyleSheet.create({
   bsValue: { fontFamily: "Inter_700Bold", fontSize: 14 },
   bsBarBg: { height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" },
   bsBarFill: { height: "100%", borderRadius: 4 },
+  segmentSummary: { marginTop: 18, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14, gap: 4 },
+  segmentSummaryTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.textSecondary, marginBottom: 2 },
+  segmentRow: { flexDirection: "row", gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  segmentInfo: { flex: 1, gap: 2 },
+  segmentRoute: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.text },
+  segmentIntent: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.accent },
+  segmentWarning: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#f59e0b" },
+  segmentMetrics: { fontFamily: "Inter_600SemiBold", fontSize: 12, lineHeight: 17, color: colors.textSecondary, textAlign: "right" },
+  loopWarning: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#f59e0b18", borderRadius: 10, padding: 10, marginTop: 14, borderWidth: 1, borderColor: "#f59e0b44" },
+  loopWarningText: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17, color: "#f59e0b" },
+  loopImproved: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#22c55e18", borderRadius: 10, padding: 10, marginTop: 14, borderWidth: 1, borderColor: "#22c55e44" },
+  loopImprovedText: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 12, color: "#22c55e" },
   weatherBanner: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.background, padding: 12, borderRadius: 12, marginTop: 12 },
   weatherBannerText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.text },
   weatherUnavoidableRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.accentRed + "22", borderRadius: 8, padding: 10, borderWidth: 1, borderColor: colors.accentRed + "44", marginTop: 8 },

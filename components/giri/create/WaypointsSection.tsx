@@ -12,6 +12,7 @@ interface GeoResult { name: string; lat: number; lng: number; }
 
 interface WaypointsSectionProps {
   waypoints: Waypoint[];
+  isRoundTrip: boolean;
   wpInputs: string[];
   wpSuggestions: { index: number; results: GeoResult[]; error?: boolean } | null;
   wpLoading: boolean;
@@ -19,12 +20,14 @@ interface WaypointsSectionProps {
   onWpInputChange: (text: string, index: number) => void;
   onSelectSuggestion: (index: number, geo: GeoResult) => void;
   onRemoveWaypoint: (index: number) => void;
+  onMoveWaypoint: (index: number, direction: "up" | "down") => void;
   onAddWaypoint: () => void;
   onImportGpx: () => void;
 }
 
 export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
   waypoints,
+  isRoundTrip,
   wpInputs,
   wpSuggestions,
   wpLoading,
@@ -32,6 +35,7 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
   onWpInputChange,
   onSelectSuggestion,
   onRemoveWaypoint,
+  onMoveWaypoint,
   onAddWaypoint,
   onImportGpx,
 }) => {
@@ -71,7 +75,12 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
 
   return (
     <View style={s.section}>
-      <Text style={s.sectionLabel}>Percorso</Text>
+      <Text style={s.sectionLabel}>{isRoundTrip ? "Anello" : "Percorso"}</Text>
+      {isRoundTrip && (
+        <Text style={s.roundTripHint}>
+          Scegli la partenza. Le tappe sono ancore facoltative: il giro si chiude automaticamente qui.
+        </Text>
+      )}
 
       {waypoints.map((wp, i) => {
         const inputValue = wpInputs[i] ?? "";
@@ -81,12 +90,16 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
         const isLoading = wpLoading && isFocused;
         const showInlinePanel = isFocused && (isLoading || (wpSuggestions !== null && wpSuggestions.index === i));
 
+        const isIntermediate = i > 0 && (isRoundTrip || i < waypoints.length - 1);
+        const canMoveUp = isIntermediate && i > 1;
+        const canMoveDown = isIntermediate && i < waypoints.length - 2;
+
         return (
           <View key={i} style={s.wpBlock}>
             <View style={s.wpRow}>
               <View style={s.wpDot}>
                 <View style={[s.wpDotInner, {
-                  backgroundColor: i === 0 ? "#22c55e" : i === waypoints.length - 1 ? colors.accentRed : colors.accent,
+                  backgroundColor: i === 0 ? "#22c55e" : !isRoundTrip && i === waypoints.length - 1 ? colors.accentRed : colors.accent,
                 }]} />
               </View>
               <View style={{ flex: 1 }}>
@@ -95,7 +108,13 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
                     style={[s.input, wp.lat !== 0 && { borderColor: "#22c55e55" }]}
                     value={inputValue}
                     onChangeText={(t) => onWpInputChange(t, i)}
-                    placeholder={i === 0 ? "Partenza..." : i === waypoints.length - 1 ? "Arrivo..." : `Tappa ${i}...`}
+                    placeholder={i === 0
+                      ? "Partenza..."
+                      : isRoundTrip && i === waypoints.length - 1
+                        ? "Ancora facoltativa (passa da qui)..."
+                        : i === waypoints.length - 1
+                          ? "Arrivo..."
+                          : `Ancora ${i} (passa da qui)...`}
                     placeholderTextColor={colors.textSecondary}
                     onFocus={() => handleFocus(i)}
                     onBlur={handleBlur}
@@ -108,10 +127,34 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
                   <Text style={s.hint}>Digita almeno 3 caratteri per cercare</Text>
                 )}
               </View>
-              {waypoints.length > 2 && i > 0 && i < waypoints.length - 1 && (
-                <Pressable onPress={() => onRemoveWaypoint(i)} hitSlop={10} style={{ padding: 4 }}>
-                  <Ionicons name="close-circle" size={20} color={colors.accentRed} />
-                </Pressable>
+              {isIntermediate && (
+                <View style={s.waypointActions}>
+                  {canMoveUp && (
+                    <Pressable
+                      accessibilityLabel="Sposta tappa in alto"
+                      onPress={() => onMoveWaypoint(i, "up")}
+                      hitSlop={8}
+                      style={s.waypointAction}
+                    >
+                      <Ionicons name="chevron-up" size={18} color={colors.textSecondary} />
+                    </Pressable>
+                  )}
+                  {canMoveDown && (
+                    <Pressable
+                      accessibilityLabel="Sposta tappa in basso"
+                      onPress={() => onMoveWaypoint(i, "down")}
+                      hitSlop={8}
+                      style={s.waypointAction}
+                    >
+                      <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+                    </Pressable>
+                  )}
+                  {waypoints.length > 2 && (
+                    <Pressable onPress={() => onRemoveWaypoint(i)} hitSlop={10} style={s.waypointAction} accessibilityLabel="Rimuovi tappa">
+                      <Ionicons name="close-circle" size={20} color={colors.accentRed} />
+                    </Pressable>
+                  )}
+                </View>
               )}
             </View>
 
@@ -252,8 +295,11 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
 const styles = (colors: ThemeColors) => StyleSheet.create({
   section: { marginBottom: 20 },
   sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.textSecondary, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
+  roundTripHint: { marginTop: -3, marginBottom: 10, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17, color: colors.textSecondary },
   wpBlock: { marginBottom: 4 },
   wpRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 0 },
+  waypointActions: { flexDirection: "row", alignItems: "center", gap: 1, minWidth: 26, paddingTop: 9 },
+  waypointAction: { padding: 2 },
   wpDot: { width: 12, alignItems: "center", paddingTop: 14 },
   wpDotInner: { width: 8, height: 8, borderRadius: 4 },
   inputWrapper: { position: "relative", flexDirection: "row", alignItems: "center" },

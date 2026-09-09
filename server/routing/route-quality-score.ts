@@ -23,6 +23,12 @@ export interface RouteScore {
   breakdown: RouteScoreBreakdown;
 }
 
+export interface RoundTripCandidateScore {
+  score: number;
+  distanceFit: number;
+  highwayFraction: number | null;
+}
+
 // Classi OSM considerate "autostrada/superstrada" (da evitare nei profili curvy).
 const MOTORWAY_CLASSES = new Set(["motorway", "trunk", "motorway_link", "trunk_link"]);
 
@@ -31,7 +37,7 @@ const MOTORWAY_CLASSES = new Set(["motorway", "trunk", "motorway_link", "trunk_l
  * (formato GraphHopper: [[fromIdx, toIdx, value], ...]). Ritorna null se i
  * dati non sono presenti (es. engine che non espone road_class).
  */
-function extractHighwayFraction(path: RouteResult["paths"][number]): number | null {
+export function extractHighwayFraction(path: RouteResult["paths"][number]): number | null {
   const roadClass = path.details?.road_class as unknown;
   if (!Array.isArray(roadClass) || roadClass.length === 0) return null;
   let total = 0;
@@ -93,5 +99,38 @@ export function scoreRoute(result: RouteResult, aerialKm: number, style: RouteSt
       detourRatio: Math.round(detourRatio * 100) / 100,
       highwayFraction: highwayFraction === null ? null : Math.round(highwayFraction * 100) / 100,
     },
+  };
+}
+
+/**
+ * Score specifico per candidati round-trip nativi. Non usa il detour rispetto
+ * alla distanza aerea (che è zero, perché start e fine coincidono), ma premia
+ * la fedeltà alla distanza richiesta e la coerenza con il tipo di giro.
+ */
+export function scoreRoundTripCandidate(
+  result: RouteResult,
+  targetDistanceM: number,
+  style: RouteStyle,
+): RoundTripCandidateScore {
+  const path = result.paths?.[0];
+  const distanceM = path?.distance ?? 0;
+  const distanceFit = targetDistanceM > 0
+    ? clamp01(1 - Math.abs(distanceM - targetDistanceM) / targetDistanceM)
+    : 0;
+  const durationH = (path?.time ?? 0) / 3_600_000;
+  const avgSpeedKmh = durationH > 0 ? (distanceM / 1000) / durationH : 0;
+  const speedNorm = clamp01((avgSpeedKmh - 30) / 80);
+  const highwayFraction = path ? extractHighwayFraction(path) : null;
+  const highwayPenalty = highwayFraction ?? 0.5;
+  const isFast = style === "fast" || style === "direct";
+
+  const score = isFast
+    ? 0.7 * distanceFit + 0.2 * speedNorm + 0.1 * highwayPenalty
+    : 0.6 * distanceFit + 0.25 * (1 - speedNorm) + 0.15 * (1 - highwayPenalty);
+
+  return {
+    score: clamp01(score),
+    distanceFit: Math.round(distanceFit * 100) / 100,
+    highwayFraction: highwayFraction === null ? null : Math.round(highwayFraction * 100) / 100,
   };
 }

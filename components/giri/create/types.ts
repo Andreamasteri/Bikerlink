@@ -48,6 +48,14 @@ export interface TelemetryCoverage {
   targetKm: number | null;
 }
 
+export interface LoopQuality {
+  repeatedWayFraction: number | null;
+  repeatedWayCount: number;
+  totalWayCount: number;
+  returnRerouted: boolean;
+  warning: "high_retracing" | null;
+}
+
 export interface RouteResult {
   encoded?: string | null;
   rawPoints?: Array<{ lat: number; lng: number }> | null;
@@ -72,6 +80,7 @@ export interface RouteResult {
     weatherWarning: string | null;
     telemetryCoverage: TelemetryCoverage | null;
   }>;
+  loopQuality?: LoopQuality | null;
 }
 
 export interface WeatherWaypoint {

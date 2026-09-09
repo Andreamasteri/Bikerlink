@@ -47,6 +47,17 @@ export interface SegmentedRoutePlan {
   weatherWarning: string | null;
   telemetryCoverage: TelemetryCoverage | null;
   segments: SegmentRouteSummary[];
+  loopQuality: LoopQuality | null;
+}
+
+export interface LoopQuality {
+  /** Frazione degli osm_way_id che compaiono in più sezioni dell'anello. */
+  repeatedWayFraction: number | null;
+  repeatedWayCount: number;
+  totalWayCount: number;
+  /** true se il rientro è stato ricalcolato evitando strade già percorse. */
+  returnRerouted: boolean;
+  warning: "high_retracing" | null;
 }
 
 interface SegmentOutcome {
@@ -139,6 +150,7 @@ async function calculateOneSegment(params: {
   userId: string;
   response: Response;
   geocodingOk: boolean;
+  avoidWayIds?: number[];
 }): Promise<SegmentOutcome> {
   const intent = resolveSegmentRouteIntent(params.requestedIntent, params.globalIntent);
   const style = normalizeStyle(intent.style);
@@ -156,7 +168,13 @@ async function calculateOneSegment(params: {
   if (intent.avoidTolls) avoidRules.push({ if: "toll == ALL", multiply_by: 0.0 });
   if (intent.avoidFerries) avoidRules.push({ if: "road_environment == FERRY", multiply_by: 0.0 });
   if (intent.avoidUnpaved) avoidRules.push({ if: "road_environment == UNPAVED", multiply_by: 0.0 });
-  const basePriority = [...geometric.priority, ...avoidRules];
+  const retraceAvoidanceRules: PriorityRule[] = (params.avoidWayIds ?? []).slice(0, 60).map((wayId) => ({
+    if: `osm_way_id == ${wayId}`,
+    // Penalità forte, ma non bloccante: se non esiste alternativa il motore
+    // può comunque chiudere il giro senza produrre un errore artificiale.
+    multiply_by: 0.1,
+  }));
+  const basePriority = [...geometric.priority, ...avoidRules, ...retraceAvoidanceRules];
 
   const runRoute = (priority: PriorityRule[], areas?: Record<string, unknown>) => {
     const body: RouteRequest = {
@@ -251,6 +269,43 @@ async function calculateOneSegment(params: {
   };
 }
 
+function wayIdsForPath(path: RoutePath): number[] {
+  return extractRouteWayIds(path as { details?: Record<string, unknown> });
+}
+
+function calculateLoopQuality(paths: RoutePath[], returnRerouted: boolean): LoopQuality {
+  const appearances = new Map<number, number>();
+  for (const path of paths) {
+    for (const wayId of wayIdsForPath(path)) {
+      appearances.set(wayId, (appearances.get(wayId) ?? 0) + 1);
+    }
+  }
+
+  const totalWayCount = appearances.size;
+  const repeatedWayCount = [...appearances.values()].filter((count) => count > 1).length;
+  const repeatedWayFraction = totalWayCount > 0 ? repeatedWayCount / totalWayCount : null;
+  // Sotto quattro strade distinte il segnale è troppo povero (es. dettagli
+  // troncati dall'engine): non presentiamo un giudizio fuorviante.
+  const warning = totalWayCount >= 4 && (repeatedWayFraction ?? 0) >= 0.35
+    ? "high_retracing"
+    : null;
+
+  return {
+    repeatedWayFraction: repeatedWayFraction === null ? null : Math.round(repeatedWayFraction * 100) / 100,
+    repeatedWayCount,
+    totalWayCount,
+    returnRerouted,
+    warning,
+  };
+}
+
+function returnOverlap(previousPaths: RoutePath[], returnPath: RoutePath): { ids: number[]; fraction: number } {
+  const previousWayIds = new Set(previousPaths.flatMap(wayIdsForPath));
+  const returnWayIds = wayIdsForPath(returnPath);
+  const ids = returnWayIds.filter((wayId) => previousWayIds.has(wayId));
+  return { ids, fraction: returnWayIds.length > 0 ? ids.length / returnWayIds.length : 0 };
+}
+
 export async function calculateSegmentedRoute(params: {
   waypoints: RoutingWaypoint[];
   segmentIntents: SegmentRouteIntent[];
@@ -259,6 +314,7 @@ export async function calculateSegmentedRoute(params: {
   userId: string;
   response: Response;
   geocodingOk: boolean;
+  isRoundTrip?: boolean;
 }): Promise<SegmentedRoutePlan> {
   const outcomes: SegmentOutcome[] = [];
   for (let index = 0; index < params.segmentIntents.length; index += 1) {
@@ -275,6 +331,41 @@ export async function calculateSegmentedRoute(params: {
     }));
   }
 
+  let returnRerouted = false;
+  // Su un anello con ancore proviamo a differenziare il solo rientro quando
+  // riusa quasi tutta la strada dell'andata. Manteniamo il primo risultato se
+  // il tentativo non riduce davvero la sovrapposizione o allunga troppo il giro.
+  if (params.isRoundTrip && outcomes.length >= 2) {
+    const lastIndex = outcomes.length - 1;
+    const original = outcomes[lastIndex];
+    const overlap = returnOverlap(outcomes.slice(0, -1).map((outcome) => outcome.path), original.path);
+    if (overlap.ids.length >= 4 && overlap.fraction >= 0.45) {
+      try {
+        const rerouted = await calculateOneSegment({
+          index: lastIndex,
+          start: params.waypoints[lastIndex],
+          end: params.waypoints[lastIndex + 1],
+          requestedIntent: params.segmentIntents[lastIndex],
+          globalIntent: params.globalIntent,
+          routingProfile: params.routingProfile,
+          userId: params.userId,
+          response: params.response,
+          geocodingOk: params.geocodingOk,
+          avoidWayIds: overlap.ids,
+        });
+        const reroutedOverlap = returnOverlap(outcomes.slice(0, -1).map((outcome) => outcome.path), rerouted.path);
+        const isMateriallyDifferent = reroutedOverlap.fraction < overlap.fraction;
+        const isReasonableDetour = rerouted.path.distance <= original.path.distance * 1.4;
+        if (isMateriallyDifferent && isReasonableDetour) {
+          outcomes[lastIndex] = rerouted;
+          returnRerouted = true;
+        }
+      } catch (error) {
+        console.warn("[routing] loop anti-retracing retry failed, keep original return:", (error as Error)?.message ?? error);
+      }
+    }
+  }
+
   const segments = outcomes.map((outcome) => outcome.summary);
   return {
     path: mergeSegmentPaths(outcomes.map((outcome) => outcome.path)),
@@ -282,5 +373,6 @@ export async function calculateSegmentedRoute(params: {
     weatherWarning: segments.find((segment) => segment.weatherWarning)?.weatherWarning ?? null,
     telemetryCoverage: combineTelemetryCoverage(segments.map((segment) => segment.telemetryCoverage)),
     segments,
+    loopQuality: params.isRoundTrip ? calculateLoopQuality(outcomes.map((outcome) => outcome.path), returnRerouted) : null,
   };
 }

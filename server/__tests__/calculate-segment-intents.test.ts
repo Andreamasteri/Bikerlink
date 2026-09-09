@@ -41,14 +41,14 @@ function buildApp(): express.Application {
   return app;
 }
 
-function makePath(coordinates: number[][], distance: number, time: number) {
+function makePath(coordinates: number[][], distance: number, time: number, wayIds: number[] = [distance]) {
   return {
     points: { coordinates },
     points_encoded: false,
     distance,
     time,
     instructions: [{ text: "Prosegui", distance, time, interval: [0, 1] as [number, number] }],
-    details: { osm_way_id: [[0, 1, distance]] },
+    details: { osm_way_id: wayIds.map((wayId, index) => [index, index + 1, wayId]) },
   };
 }
 
@@ -59,9 +59,10 @@ beforeEach(() => {
 
 describe("/calculate — intenti per sezione", () => {
   it("usa l'algoritmo nativo round_trip per un anello senza tappe esplicite", async () => {
-    mocks.getActiveRouter.mockResolvedValueOnce({
-      paths: [makePath([[9, 45], [9.2, 45.2], [9, 45]], 165_000, 10_800_000)],
-    });
+    mocks.getActiveRouter
+      .mockResolvedValueOnce({ paths: [makePath([[9, 45], [9.15, 45.15], [9, 45]], 100_000, 6_000_000)] })
+      .mockResolvedValueOnce({ paths: [makePath([[9, 45], [9.2, 45.2], [9, 45]], 165_000, 10_800_000)] })
+      .mockResolvedValueOnce({ paths: [makePath([[9, 45], [9.25, 45.25], [9, 45]], 200_000, 12_000_000)] });
 
     const response = await request(buildApp())
       .post("/api/planned-routes/calculate")
@@ -74,13 +75,95 @@ describe("/calculate — intenti per sezione", () => {
       });
 
     expect(response.status).toBe(200);
-    expect(mocks.getActiveRouter).toHaveBeenCalledTimes(1);
+    expect(mocks.getActiveRouter).toHaveBeenCalledTimes(3);
     expect(mocks.getActiveRouter.mock.calls[0][0]).toMatchObject({
       points: [[9, 45]],
       algorithm: "round_trip",
       roundTrip: { distance: 165_000 },
       heading: 45,
     });
+    const seeds = mocks.getActiveRouter.mock.calls.map((call) => call[0].roundTrip.seed);
+    expect(new Set(seeds).size).toBe(3);
+    // Il secondo candidato è l'unico alla distanza obiettivo (3h curvy ≈165 km).
+    expect(response.body.distanceKm).toBe(165);
+  });
+
+  it("mantiene un anello con ancora esplicita come percorso a sezioni, senza inventare un round_trip", async () => {
+    mocks.getActiveRouter
+      .mockResolvedValueOnce({ paths: [makePath([[9, 45], [9.2, 45.2]], 90_000, 5_400_000)] })
+      .mockResolvedValueOnce({ paths: [makePath([[9.2, 45.2], [9, 45]], 75_000, 4_800_000)] });
+
+    const response = await request(buildApp())
+      .post("/api/planned-routes/calculate")
+      .send({
+        waypoints: [
+          { lat: 45, lng: 9 },
+          { lat: 45.2, lng: 9.2, name: "Ancora panoramica" },
+          { lat: 45, lng: 9 },
+        ],
+        style: "balanced",
+        isRoundTrip: true,
+        segmentIntents: [
+          { kind: "guided" },
+          { kind: "quick_return" },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(mocks.getActiveRouter).toHaveBeenCalledTimes(2);
+    expect(mocks.getActiveRouter.mock.calls[0][0]).toMatchObject({
+      points: [[9, 45], [9.2, 45.2]],
+    });
+    expect(mocks.getActiveRouter.mock.calls[0][0]).not.toHaveProperty("algorithm");
+    expect(response.body.segmentResults).toEqual([
+      expect.objectContaining({ index: 0, intent: expect.objectContaining({ kind: "guided", style: "curvy" }) }),
+      expect.objectContaining({ index: 1, intent: expect.objectContaining({ kind: "quick_return", style: "fast" }) }),
+    ]);
+  });
+
+  it("suddivide automaticamente un anello con ancore e ricalcola il rientro troppo sovrapposto", async () => {
+    mocks.getActiveRouter
+      .mockResolvedValueOnce({ paths: [makePath([[9, 45], [9.2, 45.2]], 90_000, 5_400_000, [101, 102, 103, 104])] })
+      .mockResolvedValueOnce({ paths: [makePath([[9.2, 45.2], [9, 45]], 80_000, 4_800_000, [101, 102, 103, 104])] })
+      .mockResolvedValueOnce({ paths: [makePath([[9.2, 45.2], [9.1, 44.9], [9, 45]], 100_000, 6_000_000, [201, 202, 203, 204])] });
+
+    const response = await request(buildApp())
+      .post("/api/planned-routes/calculate")
+      .send({
+        waypoints: [
+          { lat: 45, lng: 9 },
+          { lat: 45.2, lng: 9.2, name: "Ancora panoramica" },
+          { lat: 45, lng: 9 },
+        ],
+        style: "curvy",
+        isRoundTrip: true,
+      });
+
+    expect(response.status).toBe(200);
+    expect(mocks.getActiveRouter).toHaveBeenCalledTimes(3);
+    expect(response.body.segmentResults).toHaveLength(2);
+    expect(response.body.loopQuality).toEqual(expect.objectContaining({
+      returnRerouted: true,
+      warning: null,
+      repeatedWayCount: 0,
+    }));
+    expect(mocks.getActiveRouter.mock.calls[2][0].custom_model.priority).toEqual(expect.arrayContaining([
+      expect.objectContaining({ if: "osm_way_id == 101", multiply_by: 0.1 }),
+    ]));
+  });
+
+  it("rifiuta intenti di sezione su un anello nativo senza ancore", async () => {
+    const response = await request(buildApp())
+      .post("/api/planned-routes/calculate")
+      .send({
+        waypoints: [{ lat: 45, lng: 9 }, { lat: 45, lng: 9 }],
+        isRoundTrip: true,
+        segmentIntents: [{ kind: "guided" }],
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toContain("non sono compatibili");
+    expect(mocks.getActiveRouter).not.toHaveBeenCalled();
   });
 
   it("calcola ogni tratta con l'intento risolto e restituisce un solo percorso continuo", async () => {

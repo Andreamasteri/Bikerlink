@@ -232,8 +232,11 @@ export function useGiriCreateState(language?: string) {
     setSegmentIntents((current) => {
       if (!current) return null;
       const next = [...current];
-      const copiedIntent = { ...(current[Math.max(0, insertAt - 1)] ?? { kind: "inherit" }) };
-      next.splice(insertAt - 1, 0, copiedIntent);
+      // L'inserimento spezza una tratta in due: l'intento precedente non è più
+      // associato alla stessa coppia di punti, quindi le nuove tratte ereditano
+      // il profilo del giro finché l'utente non le configura esplicitamente.
+      next.splice(insertAt - 1, 0, { kind: "inherit" });
+      next[insertAt] = { kind: "inherit" };
       return next;
     });
     setRouteResult(null);
@@ -247,15 +250,58 @@ export function useGiriCreateState(language?: string) {
       if (!current) return null;
       const next = [...current];
       next.splice(index, 1);
+      if (index > 0 && next[index - 1]) {
+        // La nuova tratta unisce due estremi diversi: non riutilizzare
+        // silenziosamente l'intento della tratta entrante rimossa.
+        next[index - 1] = { kind: "inherit" };
+      }
       return next;
     });
     setRouteResult(null);
   };
 
+  const moveWaypoint = (index: number, direction: "up" | "down") => {
+    const destination = direction === "up" ? index - 1 : index + 1;
+    const isIntermediate = index > 0 && (isRoundTrip || index < waypoints.length - 1);
+    const destinationIsIntermediate = destination > 0 && (isRoundTrip || destination < waypoints.length - 1);
+    if (!isIntermediate || !destinationIsIntermediate || destination < 0 || destination >= waypoints.length) return;
+
+    const nextWaypoints = [...waypoints];
+    [nextWaypoints[index], nextWaypoints[destination]] = [nextWaypoints[destination], nextWaypoints[index]];
+    setWaypoints(nextWaypoints);
+
+    const nextInputs = [...wpInputs];
+    [nextInputs[index], nextInputs[destination]] = [nextInputs[destination], nextInputs[index]];
+    setWpInputs(nextInputs);
+
+    setSegmentIntents((current) => {
+      if (!current) return null;
+      const next = [...current];
+      // Lo scambio modifica al massimo le tre tratte attorno alle due ancore.
+      // Le azzeriamo a "eredita" invece di applicare un intento pensato per
+      // una coppia di punti diversa; le altre sezioni restano invariate.
+      const firstChangedSegment = Math.max(0, Math.min(index, destination) - 1);
+      const lastChangedSegment = Math.min(next.length - 1, Math.max(index, destination));
+      for (let segmentIndex = firstChangedSegment; segmentIndex <= lastChangedSegment; segmentIndex += 1) {
+        next[segmentIndex] = { kind: "inherit" };
+      }
+      return next;
+    });
+    setRouteResult(null);
+    setWeatherPreview(null);
+  };
+
   const handleCalculate = async () => {
     const resolved = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-    if (resolved.length < 2) {
-      Alert.alert("Waypoint non risolti", "Tocca 📍 accanto ai campi non risolti per selezionare un luogo."); return;
+    const requiredWaypoints = isRoundTrip ? 1 : 2;
+    if (resolved.length < requiredWaypoints) {
+      Alert.alert(
+        "Waypoint non risolti",
+        isRoundTrip
+          ? "Seleziona almeno la partenza del giro."
+          : "Tocca 📍 accanto ai campi non risolti per selezionare un luogo.",
+      );
+      return;
     }
     const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
     setCalculating(true);
@@ -297,7 +343,10 @@ export function useGiriCreateState(language?: string) {
   const handleSave = () => {
     if (!title.trim()) { Alert.alert("Errore", "Inserisci un titolo."); return; }
     const resolved = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-    if (resolved.length < 2) { Alert.alert("Errore", "Seleziona almeno 2 luoghi."); return; }
+    if (resolved.length < (isRoundTrip ? 1 : 2)) {
+      Alert.alert("Errore", isRoundTrip ? "Seleziona almeno la partenza." : "Seleziona almeno 2 luoghi.");
+      return;
+    }
 
     const avgKmPerLiter = 18;
     const tankEstimateL = 15;
@@ -306,7 +355,9 @@ export function useGiriCreateState(language?: string) {
 
     saveMutation.mutate({
       title,
-      waypoints: resolved,
+      // Il giro salvato mantiene esplicitamente la chiusura: A oppure A→ancore
+      // diventano A→A oppure A→ancore→A anche fuori dal form di creazione.
+      waypoints: isRoundTrip ? [...resolved, resolved[0]] : resolved,
       polyline: null,
       distanceKm: routeResult?.distanceKm ?? 0,
       durationMinutes: routeResult?.durationMinutes ?? 0,
@@ -367,8 +418,8 @@ export function useGiriCreateState(language?: string) {
       setSegmentIntents((current) => {
         if (!current) return null;
         const next = [...current];
-        const copiedIntent = { ...(current[Math.max(0, insertAt - 1)] ?? { kind: "inherit" }) };
-        next.splice(insertAt - 1, 0, copiedIntent);
+        next.splice(insertAt - 1, 0, { kind: "inherit" });
+        next[insertAt] = { kind: "inherit" };
         return next;
       });
     }
@@ -398,7 +449,7 @@ export function useGiriCreateState(language?: string) {
     wpSuggestions, setWpSuggestions, wpLoading, routeResult, calculating,
     routeError, weatherPreview, weatherLoading, handleAiParse,
     updatePreviewItemName, regeocodePillItem, selectPreviewItemSuggestion, handleConfirmPreview, handleWpInput,
-    selectSuggestion, addWaypoint, removeWaypoint, handleCalculate, handleSave,
+    selectSuggestion, addWaypoint, removeWaypoint, moveWaypoint, handleCalculate, handleSave,
     handleImportGpx, isImportingGpx, debugVisible, debugLogs, handleTitleTap,
     clearDebugLogs, fuelLevel, setFuelLevel, selectedMotoId, setSelectedMotoId,
     pendingMapTap, mapTapGeocoding, handleMapTap, confirmMapTap, dismissMapTap,

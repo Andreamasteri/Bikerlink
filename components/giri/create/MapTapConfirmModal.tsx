@@ -8,6 +8,7 @@ import { useColors } from "@/hooks/useColors";
 
 interface MapTapConfirmModalProps {
   visible: boolean;
+  isRoundTrip: boolean;
   address: string;
   geocoding: boolean;
   onSetStart: () => void;
@@ -18,6 +19,7 @@ interface MapTapConfirmModalProps {
 
 export const MapTapConfirmModal: React.FC<MapTapConfirmModalProps> = ({
   visible,
+  isRoundTrip,
   address,
   geocoding,
   onSetStart,
@@ -65,10 +67,12 @@ export const MapTapConfirmModal: React.FC<MapTapConfirmModalProps> = ({
             <Text style={[s.actionLabel, { color: colors.accent }]}>Aggiungi tappa</Text>
           </Pressable>
 
-          <Pressable style={[s.actionBtn, { borderColor: colors.accentRed }]} onPress={onSetEnd}>
-            <Ionicons name="checkmark-circle-outline" size={20} color={colors.accentRed} />
-            <Text style={[s.actionLabel, { color: colors.accentRed }]}>Imposta come Arrivo</Text>
-          </Pressable>
+          {!isRoundTrip && (
+            <Pressable style={[s.actionBtn, { borderColor: colors.accentRed }]} onPress={onSetEnd}>
+              <Ionicons name="checkmark-circle-outline" size={20} color={colors.accentRed} />
+              <Text style={[s.actionLabel, { color: colors.accentRed }]}>Imposta come Arrivo</Text>
+            </Pressable>
+          )}
         </View>
 
         <Pressable style={s.cancelBtn} onPress={onDismiss}>

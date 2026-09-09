@@ -45,7 +45,7 @@ export const useAutoRecalculate = ({
   useEffect(() => {
     if (mode !== "manual") return;
     const resolved = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-    if (resolved.length < 2) return;
+    if (resolved.length < (isRoundTrip ? 1 : 2)) return;
     if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current);
     autoCalcTimeout.current = setTimeout(async () => {
       const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;

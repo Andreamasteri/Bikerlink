@@ -20,6 +20,7 @@ import {
   normalizeDrivingProfile,
 } from "../../routing/route-weights";
 import type { TelemetryCoverage } from "../../routing/route-weights";
+import { scoreRoundTripCandidate } from "../../routing/route-quality-score";
 import { calculateSegmentedRoute } from "../../routing/segment-route-planner";
 import {
   fetchWeatherForWaypoints,
@@ -122,9 +123,21 @@ export async function handleCalculateRoute(req: Request, res: Response) {
     roundTripDirection,
   );
   const effectiveWaypoints = nativeRoundTrip ? [nativeRoundTrip.point] : waypoints;
+  const isAnchoredRoundTrip = Boolean(
+    isRoundTrip
+    && !nativeRoundTrip
+    && effectiveWaypoints.length >= 3
+    && sameWaypoint(effectiveWaypoints[0], effectiveWaypoints[effectiveWaypoints.length - 1]),
+  );
+  // Un anello con ancore è composto da tratte esplicite anche quando il client
+  // non personalizza ancora ogni intento. Questo rende possibile il controllo
+  // qualità anti-ripetizione senza alterare l'anello nativo start→start.
+  const effectiveSegmentIntents = segmentIntents ?? (isAnchoredRoundTrip
+    ? Array.from({ length: effectiveWaypoints.length - 1 }, () => ({ kind: "inherit" as const }))
+    : undefined);
 
-  // Gli intenti descrivono tratti espliciti. Un anello nativo non ha ancora
-  // sezioni semanticamente selezionabili: arriveranno con le ancore Fase 4.
+  // Gli intenti descrivono tratti espliciti. L'anello nativo start→start non
+  // ha sezioni da personalizzare; un anello con ancore invece è segmentato.
   if (segmentIntents && (nativeRoundTrip || segmentIntents.length !== effectiveWaypoints.length - 1)) {
     return sendError(res, 400, "Gli intenti di sezione non sono compatibili con questo giro ad anello");
   }
@@ -134,10 +147,10 @@ export async function handleCalculateRoute(req: Request, res: Response) {
 
   try {
     const geocodingOk = clientGeocodingOk ?? true;
-    if (segmentIntents) {
+    if (effectiveSegmentIntents) {
       const segmented = await calculateSegmentedRoute({
         waypoints: effectiveWaypoints,
-        segmentIntents,
+        segmentIntents: effectiveSegmentIntents,
         globalIntent: {
           style: normStyle,
           drivingProfile: normProfile,
@@ -151,6 +164,7 @@ export async function handleCalculateRoute(req: Request, res: Response) {
         userId,
         response: res,
         geocodingOk,
+        isRoundTrip: isAnchoredRoundTrip,
       });
       const path = segmented.path;
       return res.json({
@@ -164,6 +178,7 @@ export async function handleCalculateRoute(req: Request, res: Response) {
         weatherWarning: segmented.weatherWarning,
         telemetryCoverage: segmented.telemetryCoverage,
         segmentResults: segmented.segments,
+        loopQuality: segmented.loopQuality,
       });
     }
 
@@ -209,10 +224,11 @@ export async function handleCalculateRoute(req: Request, res: Response) {
     const runRoute = (
       priorityRules: Array<{ if: string; multiply_by: number }>,
       areas?: Record<string, unknown>,
+      routeBody: Record<string, unknown> = body,
     ) => {
       // Richiediamo i details osm_way_id per poter valutare la copertura
       // telemetrica sui segmenti effettivi del percorso.
-      const reqBody: Record<string, unknown> = { ...body, details: ["osm_way_id"] };
+      const reqBody: Record<string, unknown> = { ...routeBody, details: ["osm_way_id", "road_class"] };
       const customModel: Record<string, unknown> = {};
       if (priorityRules.length > 0) customModel.priority = priorityRules;
       if (geo.distanceInfluence !== undefined) customModel.distance_influence = geo.distanceInfluence;
@@ -223,7 +239,36 @@ export async function handleCalculateRoute(req: Request, res: Response) {
 
     // Percorso geometrico di base: è il risultato per il profilo "geometric" e
     // la base su cui valutare la copertura telemetrica del percorso richiesto.
-    const baseResult = await runRoute(basePriority);
+    const candidateCount = nativeRoundTrip && (normStyle === "balanced" || normStyle === "curvy" || normStyle === "extra_curvy")
+      ? 3
+      : 1;
+    const baseResult = candidateCount === 1
+      ? await runRoute(basePriority)
+      : await (async () => {
+        const baseSeed = nativeRoundTrip?.seed ?? 1;
+        const roundTrip = body.roundTrip as { distance: number; seed: number };
+        const settled = await Promise.allSettled(
+          Array.from({ length: candidateCount }, (_, index) => {
+            const seed = (baseSeed + index * 7919) >>> 0 || 1;
+            return runRoute(basePriority, undefined, {
+              ...body,
+              roundTrip: { ...roundTrip, seed },
+            });
+          }),
+        );
+        const candidates = settled
+          .filter((outcome): outcome is PromiseFulfilledResult<Awaited<ReturnType<typeof runRoute>>> => outcome.status === "fulfilled")
+          .map((outcome) => ({
+            result: outcome.value,
+            score: scoreRoundTripCandidate(outcome.value, nativeRoundTrip!.distance, normStyle).score,
+          }));
+        if (candidates.length === 0) {
+          const rejected = settled.find((outcome): outcome is PromiseRejectedResult => outcome.status === "rejected");
+          throw rejected?.reason ?? new Error("Nessun candidato per il giro ad anello");
+        }
+        candidates.sort((left, right) => right.score - left.score);
+        return candidates[0].result;
+      })();
     let path = baseResult.paths[0];
     // Insieme di regole di priorità effettivamente applicate al percorso finale
     // (base + eventuale strato telemetrico). Serve come base per l'eventuale
