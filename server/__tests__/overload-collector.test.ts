@@ -140,17 +140,20 @@ describe("overload sustained tracking (Task #72)", () => {
     expect(collectOverload().find((s) => s.metric === "db.overload_sustained")).toBeUndefined();
   });
 
-  it("un errore DB reale (non derivato) durante la ripresa mantiene l'overload", async () => {
+  it("un errore DB reale resta diagnostico ma non mantiene l'overload senza pressione", async () => {
     getPoolStatsMock.mockReturnValue({ total: 2, idle: 2, waiting: 0, max: 10, activePct: 0 });
     // reset
     await recordDbMonitorSample({ problems: [], metrics: {} });
-    // un problema DB reale conta ancora come errore → dbOverload true
+    // Un problema DB reale resta visibile in dbErrorCount, ma da Task #545
+    // l'overload è guidato solo da pressione diretta di pool/ping: altrimenti
+    // un errore isolato può auto-latchare lo stato DEGRADED.
     const realDbError = {
       problems: [{ id: "db.db.circuit_breaker", source: "db", severity: "critical" }],
       metrics: {},
     };
     await recordDbMonitorSample(realDbError);
-    expect(getSustainedOverloadState().db.consecutiveTicks).toBe(1);
+    expect(getSustainedOverloadState().db.dbErrorCount).toBe(1);
+    expect(getSustainedOverloadState().db.consecutiveTicks).toBe(0);
   });
 
   it("3 tick di sovraccarico backend → segnale high backend.overload_sustained, indipendente dal DB", async () => {
