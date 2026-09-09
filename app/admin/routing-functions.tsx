@@ -33,8 +33,6 @@ import type {
 const ENGINE_LABELS: Record<string, string> = {
   graphhopper: "GraphHopper",
   valhalla: "Valhalla",
-  tomtom: "TomTom",
-  "mapbox-directions": "Mapbox",
 };
 
 const FUNCTION_ICONS: Record<RoutingFunctionId, string> = {

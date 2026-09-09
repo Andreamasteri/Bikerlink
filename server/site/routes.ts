@@ -268,7 +268,11 @@ export function registerSiteRoutes(app: Express) {
   }
 
   app.get("/blog/:slug", (req: Request, res: Response, next) => {
-    const post = findBlogPost(req.params.slug);
+    // Express 5 tipizza i parametri come string | string[]. Questa route
+    // accetta un solo slug: un array non è un blog post valido e non va
+    // passato al resolver (che richiede una stringa).
+    const slug = typeof req.params.slug === "string" ? req.params.slug : null;
+    const post = slug ? findBlogPost(slug) : null;
     if (!post) return next();
     try {
       const baseUrl = getBaseUrl(req);

@@ -7,7 +7,7 @@
  *
  * Questo test verifica lo scheduler daily-time-profile (il più semplice dei 6
  * loop toccati — map-matching-job, curvy-score-job, vacuum-service,
- * time-profile, mapbox/tomtom quota-guard condividono lo stesso pattern
+ * time-profile e i job di manutenzione condividono lo stesso pattern
  * "gatedRun() dentro fireAndReschedule(), reschedule fuori dal gate"): con il
  * gate che nega SEMPRE, il loop deve comunque pianificare il tick successivo.
  */

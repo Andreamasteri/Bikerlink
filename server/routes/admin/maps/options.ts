@@ -22,8 +22,6 @@ export const AVAILABLE_TILES: OptionEntry<MapsTileId>[] = [
 export const AVAILABLE_ENGINES: OptionEntry<RoutingEngineId>[] = [
   { id: "graphhopper", label: "GraphHopper", implemented: true },
   { id: "valhalla", label: "Valhalla", implemented: true },
-  { id: "mapbox-directions", label: "Mapbox Directions", implemented: false },
-  { id: "tomtom", label: "TomTom Routing", implemented: true },
   { id: "ai", label: "AI (auto-selezione)", implemented: true },
 ];
 

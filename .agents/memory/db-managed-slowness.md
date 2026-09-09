@@ -65,7 +65,7 @@ erano effetti a valle dell'outage, non problemi del nostro DB/pool.
   self-hosted (graphhopper, valhalla).
 - NON sopprimere mai per prefisso `maps.health.*` né `routing.engine_down.*`: a
   ThinkCentre spento gli health-check self-hosted sono già saltati a monte, quindi un
-  `maps.health.*` residuo è cloud/CDN (mapbox/tomtom/tile) e va lasciato azionabile;
+  `maps.health.*` residuo riguarda CDN tile e va lasciato azionabile;
   idem per gli engine_down cloud.
 - ESCLUSI dalla soppressione (sempre attivi): `db.circuit_breaker` e `db.ping_ms` —
   segnalano problemi reali del nostro lato anche durante un outage downstream.

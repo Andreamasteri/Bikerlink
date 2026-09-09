@@ -113,7 +113,7 @@ export const mapsTelemetryEvents = pgTable("maps_telemetry_events", {
   // Componente origine: InteractiveMap | LeafletRouteMap | MapLibreRouteMap |
   //                      OpenLayersRouteMap | useGpsTracking | ...
   component: varchar("component", { length: 60 }),
-  // Routing engine se evento routing_failed: graphhopper | valhalla | mapbox | tomtom
+  // Routing engine se evento routing_failed: graphhopper | valhalla
   engine: varchar("engine", { length: 30 }),
   durationMs: integer("duration_ms"),
   errorMessage: varchar("error_message", { length: 500 }),

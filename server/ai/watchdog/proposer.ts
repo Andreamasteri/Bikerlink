@@ -25,7 +25,6 @@ REGOLE:
 
 PROBLEMI MAPPE (source="maps"):
 - Per "routing.engine_down.*" o "health.engine.*": proporre switch a engine fallback (GraphHopper) via "manual_only", citando engine specifico.
-- Per "quota.mapbox" o "quota.tomtom" >= 80%: proporre rollout temporaneo verso GraphHopper self-hosted.
 - Per "client.webview_crash_5min" alto: proporre disable rendering avanzato (es. forzare LeafletRouteMap base) come hotfix.
 - Per "client.tile_load_error_5min" alto: proporre switch provider tile fallback.
 - Per "client.gps_lost_5min" alto: proporre verifica permission flow / suggerire push educational agli utenti.

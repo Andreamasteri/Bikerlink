@@ -1,7 +1,7 @@
 // Task #2686 — Counter in-process per il router selector. Conta successi,
 // fallback e fallimenti per engine; tracking di "engine down" basato su una
 // finestra di tentativi consecutivi falliti. Consumato dal maps-collector.
-type Engine = "graphhopper" | "valhalla" | "mapbox" | "tomtom";
+type Engine = "graphhopper" | "valhalla";
 
 // `bboxKey` lega il campione a una cella geografica (~0.5°) e `score` allo score
 // qualità calcolato nel dual-compare: insieme alimentano lo storico qualità

@@ -6,7 +6,7 @@ Lo stack scarica i dati OpenStreetMap per ciascun gruppo di nazioni, costruisce 
 per area e genera un `.env.local` precompilato con tutti gli URL locali.
 
 > **Cosa NON è incluso (resta cloud):** servizi AI (Anthropic, OpenAI, Gemini),
-> Mapbox tiles, TomTom, Last.fm, Expo Push. Non sono self-hostabili senza GPU/licenze
+> Last.fm, Expo Push. Non sono self-hostabili senza GPU/licenze
 > dedicate. Le relative variabili restano `<INSERIRE>` nel template.
 
 ---
@@ -264,8 +264,8 @@ il path dell'area (es. `https://gh.bikerlink.app/areas/arco-alpino`).
 Per il deploy cloud su Replit imposta `GRAPHHOPPER_URL` nei Secrets di Replit
 con l'URL pubblico del tunnel (Cloudflare Tunnel o Nginx+TLS — vedi `expose/`).
 
-Le variabili cloud (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MAPBOX_ACCESS_TOKEN`,
-`TOMTOM_API_KEY`, `LASTFM_API_KEY`, ...) restano `<INSERIRE>`: vanno compilate a mano.
+Le variabili cloud (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `LASTFM_API_KEY`, ...)
+restano `<INSERIRE>`: vanno compilate a mano.
 
 ---
 

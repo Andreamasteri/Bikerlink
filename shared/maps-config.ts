@@ -1,7 +1,7 @@
 export type MapsRollout = "disabled" | "tester" | "all";
 export type MapsRendererId = "leaflet" | "maplibre" | "openlayers" | "maplibre-full-3d";
 export type MapsTileId = "carto-light" | "carto-dark" | "osm-standard";
-export type RoutingEngineId = "graphhopper" | "valhalla" | "mapbox-directions" | "tomtom" | "ai";
+export type RoutingEngineId = "graphhopper" | "valhalla" | "ai";
 export type RoutingProfileId = "motorcycle" | "car";
 
 export interface MapsOption<T extends string> {
@@ -74,19 +74,6 @@ export const ROUTING_OPTIONS: MapsOption<RoutingEngineId>[] = [
     implemented: true,
   },
   {
-    id: "mapbox-directions",
-    label: "Mapbox Directions",
-    description: "Archiviato — duplicato di TomTom come fallback cloud. Ignorato anche se impostato nel DB.",
-    implemented: false,
-    archived: true,
-  },
-  {
-    id: "tomtom",
-    label: "TomTom Routing",
-    description: "Cloud — profilo motorcycle nativo + traffic real-time EU. 2.500 req/giorno gratuiti.",
-    implemented: true,
-  },
-  {
     id: "ai",
     label: "AI (auto-selezione)",
     description: "Un modello AI sceglie l'engine self-hosted ottimale per ogni richiesta (Task #164: default versionato per la funzione routing). Fallback deterministico → Valhalla se l'AI non risponde.",
@@ -111,7 +98,7 @@ export const ROUTING_PROFILE_OPTIONS: MapsOption<RoutingProfileId>[] = [
 
 /**
  * Engine ignorati nella catena di fallback del router anche se impostati nel DB.
- * Derivato da ROUTING_OPTIONS.archived — include mapbox-directions e ai.
+ * Derivato da ROUTING_OPTIONS.archived.
  */
 export const ARCHIVED_ROUTING_ENGINES = new Set<RoutingEngineId>(
   ROUTING_OPTIONS.filter((o) => o.archived).map((o) => o.id),

@@ -10,8 +10,7 @@
  *     come success deve essere quello che ha realmente prodotto la route.
  *
  * Mock: valhalla-client, graphhopper-adapter, ai-engine-decider, routing-kill-switch,
- *       routing-area-mode, routing-area-resolver, mapbox-directions-client,
- *       tomtom-routing-client, quota-guard (mapbox + tomtom), geo, route-quality-score.
+ *       routing-area-mode, routing-area-resolver, geo, route-quality-score.
  * Reali: routing-metrics (ring buffer in-memory), ai-decision-log (ring buffer in-memory).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -28,10 +27,6 @@ const mocks = vi.hoisted(() => ({
   resolveRoutingArea: vi.fn(),
   scoreRoute: vi.fn(),
   haversineKm: vi.fn().mockReturnValue(50),
-  mapboxCalculateRoute: vi.fn(),
-  tomtomCalculateRoute: vi.fn(),
-  checkMapboxQuota: vi.fn().mockResolvedValue({ ok: true }),
-  checkTomTomQuota: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -70,21 +65,6 @@ vi.mock("../geo", () => ({
   haversineKm: mocks.haversineKm,
 }));
 
-vi.mock("../routing/mapbox-directions-client", () => ({
-  calculateRoute: mocks.mapboxCalculateRoute,
-}));
-
-vi.mock("../routing/tomtom-routing-client", () => ({
-  calculateRoute: mocks.tomtomCalculateRoute,
-}));
-
-vi.mock("../routing/mapbox/quota-guard", () => ({
-  checkQuota: mocks.checkMapboxQuota,
-}));
-
-vi.mock("../routing/tomtom/quota-guard", () => ({
-  checkQuota: mocks.checkTomTomQuota,
-}));
 
 // ---------------------------------------------------------------------------
 // Imports (dopo i mock)
@@ -161,8 +141,6 @@ beforeEach(() => {
   mocks.isRoutingEnabled.mockResolvedValue(true);
   mocks.isAreaRoutingActive.mockResolvedValue(false);
   mocks.haversineKm.mockReturnValue(50);
-  mocks.checkMapboxQuota.mockResolvedValue({ ok: true });
-  mocks.checkTomTomQuota.mockResolvedValue({ ok: true });
 });
 
 // ---------------------------------------------------------------------------

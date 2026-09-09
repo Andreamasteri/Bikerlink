@@ -15,7 +15,7 @@
 // snapshot in memoria: getBackendLoad() è una lettura sincrona istantanea usata
 // sia dallo scrittore della history sia dalla route del monitor per i banner.
 
-import { monitorEventLoopDelay, type IntervalHistogram } from "node:perf_hooks";
+import { monitorEventLoopDelay } from "node:perf_hooks";
 import os from "node:os";
 import { getOverloadThresholds } from "./overload-thresholds";
 
@@ -42,7 +42,9 @@ export interface BackendLoad {
   at: number;
 }
 
-let histogram: IntervalHistogram | null = null;
+// Derivato dall'API anziché da un tipo esportato: i nomi delle interfacce
+// perf_hooks sono cambiati tra le versioni di @types/node, l'oggetto runtime no.
+let histogram: ReturnType<typeof monitorEventLoopDelay> | null = null;
 let lastCpu: NodeJS.CpuUsage | null = null;
 let lastCpuAt = 0;
 let timer: ReturnType<typeof setInterval> | null = null;

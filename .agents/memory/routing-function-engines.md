@@ -5,7 +5,7 @@ description: Come è persistita e risolta la scelta engine-per-funzione di routi
 
 # Config engine per-funzione di routing
 
-La scelta di quale engine (graphhopper/valhalla/tomtom/mapbox-directions) serve
+La scelta di quale engine (graphhopper/valhalla) serve
 ogni funzione di routing (`routing`, `map_matching`, `isochrone`, `matrix`) vive
 nella AppSetting `routing_function_engines` (valueJson). Registro condiviso delle
 funzioni + engine ammessi: `shared/routing-functions.ts`. Lettura/scrittura:

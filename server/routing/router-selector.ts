@@ -4,9 +4,6 @@ import { ARCHIVED_ROUTING_ENGINES } from "@shared/maps-config";
 import { routeViaGraphHopper, type RouteRequest, type RouteResult } from "./graphhopper-adapter";
 export type { RouteRequest, RouteResult } from "./graphhopper-adapter";
 import { calculateRoute as valhallaCalculateRoute } from "./valhalla-client";
-import { calculateRoute as mapboxCalculateRoute } from "./mapbox-directions-client";
-import { calculateRoute as tomtomCalculateRoute } from "./tomtom-routing-client";
-import { checkQuota as checkTomTomQuota } from "./tomtom/quota-guard";
 import { recordRoutingFallback, recordRoutingFailure, recordRoutingSuccess } from "./routing-metrics";
 import { isRoutingEnabled } from "./routing-kill-switch";
 import { isThinkCentreOffline } from "../lib/thinkcentre-offline";
@@ -21,19 +18,6 @@ export class RoutingDisabledError extends Error {
   constructor() {
     super("Routing disabilitato dal kill-switch.");
     this.name = "RoutingDisabledError";
-  }
-}
-
-/**
- * Errore specifico per il profilo Auto Panoramica (auto_curvy) quando il
- * ThinkCentre è dichiarato offline. Restituito immediatamente senza attendere
- * il timeout di Valhalla — il profilo richiede il server locale ed è impossibile
- * degradarlo su cloud (GraphHopper Cloud non è panoramico).
- */
-export class AutoCurvyOfflineError extends Error {
-  constructor() {
-    super("Profilo non disponibile — servizio locale offline");
-    this.name = "AutoCurvyOfflineError";
   }
 }
 
@@ -91,7 +75,7 @@ export interface RouterSelectorOptions {
   aiContext?: AiRoutingContext;
 }
 
-type MetricsEngine = "graphhopper" | "valhalla" | "mapbox" | "tomtom";
+type MetricsEngine = "graphhopper" | "valhalla";
 
 /**
  * Esegue `fn` registrando metriche di esito + latenza. Se la richiesta è stata
@@ -177,60 +161,6 @@ export async function routeViaValhallaWithFallback(
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
     recordRoutingFallback("valhalla", "graphhopper");
-    return graphHopperRoute(req, isMapTester);
-  }
-}
-
-/**
- * Determina se l'errore TomTom giustifica il fallback a GraphHopper.
- * Fallback su: qualsiasi errore HTTP (4xx + 5xx), timeout, errori di rete,
- * chiave non configurata.
- */
-function isTransientTomTomError(err: unknown): boolean {
-  const name = err instanceof Error ? err.name : "";
-  const msg = err instanceof Error ? err.message : String(err);
-  if (name === "AbortError") return true;
-  if (err instanceof TypeError) return true;
-  if (msg.includes("TOMTOM_API_KEY non configurato")) return true;
-  if (/TomTom Routing error \d{3}/.test(msg)) return true;
-  if (msg.startsWith("TomTom: ")) return true;
-  return false;
-}
-
-/**
- * Tenta il routing via TomTom con fallback automatico a GraphHopper.
- * Verifica la quota PRIMA di chiamare TomTom: se esaurita, fallback preventivo.
- */
-async function routeViaTomTomWithFallback(
-  req: RouteRequest,
-  isMapTester: boolean,
-  res?: Response
-): Promise<RouteResult> {
-  const quota = await checkTomTomQuota();
-  if (!quota.ok) {
-    const msg = `TomTom quota esaurita (${quota.used}/${quota.limit}) — fallback preventivo a GraphHopper`;
-    console.warn(`[RouterSelector] ${msg}`);
-    if (res && !res.headersSent) {
-      res.setHeader("X-Routing-Fallback", "graphhopper");
-    }
-    // Fallback runtime a tutti gli effetti (engine non utilizzabile per quota):
-    // registrato in metrics come i rami errore, per coerenza con l'header.
-    recordRoutingFallback("tomtom", "graphhopper");
-    return graphHopperRoute(req, isMapTester);
-  }
-
-  try {
-    return await tomtomCalculateRoute(req);
-  } catch (err: unknown) {
-    if (!isTransientTomTomError(err)) {
-      throw err;
-    }
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[RouterSelector] TomTom fallito (${msg}) — fallback a GraphHopper`);
-    if (res && !res.headersSent) {
-      res.setHeader("X-Routing-Fallback", "graphhopper");
-    }
-    recordRoutingFallback("tomtom", "graphhopper");
     return graphHopperRoute(req, isMapTester);
   }
 }
@@ -333,38 +263,10 @@ async function getActiveRouterInner(
   }
 
   // ThinkCentre offline (spento O in manutenzione): tutti i servizi self-hosted
-  // (GH, Valhalla) sono offline. Il profilo auto_curvy richiede Valhalla locale
-  // e NON può essere degradato su cloud (GH Cloud produce solo percorso diretto,
-  // non panoramico): restituiamo subito un errore chiaro senza attendere il
-  // timeout del server locale. Gli altri profili vanno sulla catena cloud
-  // Mapbox → TomTom.
+  // sono offline. Non esistono fallback cloud: i percorsi moto BikerLink devono
+  // mantenere il proprio modello di qualità, non degradare a routing generico.
   if (await isThinkCentreOffline()) {
-    if (req.profile === "auto_curvy") {
-      throw new AutoCurvyOfflineError();
-    }
-    console.log("[RouterSelector] ThinkCentre spento — routing su cloud");
-    // Catena cloud resiliente: Mapbox → TomTom, con fallback su errore runtime.
-    let mapboxAttempted = false;
-    if (process.env.MAPBOX_ACCESS_TOKEN) {
-      try {
-        if (res && !res.headersSent) res.setHeader("X-Routing-Fallback", "mapbox");
-        recordRoutingFallback("graphhopper", "mapbox");
-        mapboxAttempted = true;
-        return await wrapMetrics("mapbox", () => mapboxCalculateRoute(req), res);
-      } catch (mapboxErr) {
-        const msg = mapboxErr instanceof Error ? mapboxErr.message : String(mapboxErr);
-        console.warn(`[RouterSelector] Mapbox fallito (${msg}) — provo TomTom`);
-      }
-    }
-    if (process.env.TOMTOM_API_KEY) {
-      if (res && !res.headersSent) res.setHeader("X-Routing-Fallback", "tomtom");
-      // Il secondo salto della catena parte dall'engine che ha DAVVERO fallito:
-      // mapbox se è stato tentato (il suo failure è già registrato da wrapMetrics),
-      // altrimenti graphhopper (mapbox non configurato, salto diretto).
-      recordRoutingFallback(mapboxAttempted ? "mapbox" : "graphhopper", "tomtom");
-      return wrapMetrics("tomtom", () => tomtomCalculateRoute(req), res);
-    }
-    throw new Error("ThinkCentre spento — nessun engine cloud configurato come fallback");
+    throw new Error("ThinkCentre spento — routing BikerLink non disponibile");
   }
 
   // Profilo "auto panoramica" (auto_curvy): instradato SEMPRE a Valhalla con
@@ -379,7 +281,7 @@ async function getActiveRouterInner(
     return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
   }
 
-  // Engine archiviati (es. mapbox-directions, ai): ignorati completamente anche se
+  // Engine archiviati (es. ai): ignorati completamente anche se
   // impostati nel DB — fallback silenzioso a GraphHopper. Questo guard è PRIMA
   // della modalità AI: quando il DB contiene "ai" e aiMode=true, opts.engine è il
   // safe-default (graphhopper) — non "ai" — quindi controlliamo esplicitamente anche
@@ -407,7 +309,6 @@ async function getActiveRouterInner(
   }
 
   if (opts.engine === "valhalla") return wrapMetrics("valhalla", () => routeViaValhallaWithFallback(req, opts.isMapTester, res), res);
-  if (opts.engine === "tomtom") return wrapMetrics("tomtom", () => routeViaTomTomWithFallback(req, opts.isMapTester, res), res);
   return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
 }
 

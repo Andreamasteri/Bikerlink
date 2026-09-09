@@ -463,40 +463,6 @@ async function checkR2() {
   }
 }
 
-async function checkTomTom() {
-  const key = process.env.TOMTOM_API_KEY;
-  if (!key) {
-    record("TomTom", "TOMTOM_API_KEY", "mandatory", false, false,
-      "Non configurata — map matching / snap-to-roads non disponibile (lancia errore)");
-    return;
-  }
-  const r = await fetchCheck(
-    `https://api.tomtom.com/routing/1/calculateRoute/52.50931,13.42936:52.50274,13.43872/json?key=${key}&routeType=fastest&travelMode=car&maxAlternatives=0`,
-  );
-  record("TomTom", "TOMTOM_API_KEY", "mandatory", true, r.ok,
-    r.ok ? "HTTP 200 — routing API OK" : `HTTP ${r.status}: ${r.body.slice(0, 80)}`);
-}
-
-async function checkMapbox() {
-  const token = process.env.MAPBOX_ACCESS_TOKEN;
-  if (!token) {
-    record("Mapbox", "MAPBOX_ACCESS_TOKEN", "mandatory", false, false,
-      "Non configurata — fallback routing emergenza non disponibile (lancia errore)");
-    return;
-  }
-  const isValidFormat = token.startsWith("pk.") || token.startsWith("sk.");
-  if (!isValidFormat) {
-    record("Mapbox", "MAPBOX_ACCESS_TOKEN", "mandatory", true, false,
-      `Formato non valido — deve iniziare con pk. o sk. (trovato: ${token.slice(0, 8)}...)`);
-    return;
-  }
-  const r = await fetchCheck(
-    `https://api.mapbox.com/directions/v5/mapbox/driving/13.3888%2C52.5166%3B13.4094%2C52.5244?geometries=geojson&access_token=${token}`,
-  );
-  record("Mapbox", "MAPBOX_ACCESS_TOKEN", "mandatory", true, r.ok,
-    r.ok ? "HTTP 200 — directions OK" : `HTTP ${r.status}: ${r.body.slice(0, 80)}`);
-}
-
 // ── Tile / Mappe ──────────────────────────────────────────────────────────────
 
 async function checkTileProviders() {
@@ -714,8 +680,6 @@ async function main() {
     checkGemini(),
     checkOllama(),
     checkGraphHopper(),
-    checkTomTom(),
-    checkMapbox(),
     checkCloudflare(),
     checkR2(),
     checkPhoton(),
