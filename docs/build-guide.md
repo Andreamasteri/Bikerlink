@@ -51,7 +51,7 @@ cat app.json | python3 -c "import json,sys; d=json.load(sys.stdin)['expo']; prin
 
 | Profilo | Tipo | Canale | Scopo |
 |---------|------|--------|-------|
-| `preview` | APK interno | `staging` | Test rapidi, NON tocca production |
+| `preview` | APK interno | `staging` | Test rapidi contro `bikerlink-staging-staging.up.railway.app`, NON tocca production |
 | `release-apk` | APK interno | `production` | Test OTA su canale production |
 | `production` | AAB + iOS | `production` | Store (Google Play + App Store) |
 
@@ -59,7 +59,7 @@ cat app.json | python3 -c "import json,sys; d=json.load(sys.stdin)['expo']; prin
 
 ## 3. Prima build Android — APK test rapido (profilo preview)
 
-Usa questo profilo per testare l'app senza impattare il canale production OTA.
+Usa questo profilo per testare l'app senza impattare il canale production OTA. L'APK viene compilato con API fissata su `bikerlink-staging-staging.up.railway.app`: non può ricadere sul dominio di produzione.
 
 ```bash
 GIT_INDEX_FILE=/tmp/eas-build-index bash scripts/eas.sh build --platform android --profile preview --non-interactive
