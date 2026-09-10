@@ -10,13 +10,15 @@
 #         touch .local/apk-build-authorized
 #    3. Eseguire questo script:
 #         bash scripts/build-apk.sh                # default = release-apk (APK arm64 dimagrita ~50MB)
+#         bash scripts/build-apk.sh preview        # APK test contro Railway staging
 #         bash scripts/build-apk.sh release-apk    # equivalente esplicito
 #         bash scripts/build-apk.sh production     # AAB Play Store (NON APK)
 #
 #  Il file .local/apk-build-authorized viene eliminato automaticamente dopo
 #  l'uso — ogni build richiede una nuova autorizzazione esplicita.
 #
-#  ⚠️  Profilo "preview" RIMOSSO (Task #1017) — produceva APK universali ~135MB.
+#  Il profilo "preview" è riservato ai test contro Railway staging: non punta
+#  mai al dominio di produzione.
 #  ⚠️  NON usare il binario eas direttamente — usa SEMPRE questo script.
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -27,6 +29,24 @@ LOG_FILE="logs/apk-build-history.log"
 # Task #1017: default permanente = release-apk (arm64-v8a only + NewArch + ProGuard/R8)
 # APK dimagrita (~50MB invece di 135MB). Per AAB Play Store usa esplicitamente "production".
 PROFILE="${1:-release-apk}"
+STAGING_DOMAIN="bikerlink-staging-staging.up.railway.app"
+
+if [[ "$PROFILE" != "production" && "$PROFILE" != "release-apk" && "$PROFILE" != "preview" ]]; then
+  echo "  ✖  Profilo non valido: '$PROFILE'"
+  echo "  Usa: bash scripts/build-apk.sh [preview|release-apk|production]"
+  exit 1
+fi
+
+# Il profilo preview è un artefatto di test isolato: non permettiamo che una
+# variabile della shell lo faccia puntare per sbaglio alla produzione.
+if [[ "$PROFILE" == "preview" ]]; then
+  if [[ -n "${EXPO_PUBLIC_DOMAIN:-}" && "$EXPO_PUBLIC_DOMAIN" != "$STAGING_DOMAIN" ]]; then
+    echo "  ✖  EXPO_PUBLIC_DOMAIN incompatibile con il profilo preview: '$EXPO_PUBLIC_DOMAIN'"
+    echo "     Il profilo preview può usare solo: $STAGING_DOMAIN"
+    exit 1
+  fi
+  export EXPO_PUBLIC_DOMAIN="$STAGING_DOMAIN"
+fi
 
 # ── Banner ──────────────────────────────────────────────────────────────────
 echo ""
@@ -45,7 +65,7 @@ if [ ! -f "$AUTH_FILE" ]; then
   echo "    1. Ottenere approvazione esplicita dall'utente"
   echo "    2. Creare il file di autorizzazione:"
   echo "         touch .local/apk-build-authorized"
-  echo "    3. Rieseguire: bash scripts/build-apk.sh [release-apk|production]"
+  echo "    3. Rieseguire: bash scripts/build-apk.sh [preview|release-apk|production]"
   echo ""
   echo "  Questo blocco esiste per prevenire build non autorizzate."
   echo ""
@@ -159,28 +179,7 @@ else
   fi
 fi
 
-# ── 3. Validazione profilo ──────────────────────────────────────────────────
-# Task #1017: profili ammessi sono solo "release-apk" (default APK dimagrita) e
-# "production" (AAB Play Store). Il vecchio "preview" è stato rimosso per evitare
-# regressioni accidentali a APK universali (4 ABI = ~135MB invece di ~50MB).
-if [[ "$PROFILE" == "preview" ]]; then
-  echo "  ✖  Profilo 'preview' RIMOSSO (Task #1017)"
-  echo ""
-  echo "  Il profilo 'preview' produceva APK universali (4 ABI, ~135MB)."
-  echo "  Da ora il default è 'release-apk' (arm64-v8a only + NewArch, ~50MB)."
-  echo ""
-  echo "  Usa: bash scripts/build-apk.sh             # default = release-apk (APK dimagrita)"
-  echo "  Usa: bash scripts/build-apk.sh release-apk # esplicito"
-  echo "  Usa: bash scripts/build-apk.sh production  # AAB Play Store"
-  exit 1
-fi
-if [[ "$PROFILE" != "production" && "$PROFILE" != "release-apk" ]]; then
-  echo "  ✖  Profilo non valido: '$PROFILE'"
-  echo "  Usa: bash scripts/build-apk.sh [release-apk|production]"
-  exit 1
-fi
-
-# ── 3a. Assertion config-based — Task #1017 ─────────────────────────────────
+# ── 3. Assertion config-based — Task #1017 ─────────────────────────────────
 # Verifica che la config Android non sia stata accidentalmente regredita a
 # multi-ABI (4 ABI universale = APK ~135MB invece di ~50MB).
 # Questo controllo è indipendente dal nome del profilo: se qualcuno modifica
