@@ -4,6 +4,11 @@ const path = require("path");
 const http = require("http");
 
 const config = getDefaultConfig(__dirname);
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\const config = getDefaultConfig(__dirname);
+");
+const projectTmpDirPattern = new RegExp(
+  `${escapeRegex(path.join(__dirname, "tmp"))}/`,
+);
 
 const BACKEND_PORT = 5000;
 config.server = {
@@ -88,7 +93,9 @@ config.resolver.blockList = [
   /\/server_dist\//,
   /\/server\//,
   /\/scripts\//,
-  /\/tmp\//,
+  // EAS local builds use a temporary project root under /tmp. Block only the
+  // repository\'s own tmp directory, otherwise Metro excludes all dependencies.
+  projectTmpDirPattern,
   /\/migrations\//,
   /\/static-build\//,
   /\/attached_assets\//,
