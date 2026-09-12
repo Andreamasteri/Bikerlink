@@ -4,8 +4,7 @@ const path = require("path");
 const http = require("http");
 
 const config = getDefaultConfig(__dirname);
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\const config = getDefaultConfig(__dirname);
-");
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const projectTmpDirPattern = new RegExp(
   `${escapeRegex(path.join(__dirname, "tmp"))}/`,
 );
