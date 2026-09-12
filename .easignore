@@ -49,8 +49,10 @@ stress-test/
 # Server not needed for mobile build
 server/
 
-# Scripts directory (not needed for mobile build)
-scripts/
+# Scripts: escludi tutto salvo i due hook necessari al postinstall mobile
+scripts/*
+!scripts/patch-package-safe.cjs
+!scripts/patch-metro-image-size.cjs
 
 # Metro cache (bundler cache, not needed for EAS)
 .metro-cache/
