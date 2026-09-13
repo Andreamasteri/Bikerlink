@@ -116,7 +116,7 @@ else
   fail "expo-router/entry non risolvibile nelle dipendenze locali"
 fi
 
-if grep -Fxq '!scripts/postinstall-assets.js' .easignore && grep -Fxq '!scripts/patch-metro-image-size.cjs' .easignore; then
+if grep -Fxq '!scripts/patch-package-safe.cjs' .easignore && grep -Fxq '!scripts/patch-metro-image-size.cjs' .easignore; then
   ok ".easignore include gli script postinstall richiesti"
 else
   fail ".easignore non include tutti gli script postinstall richiesti"
@@ -141,11 +141,16 @@ else
   fail "EAS CLI locale non eseguibile"
 fi
 
-AVAILABLE_KB="$(df -Pk /tmp | awk 'NR==2 {print $4}')"
+BUILD_WORKDIR="${EAS_LOCAL_BUILD_WORKINGDIR:-/home/andrea/.cache/bikerlink-eas/work}"
+BUILD_VOLUME="$(dirname "$BUILD_WORKDIR")"
+while [ ! -d "$BUILD_VOLUME" ] && [ "$BUILD_VOLUME" != "/" ]; do
+  BUILD_VOLUME="$(dirname "$BUILD_VOLUME")"
+done
+AVAILABLE_KB="$(df -Pk "$BUILD_VOLUME" 2>/dev/null | awk 'END {print $4}')"
 if [ -n "$AVAILABLE_KB" ] && [ "$AVAILABLE_KB" -ge 26214400 ]; then
-  ok "spazio /tmp sufficiente: $((AVAILABLE_KB / 1024 / 1024)) GiB"
+  ok "spazio workspace build ($BUILD_VOLUME): $((AVAILABLE_KB / 1024 / 1024)) GiB"
 else
-  fail "spazio /tmp insufficiente (servono almeno 25 GiB)"
+  fail "spazio workspace build insufficiente in $BUILD_VOLUME (servono almeno 25 GiB)"
 fi
 
 if [ -n "${EXPO_TOKEN:-}" ]; then
