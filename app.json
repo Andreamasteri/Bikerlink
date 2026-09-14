@@ -133,6 +133,7 @@
           }
         }
       ],
+      "./plugins/with-gradle-jvm-memory",
       "expo-asset",
       "expo-secure-store",
       "expo-status-bar"
