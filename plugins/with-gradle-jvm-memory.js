@@ -1,6 +1,6 @@
 const { withGradleProperties } = require("@expo/config-plugins");
 
-const JVM_ARGS = "-Xmx2048m -XX:MaxMetaspaceSize=1024m";
+const JVM_ARGS = "-Xmx4096m -XX:MaxMetaspaceSize=1024m";
 
 module.exports = function withGradleJvmMemory(config) {
   return withGradleProperties(config, (config) => {
