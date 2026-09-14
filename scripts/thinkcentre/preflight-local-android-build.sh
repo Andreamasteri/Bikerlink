@@ -98,10 +98,17 @@ if [ -x "$JAVA_HOME/bin/java" ]; then
   esac
 fi
 
-if [ -f android/gradle.properties ] && grep -Fxq 'org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=1024m' android/gradle.properties; then
-  ok "Gradle Metaspace: 1024m"
+if node -e '
+const fs = require("fs");
+const config = require("./app.json").expo;
+if (!config.plugins.includes("./plugins/with-gradle-jvm-memory")) process.exit(1);
+const plugin = fs.readFileSync("plugins/with-gradle-jvm-memory.js", "utf8");
+if (!plugin.includes("org.gradle.jvmargs") || !plugin.includes("MaxMetaspaceSize=1024m")) process.exit(1);
+require("./plugins/with-gradle-jvm-memory");
+'; then
+  ok "Gradle Metaspace generata da config plugin: 1024m"
 else
-  fail "android/gradle.properties non contiene la correzione Metaspace prevista"
+  fail "config plugin Gradle Metaspace assente, incompleta o non caricabile"
 fi
 
 if node --check metro.config.js >/dev/null 2>&1 && node -e "require('./metro.config.js')" >/dev/null 2>&1; then
